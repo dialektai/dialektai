@@ -9,6 +9,9 @@ import OfflineScreen from './screens/OfflineScreen.jsx';
 import OnboardingPermsScreen from './screens/OnboardingPermsScreen.jsx';
 import OnboardingIndexScreen from './screens/OnboardingIndexScreen.jsx';
 import OnboardingFirstChatScreen from './screens/OnboardingFirstChatScreen.jsx';
+import ModeSetupScreen from './screens/ModeSetupScreen.jsx';
+
+const API = 'http://localhost:8765';
 
 export default function App() {
   const [screen, setScreen] = useState('main');
@@ -18,6 +21,14 @@ export default function App() {
     setScreen(s);
     setScreenProps(props);
   };
+
+  // First-launch mode detection: if settings has no 'mode' key, show setup
+  useEffect(() => {
+    fetch(`${API}/settings`)
+      .then(r => r.json())
+      .then(s => { if (!('mode' in s)) nav('mode-setup'); })
+      .catch(() => {}); // backend offline → stay on main
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e) => {
@@ -43,6 +54,7 @@ export default function App() {
       {screen === 'onboarding-step3'   && <OnboardingPermsScreen onNav={nav} />}
       {screen === 'onboarding-step4'   && <OnboardingIndexScreen onNav={nav} />}
       {screen === 'onboarding-step5'   && <OnboardingFirstChatScreen onNav={nav} />}
+      {screen === 'mode-setup'         && <ModeSetupScreen onNav={nav} />}
     </div>
   );
 }

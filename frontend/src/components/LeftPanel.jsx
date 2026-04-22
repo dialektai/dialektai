@@ -37,6 +37,12 @@ export default function LeftPanel({
   const [tooltipY, setTooltipY] = useState(0);
   const [modelOpen, setModelOpen] = useState(false);
   const [sysStats, setSysStats] = useState({ cpu: 0, ram: 0, gpu: null, disk: 0 });
+  const [mode, setMode] = useState('builder');
+  const [agents, setAgents] = useState([]);
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [agentsOpen, setAgentsOpen] = useState(true);
+  const [showNewAgent, setShowNewAgent] = useState(false);
+  const [newAgentName, setNewAgentName] = useState('');
   const asideRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -47,11 +53,31 @@ export default function LeftPanel({
     } catch {}
   }, []);
 
+  const loadMode = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/config/mode`);
+      const data = await r.json();
+      setMode(data.mode ?? 'builder');
+    } catch {}
+  }, []);
+
+  const loadAgents = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/agents`);
+      if (r.ok) setAgents(await r.json());
+    } catch {}
+  }, []);
+
   useEffect(() => {
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    loadMode();
+    loadAgents();
+  }, [loadMode, loadAgents]);
 
   // System stats polling
   useEffect(() => {
@@ -109,7 +135,7 @@ export default function LeftPanel({
           style={{ padding: 4 }}
           title="New conversation"
           onClick={() => {
-            onNewSession?.();
+            onNewSession?.(selectedAgentId);
             onNav?.('empty');
           }}
         >
@@ -155,6 +181,98 @@ export default function LeftPanel({
           </div>
         )}
       </div>
+
+      {/* My Agents — builder mode only */}
+      {mode === 'builder' && (
+        <div style={{ borderBottom: `1px solid ${T.border}` }}>
+          <div
+            style={{ padding: '8px 12px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+            onClick={() => setAgentsOpen(o => !o)}
+          >
+            <span className="upper" style={{ color: T.dim }}>
+              My Agents <span className="mono" style={{ color: T.dim }}>· {agents.length}</span>
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                className="dlk-btn ghost"
+                style={{ padding: 3 }}
+                title="New agent"
+                onClick={e => { e.stopPropagation(); setShowNewAgent(v => !v); setAgentsOpen(true); }}
+              >
+                <Icon name="plus" size={10} color={T.muted} />
+              </button>
+            </div>
+          </div>
+
+          {agentsOpen && showNewAgent && (
+            <div style={{ padding: '4px 8px 6px' }}>
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  if (!newAgentName.trim()) return;
+                  try {
+                    await fetch(`${API}/agents`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name: newAgentName.trim(), system_prompt: '' }),
+                    });
+                    setNewAgentName('');
+                    setShowNewAgent(false);
+                    loadAgents();
+                  } catch {}
+                }}
+                style={{ display: 'flex', gap: 4 }}
+              >
+                <input
+                  autoFocus
+                  value={newAgentName}
+                  onChange={e => setNewAgentName(e.target.value)}
+                  placeholder="agent name…"
+                  style={{
+                    flex: 1, background: T.bg0, border: `1px solid ${T.cyan}55`,
+                    outline: 'none', padding: '4px 7px',
+                    fontFamily: T.mono, fontSize: 11, color: T.text, caretColor: T.cyan,
+                  }}
+                />
+                <button type="submit" className="dlk-btn primary" style={{ padding: '3px 8px', fontSize: 10 }}>+</button>
+              </form>
+            </div>
+          )}
+
+          {agentsOpen && (
+            <div style={{ padding: '0 8px 6px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {agents.length === 0 && (
+                <div className="mono" style={{ padding: '10px', fontSize: 10, color: T.dim, textAlign: 'center' }}>
+                  No agents yet
+                </div>
+              )}
+              {agents.map(a => {
+                const isSelected = a.id === selectedAgentId;
+                const statusColor = a.status === 'published' ? T.green : a.status === 'archived' ? T.dim : T.amber;
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => setSelectedAgentId(id => id === a.id ? null : a.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 8px',
+                      borderLeft: `2px solid ${isSelected ? T.cyan : 'transparent'}`,
+                      background: isSelected ? T.bg2 : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: isSelected ? T.text : T.muted, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {a.name}
+                    </span>
+                    {isSelected && <span className="mono" style={{ fontSize: 9, color: T.cyan }}>active</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sessions header */}
       <div style={{ padding: '10px 12px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

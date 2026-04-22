@@ -206,16 +206,20 @@ export function useChat() {
 
   // ── Send ──────────────────────────────────────────────────────────
 
-  const send = useCallback((text) => {
+  const send = useCallback((text, agentId = null) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     const id = `user-${Date.now()}`;
     setMessages(prev => [...prev, { id, role: 'user', type: 'message', content: text }]);
     setStreaming(true);
-    wsRef.current.send(JSON.stringify({
+    const payload = {
       type: 'chat',
       content: text,
       session_id: sessionIdRef.current || null,
-    }));
+    };
+    if (!sessionIdRef.current && agentId) {
+      payload.agent_id = agentId;
+    }
+    wsRef.current.send(JSON.stringify(payload));
   }, []);
 
   const stop = useCallback(() => {
