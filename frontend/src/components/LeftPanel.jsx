@@ -6,7 +6,6 @@ import { Logo, Meter } from './Shell.jsx';
 const API = 'http://localhost:8765';
 
 function shortModel(m) {
-  // "gemma3-12b:latest" → "gemma3-12b"
   return m.replace(/:latest$/, '');
 }
 
@@ -79,7 +78,6 @@ export default function LeftPanel({
     loadAgents();
   }, [loadMode, loadAgents]);
 
-  // System stats polling
   useEffect(() => {
     const fetchStats = () =>
       fetch(`${API}/system`).then(r => r.json()).then(setSysStats).catch(() => {});
@@ -115,6 +113,95 @@ export default function LeftPanel({
   const filtered = sessions.filter(s =>
     !search || (s.title ?? '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const renderSession = (s) => {
+    const isCurrent = s.id === currentSessionId;
+    const isHover = s.id === hoverId;
+    return (
+      <div
+        key={s.id}
+        onClick={() => handleClick(s)}
+        onMouseEnter={(e) => handleMouseEnter(s.id, e)}
+        onMouseLeave={() => setHoverId(null)}
+        style={{
+          padding: '8px 10px', marginBottom: 1, position: 'relative',
+          border: `1px solid ${isHover ? T.borderHi : 'transparent'}`,
+          borderLeft: `2px solid ${isCurrent ? T.cyan : isHover ? T.borderHi : 'transparent'}`,
+          background: isCurrent || isHover ? T.bg2 : 'transparent',
+          cursor: 'pointer',
+          transition: 'background .1s',
+          zIndex: isHover ? 2 : 1,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isCurrent && <span className="dlk-dot cyan live" />}
+          <div style={{
+            fontSize: 12, color: isCurrent ? T.text : T.muted,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            fontWeight: isCurrent ? 500 : 400, flex: 1,
+          }}>
+            {s.title}
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2, paddingLeft: isCurrent ? 12 : 0 }}>
+          {isCurrent ? `active · ${s.message_count} msgs` : `${timeAgo(s.updated_at)} · ${s.message_count} msgs`}
+        </div>
+        {isHover && (
+          <div style={{ display: 'flex', gap: 3, marginTop: 6, paddingLeft: isCurrent ? 10 : 0 }}>
+            <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Copy link">
+              <Icon name="copy" size={10} color={T.muted} />
+            </button>
+            <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Export">
+              <Icon name="file" size={10} color={T.muted} />
+            </button>
+            <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Stop">
+              <Icon name="stop" size={10} color={T.amber} />
+            </button>
+            <div style={{ flex: 1 }} />
+            <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => del(e, s.id)} title="Delete">
+              <Icon name="x" size={10} color={T.dim} />
+            </button>
+            <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="More">
+              <Icon name="ham" size={10} color={T.muted} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderGroupedSessions = () => {
+    const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+    const groups = {};
+    for (const s of filtered) {
+      const key = s.agent_id || '__none__';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
+    }
+    const agentIds = Object.keys(groups).sort((a, b) => {
+      const nameA = agentMap[a]?.name ?? 'Unknown';
+      const nameB = agentMap[b]?.name ?? 'Unknown';
+      return nameA.localeCompare(nameB);
+    });
+    return agentIds.map(agentId => {
+      const agent = agentMap[agentId];
+      const groupSessions = groups[agentId];
+      const statusColor = agent?.status === 'published' ? T.green
+        : agent?.status === 'archived' ? T.dim : T.amber;
+      return (
+        <div key={agentId}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 4px 2px', marginTop: 4 }}>
+            {agent && <span style={{ width: 4, height: 4, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />}
+            <span className="upper" style={{ fontSize: 8, color: T.dim, letterSpacing: '.1em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {agent?.name ?? 'Unknown agent'}
+            </span>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+          </div>
+          {groupSessions.map(s => renderSession(s))}
+        </div>
+      );
+    });
+  };
 
   return (
     <aside ref={asideRef} style={{
@@ -279,7 +366,9 @@ export default function LeftPanel({
         <span className="upper" style={{ color: T.dim }}>
           Sessions <span className="mono" style={{ color: T.dim }}>· {sessions.length}</span>
         </span>
-        <span className="mono" style={{ color: T.dim, fontSize: 9 }}>recent</span>
+        <span className="mono" style={{ color: T.dim, fontSize: 9 }}>
+          {mode === 'builder' ? 'by agent' : 'recent'}
+        </span>
       </div>
 
       {/* Sessions list */}
@@ -289,61 +378,8 @@ export default function LeftPanel({
             {sessions.length === 0 ? 'No sessions yet' : 'No matches'}
           </div>
         )}
-        {filtered.map((s) => {
-          const isCurrent = s.id === currentSessionId;
-          const isHover = s.id === hoverId;
-          return (
-            <div
-              key={s.id}
-              onClick={() => handleClick(s)}
-              onMouseEnter={(e) => handleMouseEnter(s.id, e)}
-              onMouseLeave={() => setHoverId(null)}
-              style={{
-                padding: '8px 10px', marginBottom: 1, position: 'relative',
-                border: `1px solid ${isHover ? T.borderHi : 'transparent'}`,
-                borderLeft: `2px solid ${isCurrent ? T.cyan : isHover ? T.borderHi : 'transparent'}`,
-                background: isCurrent || isHover ? T.bg2 : 'transparent',
-                cursor: 'pointer',
-                transition: 'background .1s',
-                zIndex: isHover ? 2 : 1,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {isCurrent && <span className="dlk-dot cyan live" />}
-                <div style={{
-                  fontSize: 12, color: isCurrent ? T.text : T.muted,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  fontWeight: isCurrent ? 500 : 400, flex: 1,
-                }}>
-                  {s.title}
-                </div>
-              </div>
-              <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2, paddingLeft: isCurrent ? 12 : 0 }}>
-                {isCurrent ? `active · ${s.message_count} msgs` : `${timeAgo(s.updated_at)} · ${s.message_count} msgs`}
-              </div>
-              {isHover && (
-                <div style={{ display: 'flex', gap: 3, marginTop: 6, paddingLeft: isCurrent ? 10 : 0 }}>
-                  <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Copy link">
-                    <Icon name="copy" size={10} color={T.muted} />
-                  </button>
-                  <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Export">
-                    <Icon name="file" size={10} color={T.muted} />
-                  </button>
-                  <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="Stop">
-                    <Icon name="stop" size={10} color={T.amber} />
-                  </button>
-                  <div style={{ flex: 1 }} />
-                  <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => del(e, s.id)} title="Delete">
-                    <Icon name="x" size={10} color={T.dim} />
-                  </button>
-                  <button className="dlk-btn ghost" style={{ padding: 3 }} onClick={e => e.stopPropagation()} title="More">
-                    <Icon name="ham" size={10} color={T.muted} />
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {mode === 'builder' && filtered.length > 0 && renderGroupedSessions()}
+        {mode !== 'builder' && filtered.map(s => renderSession(s))}
       </div>
 
       {/* Session hover tooltip */}
@@ -401,7 +437,7 @@ export default function LeftPanel({
           }}>
             {models.map(m => {
               const short = shortModel(m);
-              const active = short === shortModel(model) || m === model;
+              const isActive = short === shortModel(model) || m === model;
               return (
                 <div
                   key={m}
@@ -409,13 +445,13 @@ export default function LeftPanel({
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
                     borderBottom: `1px solid ${T.border}`,
-                    background: active ? T.bg2 : 'transparent',
+                    background: isActive ? T.bg2 : 'transparent',
                     cursor: 'pointer',
                   }}
                 >
-                  <span className="dlk-dot" style={{ background: active ? T.cyan : T.dim }} />
-                  <span className="mono" style={{ fontSize: 11, color: active ? T.text : T.muted, flex: 1 }}>{short}</span>
-                  {active && <span className="mono" style={{ fontSize: 9, color: T.cyan }}>active</span>}
+                  <span className="dlk-dot" style={{ background: isActive ? T.cyan : T.dim }} />
+                  <span className="mono" style={{ fontSize: 11, color: isActive ? T.text : T.muted, flex: 1 }}>{short}</span>
+                  {isActive && <span className="mono" style={{ fontSize: 9, color: T.cyan }}>active</span>}
                 </div>
               );
             })}
