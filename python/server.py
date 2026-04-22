@@ -102,13 +102,26 @@ db: aiosqlite.Connection = None
 _active_interpreters: dict = {}  # ws_id → interpreter instance
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS agents (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    system_prompt TEXT NOT NULL DEFAULT '',
+    manifest_yaml TEXT,
+    version       TEXT NOT NULL DEFAULT '1.0.0',
+    status        TEXT NOT NULL DEFAULT 'draft',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
-    id           TEXT PRIMARY KEY,
-    model        TEXT NOT NULL DEFAULT 'gemma3-12b',
-    title        TEXT,
+    id            TEXT PRIMARY KEY,
+    agent_id      TEXT REFERENCES agents(id) ON DELETE SET NULL,
+    model         TEXT NOT NULL DEFAULT 'gemma3-12b',
+    title         TEXT,
     message_count INTEGER NOT NULL DEFAULT 0,
-    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -128,6 +141,35 @@ async def _init_db():
     await db.commit()
 
 
+async def _migrate_agents():
+    """Idempotent: add agent_id column to sessions, seed General Assistant agent."""
+    cursor = await db.execute("PRAGMA table_info(sessions)")
+    cols = [row[1] for row in await cursor.fetchall()]
+    if "agent_id" not in cols:
+        await db.execute(
+            "ALTER TABLE sessions ADD COLUMN agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL"
+        )
+        log.info("Migration: added agent_id column to sessions")
+
+    cursor = await db.execute("SELECT id FROM agents WHERE name = 'General Assistant' LIMIT 1")
+    row = await cursor.fetchone()
+    if row is None:
+        ga_id = str(uuid.uuid4())
+        await db.execute(
+            "INSERT INTO agents (id, name, description, system_prompt, status) VALUES (?,?,?,?,?)",
+            (ga_id, "General Assistant",
+             "Default dialekt agent with full computer access",
+             DEFAULT_SETTINGS["system_prompt"], "published"),
+        )
+        log.info(f"Migration: created General Assistant agent {ga_id}")
+    else:
+        ga_id = row[0]
+
+    await db.execute("UPDATE sessions SET agent_id = ? WHERE agent_id IS NULL", (ga_id,))
+    await db.commit()
+    log.info("Migration: agents ready")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db
@@ -137,6 +179,7 @@ async def lifespan(app: FastAPI):
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
     await _init_db()
+    await _migrate_agents()
     log.info(f"SQLite ready at {DB_PATH}")
     yield
     await db.close()
@@ -181,11 +224,13 @@ _builtins.input = _dialekt_input
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
-async def db_create_session(model: str = "gemma3-12b") -> str:
+async def db_create_session(model: str | None = None, agent_id: str | None = None) -> str:
     sid = str(uuid.uuid4())
+    s = load_settings()
+    m = model or s.get("model", "gemma3-12b")
     await db.execute(
-        "INSERT INTO sessions(id, model) VALUES(?, ?)",
-        (sid, model),
+        "INSERT INTO sessions(id, agent_id, model) VALUES(?,?,?)",
+        (sid, agent_id, m),
     )
     await db.commit()
     return sid
@@ -212,6 +257,51 @@ async def db_save_message(session_id: str, role: str, type_: str,
     )
     await db.commit()
     return mid
+
+
+# ── Agent DB helpers ─────────────────────────────────────────────────────────
+
+async def db_create_agent(name: str, description: str, system_prompt: str,
+                          manifest_yaml: str | None = None,
+                          version: str = "1.0.0") -> str:
+    agent_id = str(uuid.uuid4())
+    await db.execute(
+        "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (agent_id, name, description, system_prompt, manifest_yaml, version, "draft"),
+    )
+    await db.commit()
+    return agent_id
+
+
+async def db_get_agent(agent_id: str) -> dict | None:
+    cursor = await db.execute("SELECT * FROM agents WHERE id = ?", (agent_id,))
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def db_list_agents() -> list[dict]:
+    cursor = await db.execute("SELECT * FROM agents ORDER BY updated_at DESC")
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def db_update_agent(agent_id: str, **fields) -> None:
+    allowed = {"name", "description", "system_prompt", "manifest_yaml", "version", "status"}
+    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    if not updates:
+        return
+    set_parts = [f"{k} = ?" for k in updates] + ["updated_at = datetime('now')"]
+    await db.execute(
+        f"UPDATE agents SET {', '.join(set_parts)} WHERE id = ?",
+        [*updates.values(), agent_id],
+    )
+    await db.commit()
+
+
+async def db_delete_agent(agent_id: str) -> None:
+    await db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+    await db.commit()
 
 
 # ── REST endpoints ────────────────────────────────────────────────────────────
@@ -253,6 +343,118 @@ async def about():
     }
 
 
+# ── Agent endpoints ───────────────────────────────────────────────────────────
+
+@app.get("/agents")
+async def list_agents_endpoint():
+    return await db_list_agents()
+
+
+@app.post("/agents", status_code=201)
+async def create_agent_endpoint(body: dict):
+    from fastapi import HTTPException
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "name is required")
+    agent_id = await db_create_agent(
+        name=name,
+        description=body.get("description", ""),
+        system_prompt=body.get("system_prompt", ""),
+        manifest_yaml=body.get("manifest_yaml"),
+        version=body.get("version", "1.0.0"),
+    )
+    return {"id": agent_id, "name": name}
+
+
+@app.get("/agents/{agent_id}")
+async def get_agent_endpoint(agent_id: str):
+    from fastapi import HTTPException
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    return agent
+
+
+@app.patch("/agents/{agent_id}")
+async def update_agent_endpoint(agent_id: str, body: dict):
+    from fastapi import HTTPException
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    await db_update_agent(agent_id, **body)
+    return {"ok": True}
+
+
+@app.delete("/agents/{agent_id}")
+async def delete_agent_endpoint(agent_id: str):
+    from fastapi import HTTPException
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    await db_delete_agent(agent_id)
+    return {"ok": True}
+
+
+@app.post("/agents/import")
+async def import_agent_endpoint(file: UploadFile = File(...)):
+    from fastapi import HTTPException
+    from dialekt_manifest import ManifestValidator
+    yaml_str = (await file.read()).decode("utf-8")
+    result = ManifestValidator().validate_string(yaml_str)
+    if not result.valid:
+        raise HTTPException(422, detail={
+            "errors": [{"code": e.code.value, "message": e.message} for e in result.errors]
+        })
+    m = result.manifest
+    name = m.metadata.name
+    description = m.metadata.description or ""
+    system_prompt = m.system_prompt or ""
+    version = m.metadata.version
+    agent_id = await db_create_agent(
+        name=name,
+        description=description,
+        system_prompt=system_prompt,
+        manifest_yaml=yaml_str,
+        version=version,
+    )
+    warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    return {"id": agent_id, "name": name, "warnings": warnings}
+
+
+@app.get("/agents/{agent_id}/export")
+async def export_agent_endpoint(agent_id: str):
+    from fastapi import HTTPException
+    from fastapi.responses import Response
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    yaml_content = agent.get("manifest_yaml") or ""
+    safe_name = agent["name"].replace(" ", "_")
+    return Response(
+        content=yaml_content,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.agent.yaml"'},
+    )
+
+
+# ── Mode config endpoints ─────────────────────────────────────────────────────
+
+@app.get("/config/mode")
+async def get_mode():
+    s = load_settings()
+    return {"mode": s.get("mode", "builder")}
+
+
+@app.post("/config/mode")
+async def set_mode(body: dict):
+    from fastapi import HTTPException
+    mode = body.get("mode", "builder")
+    if mode not in ("builder", "user"):
+        raise HTTPException(400, "mode must be 'builder' or 'user'")
+    s = load_settings()
+    s["mode"] = mode
+    save_settings(s)
+    return {"ok": True, "mode": mode}
+
+
 @app.post("/model")
 async def set_model(body: dict):
     model = body.get("model", "gemma3-12b")
@@ -291,13 +493,14 @@ async def ollama_start():
 @app.get("/sessions")
 async def list_sessions():
     cursor = await db.execute(
-        "SELECT id, title, model, created_at, updated_at, message_count "
+        "SELECT id, agent_id, title, model, created_at, updated_at, message_count "
         "FROM sessions ORDER BY updated_at DESC LIMIT 50"
     )
     rows = await cursor.fetchall()
     return [
         {
             "id": r["id"],
+            "agent_id": r["agent_id"],
             "title": r["title"],
             "model": r["model"],
             "message_count": r["message_count"],
@@ -770,7 +973,7 @@ def _apply_autonomy(itp, level: str) -> None:
         itp.safe_mode = "off"
 
 
-def make_interpreter():
+def make_interpreter(agent: dict | None = None):
     from interpreter import interpreter
     s = load_settings()
     interpreter.reset()
@@ -782,7 +985,10 @@ def make_interpreter():
     interpreter.llm.temperature = float(s.get("temperature", 0.7))
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
-    interpreter.system_message = s.get("system_prompt", DEFAULT_SETTINGS["system_prompt"])
+    if agent and agent.get("system_prompt"):
+        interpreter.system_message = agent["system_prompt"]
+    else:
+        interpreter.system_message = s.get("system_prompt", DEFAULT_SETTINGS["system_prompt"])
     _apply_autonomy(interpreter, s.get("autonomy", "ask-write"))
     return interpreter
 
@@ -848,6 +1054,14 @@ async def ws_chat(ws: WebSocket):
             if msg.get("type") == "join":
                 session_id = msg.get("session_id")
                 cursor = await db.execute(
+                    "SELECT agent_id FROM sessions WHERE id = ?", (session_id,)
+                )
+                sess_row = await cursor.fetchone()
+                if sess_row and sess_row[0]:
+                    agent = await db_get_agent(sess_row[0])
+                    if agent and agent.get("system_prompt"):
+                        itp.system_message = agent["system_prompt"]
+                cursor = await db.execute(
                     "SELECT role, content FROM messages WHERE session_id=? AND type='message' ORDER BY created_at",
                     (session_id,),
                 )
@@ -865,10 +1079,15 @@ async def ws_chat(ws: WebSocket):
 
             if session_id is None:
                 sid_from_client = msg.get("session_id")
+                agent_id_for_session = msg.get("agent_id")
                 if sid_from_client:
                     session_id = sid_from_client
                 else:
-                    session_id = await db_create_session()
+                    session_id = await db_create_session(agent_id=agent_id_for_session)
+                    if agent_id_for_session:
+                        agent = await db_get_agent(agent_id_for_session)
+                        if agent and agent.get("system_prompt"):
+                            itp.system_message = agent["system_prompt"]
                     first_message = True
 
             log.info(f"[{session_id[:8]}] User: {content[:80]}")

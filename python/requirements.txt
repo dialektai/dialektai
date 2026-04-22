@@ -11,6 +11,7 @@ anyio>=4.0.0
 starlette>=0.37.0
 pydantic>=2.0.0
 python-multipart>=0.0.9
+dialekt-manifest-validator>=0.1.0
 
 # Dev / test only
 pytest>=8.0.0
