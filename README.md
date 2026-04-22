@@ -115,6 +115,21 @@ The backend runs on `localhost:41337` by default.
 
 ---
 
+## Agent Manifests
+
+dialekt agents are defined as portable YAML files (`.agent.yaml`).
+
+**Manifest format:** [AGENT_MANIFEST_SPEC.md](AGENT_MANIFEST_SPEC.md) — covers all fields, types, security rules, and examples.
+
+**Validator:** [`dialekt-manifest-validator`](https://github.com/vibecoderkz/dialekt-manifest-validator) — validate manifests before importing or publishing.
+
+```bash
+pip install dialekt-manifest-validator==0.1.0
+dialekt-validate-manifest my-agent.agent.yaml
+```
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). All contributors must sign off commits with the [Developer Certificate of Origin](https://developercertificate.org).
