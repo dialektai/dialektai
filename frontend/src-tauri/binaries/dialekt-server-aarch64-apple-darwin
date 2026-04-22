@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Development stub — runs the Python backend via venv
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_DIR="$(cd "$SCRIPT_DIR/../../../../../python" && pwd)"
+exec "$PYTHON_DIR/start.sh" "$@"

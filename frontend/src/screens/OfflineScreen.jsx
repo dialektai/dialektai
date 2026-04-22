@@ -1,0 +1,185 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { T } from '../tokens.js';
+import Icon from '../components/Icon.jsx';
+import { AppFrame } from '../components/Shell.jsx';
+import LeftPanel from '../components/LeftPanel.jsx';
+
+const API = 'http://localhost:8765';
+const RETRY_INTERVAL = 5;
+
+function DiagRow({ label, state, detail, last }) {
+  const map = {
+    ok:   { c: T.green, m: '✓ OK'   },
+    warn: { c: T.amber, m: '△ INFO' },
+    fail: { c: T.red,   m: '✕ FAIL' },
+  }[state];
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: 14, alignItems: 'center',
+      padding: '10px 14px', borderBottom: last ? 'none' : `1px solid ${T.border}`,
+      background: state === 'fail' ? '#1f0d10' : 'transparent',
+    }}>
+      <span className="mono" style={{ fontSize: 10, color: map.c, letterSpacing: '.08em' }}>{map.m}</span>
+      <div>
+        <div style={{ fontSize: 12, color: T.text }}>{label}</div>
+        <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2 }}>{detail}</div>
+      </div>
+      <span className="mono" style={{ fontSize: 10, color: T.dim }}>re-run</span>
+    </div>
+  );
+}
+
+function ActionTile({ icon, title, sub, primary, onClick, loading }) {
+  return (
+    <div onClick={onClick} style={{
+      padding: 14, border: `1px solid ${primary ? T.cyan : T.border}`,
+      background: primary ? T.bg2 : T.bg1, cursor: 'pointer',
+      borderLeft: `2px solid ${primary ? T.cyan : T.border}`,
+      opacity: loading ? 0.7 : 1,
+    }}>
+      <Icon name={loading ? 'cpu' : icon} size={16} color={primary ? T.cyan : T.muted} />
+      <div style={{ fontSize: 13, color: T.text, marginTop: 10 }}>{loading ? 'Working…' : title}</div>
+      <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
+
+export default function OfflineScreen({ onNav }) {
+  const [countdown, setCountdown] = useState(RETRY_INTERVAL);
+  const [attempt, setAttempt] = useState(1);
+  const [checking, setChecking] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [lastChecked, setLastChecked] = useState('just now');
+  const timerRef = useRef(null);
+
+  const check = useCallback(async () => {
+    setChecking(true);
+    setLastChecked('checking…');
+    try {
+      const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+      const d = await r.json();
+      if (d.ollama) {
+        onNav?.('empty');
+        return;
+      }
+    } catch {}
+    setChecking(false);
+    setLastChecked('just now');
+    setAttempt(a => a + 1);
+    setCountdown(RETRY_INTERVAL);
+  }, [onNav]);
+
+  const startOllama = useCallback(async () => {
+    setStarting(true);
+    try {
+      await fetch(`${API}/ollama/start`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+    } catch {}
+    setTimeout(() => { setStarting(false); check(); }, 2000);
+  }, [check]);
+
+  // Auto-retry countdown
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { check(); return RETRY_INTERVAL; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [check]);
+
+  return (
+    <AppFrame title="dialekt.ai — connection error">
+      <LeftPanel active={-1} running={false} model="— no model —" onNav={onNav} />
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: T.bg0, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#2a0f12', borderBottom: `1px solid ${T.amber}55` }}>
+          <span className="dlk-dot amber live" />
+          <span className="mono" style={{ fontSize: 11, color: T.amber, letterSpacing: '.1em' }}>OLLAMA OFFLINE</span>
+          <span className="mono" style={{ fontSize: 11, color: T.muted }}>· can't reach localhost:11434</span>
+          <div style={{ flex: 1 }} />
+          <span className="mono" style={{ fontSize: 10, color: T.dim }}>
+            {checking ? 'checking…' : `retry in ${countdown}s · attempt ${attempt}`}
+          </span>
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 44px', minHeight: 0 }}>
+          <div style={{ maxWidth: 780, margin: '0 auto', width: '100%' }}>
+            <div className="mono" style={{ fontSize: 10, color: T.amber, letterSpacing: '.16em', marginBottom: 10 }}>ERROR · E_OLLAMA_UNREACHABLE</div>
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.15, marginBottom: 10 }}>
+              Can't reach the local inference server.
+            </div>
+            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6, maxWidth: 560, marginBottom: 24 }}>
+              dialekt runs on a local Ollama instance at <span className="mono" style={{ color: T.text }}>http://127.0.0.1:11434</span>.
+              It looks like the process isn't running, or something is blocking the port.
+            </div>
+
+            <div style={{ border: `1px solid ${T.border}`, background: T.bg1, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${T.border}`, background: T.bg2 }}>
+                <span className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em' }}>A //</span>
+                <span style={{ fontSize: 12, fontWeight: 500 }}>Diagnostics</span>
+                <div style={{ flex: 1 }} />
+                <span className="mono" style={{ fontSize: 10, color: T.dim }}>{lastChecked}</span>
+              </div>
+              <DiagRow label="Ollama binary installed"        state="ok"   detail="v0.17.4 · /usr/local/bin/ollama" />
+              <DiagRow label="Ollama process running"         state="fail" detail="pgrep returned no match" />
+              <DiagRow label="Port 11434 reachable"           state="fail" detail="connection refused" />
+              <DiagRow label="Models directory present"       state="ok"   detail="gemma3-12b · 7.3 GB cached" />
+              <DiagRow label="Network (outbound)"             state="warn" detail="not required — local only" last />
+            </div>
+
+            <div style={{ border: `1px solid ${T.border}`, background: '#05080c', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderBottom: `1px solid ${T.border}`, background: T.bg2 }}>
+                <Icon name="terminal" size={12} color={T.green} />
+                <span className="mono" style={{ fontSize: 10, color: T.text }}>dialekt backend log · latest</span>
+                <div style={{ flex: 1 }} />
+                <Icon name="copy" size={12} color={T.dim} />
+              </div>
+              <div className="mono" style={{ padding: '10px 12px', fontSize: 11, lineHeight: 1.65 }}>
+                <div style={{ color: T.dim }}>[–] <span style={{ color: T.muted }}>dialekt-api</span> probe :11434 …</div>
+                <div style={{ color: '#ff8a8a' }}>[–] fetch error: ECONNREFUSED 127.0.0.1:11434</div>
+                <div style={{ color: T.amber }}>[–] ollama offline · attempt {attempt}</div>
+                <div style={{ color: T.muted }}>[–] hint: run <span style={{ color: T.cyan }}>ollama serve</span> to start the daemon</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              <ActionTile
+                icon="refresh"
+                title="Retry now"
+                sub="re-probe :11434"
+                primary
+                loading={checking}
+                onClick={check}
+              />
+              <ActionTile
+                icon="terminal"
+                title="Start Ollama"
+                sub="runs `ollama serve` in a sandbox"
+                loading={starting}
+                onClick={startOllama}
+              />
+              <ActionTile
+                icon="cog"
+                title="Point to remote"
+                sub="use a machine on your network"
+                onClick={() => onNav?.('settings')}
+              />
+            </div>
+
+            <div style={{
+              marginTop: 18, padding: 14, display: 'flex', alignItems: 'center', gap: 14,
+              border: `1px dashed ${T.border}`,
+            }}>
+              <Icon name="shield" size={18} color={T.cyan} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: T.text }}>Keep browsing offline</div>
+                <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>All past sessions, files and memory are still available — you just can't send new messages.</div>
+              </div>
+              <button className="dlk-btn" onClick={() => onNav?.('empty')}>Open past sessions</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </AppFrame>
+  );
+}

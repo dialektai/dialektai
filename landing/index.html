@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dialekt.ai — The local AI agent that finishes what you start</title>
+  <meta name="description" content="Reads your codebase, runs tools, executes code, edits files, runs tests — on your machine, with your models. Your code never leaves the disk.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0a0d12; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+// ─────────────────────────────────────────────────────────────
+// TOKENS
+// ─────────────────────────────────────────────────────────────
+const LT = {
+  bg0: '#0a0d12',
+  bg1: '#0f1318',
+  bg2: '#161b22',
+  bg3: '#1a2029',
+  border: '#1e2733',
+  borderHi: '#2a3441',
+  text: '#e2e8f0',
+  muted: '#94a3b8',
+  dim: '#64748b',
+  deep: '#475569',
+  cyan: '#00d4ff',
+  cyanDim: '#0891b2',
+  amber: '#f59e0b',
+  green: '#22c55e',
+  red: '#ef4444',
+  mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+  ui: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+};
+
+if (!document.getElementById('dlk-land-styles')) {
+  const s = document.createElement('style');
+  s.id = 'dlk-land-styles';
+  s.textContent = `
+    html, body { background: ${LT.bg0}; }
+    .dlk-land, .dlk-land * { box-sizing: border-box; }
+    .dlk-land {
+      font-family: ${LT.ui};
+      color: ${LT.text};
+      background: ${LT.bg0};
+      font-size: 14px;
+      line-height: 1.5;
+      font-feature-settings: "cv02","cv03","cv04","cv11";
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+    }
+    .dlk-land ::selection { background: ${LT.cyan}; color: ${LT.bg0}; }
+    .dlk-land .mono { font-family: ${LT.mono}; letter-spacing: 0; }
+    .dlk-land .upper { text-transform: uppercase; letter-spacing: 0.14em; font-size: 10px; font-weight: 500; font-family: ${LT.mono}; }
+    .dlk-land a { color: inherit; text-decoration: none; }
+    .dlk-land h1, .dlk-land h2, .dlk-land h3, .dlk-land p { margin: 0; }
+    .dlk-land h1 { font-weight: 600; letter-spacing: -0.022em; }
+    .dlk-land h2 { font-weight: 600; letter-spacing: -0.018em; }
+
+    .dlk-land .sec-tag {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; margin-bottom: 24px;
+      border-bottom: 1px solid ${LT.border};
+    }
+    .dlk-land .sec-tag .n { color: ${LT.cyan}; font-family: ${LT.mono}; font-size: 11px; letter-spacing: 0.14em; }
+    .dlk-land .sec-tag .label { font-family: ${LT.mono}; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: ${LT.text}; }
+    .dlk-land .sec-tag .rule { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, ${LT.border} 0 4px, transparent 4px 8px); }
+    .dlk-land .sec-tag .meta { font-family: ${LT.mono}; font-size: 10px; color: ${LT.dim}; letter-spacing: 0.1em; }
+
+    .dlk-land .btn {
+      font-family: ${LT.mono}; font-size: 12px; font-weight: 500;
+      background: transparent; color: ${LT.text};
+      border: 1px solid ${LT.border}; padding: 10px 14px;
+      cursor: pointer; border-radius: 2px;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: border-color .12s, background .12s, color .12s;
+      letter-spacing: 0.02em;
+    }
+    .dlk-land .btn:hover { border-color: ${LT.borderHi}; background: ${LT.bg2}; }
+    .dlk-land .btn.primary { background: ${LT.cyan}; color: ${LT.bg0}; border-color: ${LT.cyan}; font-weight: 600; }
+    .dlk-land .btn.primary:hover { background: #33dfff; border-color: #33dfff; }
+    .dlk-land .btn .kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; padding: 1px 4px; border: 1px solid currentColor; border-radius: 2px; }
+
+    @keyframes dlk-land-caret { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+    .dlk-land .caret { display:inline-block; width:7px; height:14px; background:${LT.cyan}; vertical-align:-2px; margin-left:3px; animation: dlk-land-caret 1s steps(1) infinite; }
+
+    @keyframes dlk-land-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .dlk-land .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+    .dlk-land .dot.live { animation: dlk-land-pulse 1.4s ease-in-out infinite; }
+
+    .dlk-land .winchrome {
+      height: 30px; display: flex; align-items: center; gap: 10px;
+      padding: 0 12px; background: ${LT.bg1}; border-bottom: 1px solid ${LT.border};
+      font-family: ${LT.mono}; font-size: 10px; color: ${LT.muted}; letter-spacing: 0.08em;
+    }
+    .dlk-land .winchrome .dots { display: flex; gap: 6px; }
+    .dlk-land .winchrome .dots span { width:10px; height:10px; border-radius:50%; display:inline-block; }
+
+    .dlk-land .card { background: ${LT.bg1}; border: 1px solid ${LT.border}; border-radius: 2px; }
+    .dlk-land .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+    .dlk-land .wrap-wide { max-width: 1400px; margin: 0 auto; padding: 0 32px; }
+
+    @media (max-width: 860px) {
+      .dlk-land .wrap, .dlk-land .wrap-wide { padding: 0 20px; }
+      .dlk-land .hide-sm { display: none !important; }
+      .dlk-land .stack-sm { flex-direction: column !important; }
+    }
+
+    html { scroll-behavior: smooth; }
+    .dlk-land .scanlines { background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px); }
+    .dlk-land .ticks { background-image: linear-gradient(to right, ${LT.border} 1px, transparent 1px); background-size: 8px 100%; }
+    .dlk-land input, .dlk-land button, .dlk-land textarea { font-family: inherit; }
+
+    @media (max-width: 900px) {
+      .cap-grid { grid-template-columns: 1fr !important; }
+    }
+    @media (min-width: 901px) and (max-width: 1200px) {
+      .cap-grid { grid-template-columns: 1fr 1fr !important; }
+    }
+    @media (max-width: 720px) {
+      .install-row { grid-template-columns: 1fr !important; gap: 10px !important; }
+    }
+    @media (max-width: 860px) {
+      .hero-grid { grid-template-columns: 1fr !important; }
+      .local-grid { grid-template-columns: 1fr !important; }
+      .hw-grid { grid-template-columns: 1fr !important; }
+      .who-grid { grid-template-columns: 1fr !important; }
+      .install-grid { grid-template-columns: 1fr !important; }
+      .footer-grid { grid-template-columns: 1fr 1fr !important; }
+      .diff-split { grid-template-columns: 1fr !important; }
+      .how-step { grid-template-columns: 1fr !important; }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+const LIcon = ({ name, size = 14, color = 'currentColor', stroke = 1.5 }) => {
+  const paths = {
+    chat: 'M3 4h14v9H8l-4 3V4z',
+    folder: 'M2 5h6l2 2h8v9H2V5z',
+    terminal: 'M3 4h14v12H3V4zM6 8l2 2-2 2M10 12h4',
+    cog: 'M10 13a3 3 0 100-6 3 3 0 000 6zm0-9v2M10 16v2M4 10H2M18 10h-2M5.6 5.6L4.2 4.2M15.8 15.8l-1.4-1.4M5.6 14.4l-1.4 1.4M15.8 4.2l-1.4 1.4',
+    plus: 'M10 4v12M4 10h12',
+    send: 'M3 10l14-6-6 14-2-6-6-2z',
+    attach: 'M14 8l-5 5a2.5 2.5 0 01-3.5-3.5l6-6a4 4 0 015.5 5.5L9.5 16',
+    cpu: 'M5 5h10v10H5V5zM2 7h1M2 10h1M2 13h1M17 7h1M17 10h1M17 13h1M7 2v1M10 2v1M13 2v1M7 17v1M10 17v1M13 17v1',
+    file: 'M5 2h7l4 4v12H5V2zM12 2v4h4',
+    globe: 'M10 2a8 8 0 100 16 8 8 0 000-16zM2 10h16M10 2c2.5 2.8 2.5 13.2 0 16M10 2c-2.5 2.8-2.5 13.2 0 16',
+    chev: 'M6 8l4 4 4-4',
+    chevR: 'M8 6l4 4-4 4',
+    check: 'M4 10l4 4 8-8',
+    search: 'M8.5 3a5.5 5.5 0 104.1 9.3l4 4 1-1-4-4A5.5 5.5 0 008.5 3z',
+    shield: 'M10 2l7 3v5c0 5-3.5 7.5-7 8-3.5-.5-7-3-7-8V5l7-3z',
+    copy: 'M6 6h10v10H6V6zM4 4h10v2M4 4v10h2',
+    stop: 'M5 5h10v10H5z',
+    refresh: 'M3 10a7 7 0 0112-5l2 2M17 10a7 7 0 01-12 5l-2-2M15 3v4h4M5 17v-4H1',
+    arrow: 'M4 10h12M12 6l4 4-4 4',
+    down: 'M10 3v12M5 10l5 5 5-5',
+    x: 'M4 4l12 12M16 4L4 16',
+    play: 'M5 3l12 7-12 7V3z',
+    github: 'M10 2a8 8 0 00-2.5 15.6c.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.2-.1-.2-.4-1 .1-2 0 0 .7-.2 2.2.8a7.5 7.5 0 014 0c1.5-1 2.2-.8 2.2-.8.4 1 .2 1.8.1 2 .5.6.8 1.3.8 2.2 0 3.1-1.9 3.8-3.7 4 .3.3.6.8.6 1.6v2.3c0 .3.1.5.6.4A8 8 0 0010 2z',
+    bolt: 'M11 2L4 11h5l-1 7 7-9h-5l1-7z',
+    lock: 'M6 9V6a4 4 0 018 0v3M4 9h12v9H4V9z',
+    disk: 'M3 3h10l4 4v10H3V3zM6 3v5h6V3M6 13h8',
+    flask: 'M8 2h4M9 2v5l-4 8a2 2 0 002 3h6a2 2 0 002-3l-4-8V2',
+    brain: 'M7 4a3 3 0 016 0v1a3 3 0 012 3v2a3 3 0 01-2 3v1a3 3 0 01-6 0v-1a3 3 0 01-2-3V8a3 3 0 012-3V4z',
+    eye: 'M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6zM10 7a3 3 0 100 6 3 3 0 000-6z',
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="square" strokeLinejoin="miter" style={{ flexShrink: 0, display: 'block' }}>
+      <path d={paths[name]} />
+    </svg>
+  );
+};
+
+function SecTag({ n, label, meta }) {
+  return (
+    <div className="sec-tag">
+      <span className="n">{n} //</span>
+      <span className="label">{label}</span>
+      <div className="rule" />
+      {meta && <span className="meta">{meta}</span>}
+    </div>
+  );
+}
+
+function WinChrome({ title }) {
+  return (
+    <div className="winchrome">
+      <div className="dots">
+        <span style={{ background: '#ff5f56' }} />
+        <span style={{ background: '#ffbd2e' }} />
+        <span style={{ background: '#27c93f' }} />
+      </div>
+      <div style={{ flex: 1, textAlign: 'center' }}>{title}</div>
+      <div style={{ width: 52 }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// HERO
+// ─────────────────────────────────────────────────────────────
+function HeroMark({ size = 20, color = LT.cyan }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth="1.8">
+      <rect x="2" y="2" width="16" height="16" />
+      <path d="M6 6h3M6 6v3M14 14h-3M14 14v-3" />
+      <path d="M10 10l4-4" stroke={LT.amber} />
+    </svg>
+  );
+}
+
+function Nav() {
+  return (
+    <nav style={{ position: 'sticky', top: 0, zIndex: 40, background: LT.bg0 + 'ee', borderBottom: `1px solid ${LT.border}`, backdropFilter: 'blur(6px)' }}>
+      <div className="wrap-wide" style={{ display: 'flex', alignItems: 'center', height: 56, gap: 20 }}>
+        <a href="#top" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <HeroMark size={18} />
+          <span className="mono" style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
+            dialekt<span style={{ color: LT.cyan }}>.ai</span>
+          </span>
+          <span className="mono" style={{ fontSize: 10, color: LT.dim, marginLeft: 4, padding: '2px 6px', border: `1px solid ${LT.border}`, letterSpacing: '0.08em' }}>v0.8.2</span>
+        </a>
+        <div style={{ flex: 1 }} />
+        <div className="mono hide-sm" style={{ display: 'flex', gap: 22, fontSize: 12, color: LT.muted, letterSpacing: '0.04em' }}>
+          <a href="#difference">Agent</a>
+          <a href="#how">How</a>
+          <a href="#local">Local</a>
+          <a href="#capabilities">Tools</a>
+          <a href="#install">Install</a>
+        </div>
+        <a className="btn hide-sm" href="#install" style={{ padding: '6px 10px' }}>
+          <LIcon name="github" size={13} color={LT.text} />
+          <span>github</span>
+          <span className="mono" style={{ color: LT.dim, fontSize: 10 }}>★ 4.2k</span>
+        </a>
+        <a className="btn primary" href="#install" style={{ padding: '7px 12px' }}>
+          <LIcon name="down" size={13} color={LT.bg0} />
+          <span>Download</span>
+        </a>
+      </div>
+    </nav>
+  );
+}
+
+function Hero() {
+  return (
+    <section id="top" style={{ paddingTop: 72, paddingBottom: 40 }}>
+      <div className="wrap-wide">
+        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 11, color: LT.dim, letterSpacing: '0.08em', marginBottom: 36 }}>
+          <span style={{ color: LT.green, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span className="dot live" style={{ background: LT.green }} /> LIVE · v0.8.2
+          </span>
+          <span style={{ color: LT.border }}>//</span>
+          <span>LOCAL-FIRST · OLLAMA-POWERED</span>
+          <span style={{ color: LT.border }}>//</span>
+          <span>0 TOKENS SENT TO CLOUD</span>
+          <div style={{ flex: 1 }} />
+          <span className="hide-sm" style={{ color: LT.muted }}>MACOS · LINUX · WINDOWS</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, maxWidth: 1100 }}>
+          <h1 style={{ fontSize: 'clamp(42px, 6vw, 84px)', lineHeight: 1.02, letterSpacing: '-0.03em', fontWeight: 600 }}>
+            The local AI agent<br />
+            <span style={{ color: LT.muted }}>that finishes</span>{' '}
+            <span style={{ color: LT.text }}>what you start.</span>
+            <span className="caret" style={{ height: 56, width: 14, marginLeft: 6, verticalAlign: '-8px' }} />
+          </h1>
+          <p style={{ fontSize: 18, lineHeight: 1.55, color: LT.muted, maxWidth: 720 }}>
+            Reads your codebase, runs tools, executes code, edits files, runs tests — on your machine,
+            with your models, asking permission at every step that matters.{' '}
+            <span style={{ color: LT.text }}>Your code never leaves the disk.</span>
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+            <a className="btn primary" href="#install" style={{ padding: '12px 18px', fontSize: 13 }}>
+              <LIcon name="down" size={14} color={LT.bg0} />
+              Download for macOS
+              <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· arm64 · 84 MB</span>
+            </a>
+            <a className="btn" href="#install" style={{ padding: '12px 16px', fontSize: 12 }}>Linux <span className="mono" style={{ color: LT.dim }}>/</span> Windows</a>
+            <a className="btn" href="#source" style={{ padding: '12px 16px', fontSize: 12 }}>
+              <LIcon name="github" size={13} color={LT.text} />View source
+            </a>
+            <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>sha256 · 4f8c…e1a2 · signed</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="wrap-wide" style={{ marginTop: 64 }}>
+        <HeroProductShot />
+        <HeroStatsRow />
+      </div>
+    </section>
+  );
+}
+
+function HeroStatsRow() {
+  const stats = [['MODEL','llama3.1:70b-q4'],['HARDWARE','M3 Max · 48 GB'],['THROUGHPUT','22.4 tok/s'],['CONTEXT','128k'],['CLOUD CALLS','0']];
+  return (
+    <div style={{ marginTop: 18, padding: '14px 18px', border: `1px solid ${LT.border}`, borderTop: 'none', background: LT.bg1, display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+      {stats.map(([k, v], i) => (
+        <div key={k} style={{ flex: '1 1 180px', padding: '2px 18px', borderLeft: i === 0 ? 'none' : `1px solid ${LT.border}` }}>
+          <div className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.16em' }}>{k}</div>
+          <div className="mono" style={{ fontSize: 13, color: LT.text, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HeroProductShot() {
+  return (
+    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 0 0 1px rgba(0,212,255,0.03), 0 40px 80px -40px rgba(0,0,0,0.8)', position: 'relative' }}>
+      <WinChrome title="dialekt.ai  —  ~/code/acme-api · fix/jwks-rotation" />
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 320px', minHeight: 620 }} className="hero-grid">
+        <HeroSidebar />
+        <HeroConversation />
+        <HeroActivity />
+      </div>
+    </div>
+  );
+}
+
+function HeroSidebar() {
+  const sessions = [
+    { t: 'Refactor auth middleware', meta: 'now · 12 tools', active: true, dot: 'live' },
+    { t: 'Migrate migrations to drizzle', meta: '2h · done', dot: 'green' },
+    { t: 'Investigate SSR hydration bug', meta: 'yday · 47 tools', dot: 'dim' },
+    { t: 'Profile N+1 in /dashboard', meta: 'mon · done', dot: 'dim' },
+    { t: 'Bump deps to react 19', meta: 'aug 12 · done', dot: 'dim' },
+  ];
+  return (
+    <aside style={{ borderRight: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', flexDirection: 'column', padding: '14px 0' }}>
+      <div style={{ padding: '0 14px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <HeroMark size={14} />
+        <span className="mono" style={{ fontSize: 11, fontWeight: 600 }}>dialekt</span>
+        <span className="mono" style={{ fontSize: 9, color: LT.dim, marginLeft: 'auto' }}>⌘K</span>
+      </div>
+      <button className="mono" style={{ margin: '0 12px 14px', padding: '7px 10px', background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.text, fontSize: 11, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 2 }}>
+        <LIcon name="plus" size={12} color={LT.cyan} />
+        New task
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 9, color: LT.dim }}>⌘N</span>
+      </button>
+      <div style={{ padding: '4px 14px 6px' }} className="upper"><span style={{ color: LT.dim }}>Sessions · 24</span></div>
+      <div style={{ padding: '0 6px' }}>
+        {sessions.map((s, i) => (
+          <div key={i} style={{ padding: '8px 10px', background: s.active ? LT.bg2 : 'transparent', borderLeft: s.active ? `2px solid ${LT.cyan}` : '2px solid transparent', marginBottom: 2, cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span className="dot live" style={{ background: s.dot === 'live' ? LT.cyan : s.dot === 'green' ? LT.green : LT.deep, animation: s.dot === 'live' ? undefined : 'none' }} />
+              <span style={{ fontSize: 12, color: s.active ? LT.text : LT.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.t}</span>
+            </div>
+            <div className="mono" style={{ fontSize: 9, color: LT.dim, marginLeft: 14, marginTop: 3, letterSpacing: '0.04em' }}>{s.meta}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: 1 }} />
+      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '10px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <LIcon name="cpu" size={12} color={LT.cyan} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="mono" style={{ fontSize: 10, color: LT.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>llama3.1:70b-q4</div>
+            <div className="mono" style={{ fontSize: 9, color: LT.dim }}>42.1 GB · loaded</div>
+          </div>
+          <LIcon name="chev" size={10} color={LT.muted} />
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
+          {[18,24,12,28,22,16,30,20,26,14,28,20].map((h,i) => (
+            <div key={i} style={{ flex: 1, height: 16, background: LT.bg3, position: 'relative' }}>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${h*3}%`, background: LT.cyan + (i === 11 ? '' : '88') }} />
+            </div>
+          ))}
+        </div>
+        <div className="mono" style={{ fontSize: 9, color: LT.dim, marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+          <span>22.4 tok/s</span><span>GPU 61%</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function HeroConversation() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', background: LT.bg0 }}>
+      <div style={{ height: 44, display: 'flex', alignItems: 'center', gap: 12, padding: '0 18px', borderBottom: `1px solid ${LT.border}`, background: LT.bg1 }}>
+        <span className="mono" style={{ color: LT.cyan, fontSize: 10, letterSpacing: '0.14em' }}>02 //</span>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 500 }}>Refactor auth middleware</div>
+          <div className="mono" style={{ fontSize: 9, color: LT.dim }}>~/code/acme-api · fix/jwks-rotation</div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <HeroChip label="12 tools" />
+        <HeroChip label="00:47" />
+        <HeroChip label="8.2k ctx" warn />
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden', padding: '18px 24px' }}>
+        <div className="mono" style={{ fontSize: 9, color: LT.dim, textAlign: 'center', letterSpacing: '0.14em', marginBottom: 14 }}>─── TODAY · 14:32 ───</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+          <div style={{ maxWidth: '80%' }}>
+            <div className="upper" style={{ color: LT.dim, textAlign: 'right', marginBottom: 6, fontSize: 9 }}>You · 14:32</div>
+            <div style={{ padding: '10px 12px', background: LT.bg2, border: `1px solid ${LT.border}`, fontSize: 12, lineHeight: 1.55, borderRadius: 2 }}>
+              In <span className="mono" style={{ background: LT.bg0, padding: '1px 5px', fontSize: 11, color: LT.cyan }}>middleware/auth.ts</span> verifyToken fails when JWKS rotates keys mid-request. Fix it and make the test pass.
+              <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', fontSize: 9, background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.muted }}>
+                  <LIcon name="file" size={9} color={LT.cyan} />middleware/auth.ts
+                </span>
+                <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', fontSize: 9, background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.muted }}>
+                  <LIcon name="file" size={9} color={LT.cyan} />__tests__/auth.test.ts
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flexShrink: 0, paddingTop: 2 }}><HeroMark size={14} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span className="upper" style={{ color: LT.text, fontSize: 9 }}>dialekt</span>
+              <span className="mono" style={{ fontSize: 9, color: LT.dim }}>llama3.1:70b · 14:32</span>
+              <span className="dot live" style={{ background: LT.cyan }} />
+              <span className="mono" style={{ fontSize: 9, color: LT.cyan, letterSpacing: '0.06em' }}>WORKING</span>
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.55, marginBottom: 10 }}>On it. Reading the current verification flow and the failing test to see what's mocked.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              <HeroToolCall icon="search" tool="grep" detail={<>pattern <span className="mono" style={{ color: LT.cyan }}>verifyToken</span> in <span className="mono">src/**/*.ts</span></>} result="14 matches" />
+              <HeroToolCall icon="file" tool="fs.read" detail="middleware/auth.ts" result="342 lines" />
+              <HeroToolCall icon="file" tool="fs.read" detail="__tests__/auth.test.ts" result="ok" />
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.55, marginBottom: 10 }}>
+              Found it — <span className="mono" style={{ color: LT.cyan, fontSize: 11 }}>verifyToken</span> caches the signing key on first success, but never re-fetches when the <span className="mono" style={{ color: LT.amber, fontSize: 11 }}>kid</span> rotates. Patching to read JWKS on unknown kid with a 5s LRU.
+            </div>
+            <HeroDiff />
+            <div style={{ marginTop: 10, padding: '7px 10px', background: LT.bg1, border: `1px dashed ${LT.cyan}88`, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="dot live" style={{ background: LT.cyan }} />
+              <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.08em' }}>STREAM</span>
+              <span className="mono" style={{ fontSize: 10, color: LT.muted }}>running <span style={{ color: LT.cyan }}>pnpm test auth</span></span>
+              <span className="caret" style={{ height: 10, width: 5 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '12px 20px', background: LT.bg1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+          <span className="mono" style={{ fontSize: 9, color: LT.muted, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', background: LT.bg0, border: `1px solid ${LT.border}` }}>
+            <LIcon name="folder" size={9} color={LT.cyan} />~/code/acme-api
+          </span>
+          <span className="mono" style={{ fontSize: 9, color: LT.muted, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', background: LT.bg0, border: `1px solid ${LT.border}` }}>
+            <LIcon name="file" size={9} color={LT.cyan} />middleware/auth.ts
+          </span>
+          <span className="mono" style={{ fontSize: 9, color: LT.dim }}>+ 3 more</span>
+          <div style={{ flex: 1 }} />
+          <span className="mono" style={{ fontSize: 9, color: LT.dim }}>8,214 / 128k ctx</span>
+        </div>
+        <div style={{ border: `1px solid ${LT.borderHi}`, background: LT.bg0, padding: 10 }}>
+          <div className="mono" style={{ fontSize: 11, color: LT.dim }}>
+            <span style={{ color: LT.cyan }}>›</span>&nbsp; Ask, instruct, paste a trace…
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+            <LIcon name="attach" size={12} color={LT.muted} />
+            <LIcon name="terminal" size={12} color={LT.muted} />
+            <LIcon name="search" size={12} color={LT.muted} />
+            <div style={{ flex: 1 }} />
+            <span className="mono" style={{ fontSize: 9, color: LT.dim }}>autonomy: <span style={{ color: LT.amber }}>ask before write</span></span>
+            <button className="btn primary" style={{ padding: '4px 10px', fontSize: 11 }}>Send <span style={{ fontSize: 9, opacity: 0.7 }}>⏎</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroChip({ label, warn }) {
+  return (
+    <span className="mono" style={{ fontSize: 9, color: warn ? LT.amber : LT.muted, border: `1px solid ${warn ? LT.amber + '55' : LT.border}`, padding: '2px 5px', letterSpacing: '0.06em' }}>{label}</span>
+  );
+}
+
+function HeroToolCall({ icon, tool, detail, result }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px', background: LT.bg1, border: `1px solid ${LT.border}`, borderLeft: `2px solid ${LT.cyan}` }}>
+      <LIcon name={icon} size={11} color={LT.cyan} />
+      <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.04em' }}>{tool}</span>
+      <span style={{ color: LT.border }}>·</span>
+      <span className="mono" style={{ fontSize: 10, color: LT.muted, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{detail}</span>
+      {result && <span className="mono" style={{ fontSize: 9, color: LT.green }}>✓ {result}</span>}
+    </div>
+  );
+}
+
+function HeroDiff() {
+  const lines = [
+    { n: 89, c: 'let key = keyCache.get(kid)' },
+    { n: 90, c: 'if (!key) {' },
+    { n: 91, add: true, c: '  const keys = await jwks.getKeys({ forceRefresh: true })' },
+    { n: 92, add: true, c: '  key = keys.find(k => k.kid === kid)' },
+    { n: 93, add: true, c: '  if (!key) throw new UnknownKidError(kid)' },
+    { n: 94, add: true, c: '  keyCache.set(kid, key, 5_000)' },
+    { n: 95, del: true, c: '  throw new Error("key not found")' },
+    { n: 96, c: '}' },
+  ];
+  return (
+    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: `1px solid ${LT.border}`, background: LT.bg2 }}>
+        <LIcon name="file" size={10} color={LT.cyan} />
+        <span className="mono" style={{ fontSize: 10, color: LT.text }}>middleware/auth.ts · lines 87–96</span>
+        <span className="mono" style={{ fontSize: 9, color: LT.dim, border: `1px solid ${LT.border}`, padding: '0 4px' }}>typescript</span>
+        <div style={{ flex: 1 }} />
+        <span className="mono" style={{ fontSize: 9, color: LT.green }}>+4</span>
+        <span className="mono" style={{ fontSize: 9, color: LT.red }}>−1</span>
+      </div>
+      <div style={{ padding: '6px 0', fontFamily: LT.mono, fontSize: 10.5, lineHeight: 1.6 }}>
+        {lines.map((l, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, padding: '0 10px', background: l.add ? '#0c2a1f' : l.del ? '#2a0f12' : 'transparent', borderLeft: `2px solid ${l.add ? LT.green : l.del ? LT.red : 'transparent'}` }}>
+            <span style={{ color: LT.dim, width: 22, textAlign: 'right' }}>{l.n}</span>
+            <span style={{ color: l.add ? LT.green : l.del ? LT.red : LT.dim, width: 8 }}>{l.add ? '+' : l.del ? '−' : ' '}</span>
+            <span style={{ color: LT.text, whiteSpace: 'pre', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.c}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HeroActivity() {
+  const events = [
+    { t: '14:32:04', kind: 'SYS',  c: 'session.open',  detail: '~/code/acme-api',                       col: LT.dim },
+    { t: '14:32:06', kind: 'TOOL', c: 'grep',           detail: 'pattern "verifyToken"',                 col: LT.cyan, result: '14 matches' },
+    { t: '14:32:06', kind: 'TOOL', c: 'fs.read',        detail: 'middleware/auth.ts',                    col: LT.cyan, result: '342 lines' },
+    { t: '14:32:08', kind: 'TOOL', c: 'fs.read',        detail: '__tests__/auth.test.ts',                col: LT.cyan, result: '1 failing' },
+    { t: '14:32:12', kind: 'PLAN', c: 'plan.update',    detail: '4 steps · 2 done',                      col: LT.muted },
+    { t: '14:32:14', kind: 'TOOL', c: 'fs.write',       detail: 'middleware/auth.ts',                    col: LT.amber, result: '+4 −1 · pending approval', pending: true },
+    { t: '14:32:22', kind: 'OK',   c: 'approved',       detail: 'by @you',                               col: LT.green },
+    { t: '14:32:23', kind: 'TOOL', c: 'exec',           detail: 'pnpm test auth',                        col: LT.cyan, live: true },
+  ];
+  return (
+    <aside style={{ background: LT.bg1, borderLeft: `1px solid ${LT.border}`, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '10px 14px', borderBottom: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="upper" style={{ fontSize: 9, color: LT.muted }}>Activity</span>
+        <span className="mono" style={{ fontSize: 9, color: LT.dim }}>/ 47 events</span>
+        <div style={{ flex: 1 }} />
+        <span className="dot live" style={{ background: LT.cyan }} />
+        <span className="mono" style={{ fontSize: 9, color: LT.cyan }}>LIVE</span>
+      </div>
+      <div style={{ padding: '12px 14px', flex: 1, overflow: 'hidden' }}>
+        {events.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10, fontSize: 10 }} className="mono">
+            <span style={{ color: LT.dim, width: 56, flexShrink: 0 }}>{e.t}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 8, color: e.col, padding: '1px 3px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em' }}>{e.kind}</span>
+                <span style={{ color: e.col, fontSize: 10 }}>{e.c}</span>
+                {e.live && <span className="dot live" style={{ background: LT.cyan, width: 4, height: 4 }} />}
+              </div>
+              <div style={{ color: LT.muted, fontSize: 9.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.detail}</div>
+              {e.result && <div style={{ color: e.pending ? LT.amber : LT.green, fontSize: 9, marginTop: 1 }}>{e.pending ? '◇ ' : '✓ '}{e.result}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '10px 14px' }}>
+        <div className="mono" style={{ fontSize: 9, color: LT.dim, marginBottom: 6, letterSpacing: '0.1em' }}>SANDBOX</div>
+        <div className="mono" style={{ fontSize: 10, color: LT.muted, lineHeight: 1.6 }}>
+          <div><span style={{ color: LT.green }}>●</span> fs · <span style={{ color: LT.text }}>~/code/acme-api</span></div>
+          <div><span style={{ color: LT.green }}>●</span> exec · <span style={{ color: LT.text }}>pnpm, node, git</span></div>
+          <div><span style={{ color: LT.amber }}>◇</span> net · <span style={{ color: LT.text }}>ask each call</span></div>
+          <div><span style={{ color: LT.dim }}>○</span> cloud · <span style={{ color: LT.dim }}>disabled</span></div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SECTIONS A
+// ─────────────────────────────────────────────────────────────
+function SectionChatVsAgent() {
+  return (
+    <section id="difference" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
+      <div className="wrap-wide">
+        <SecTag n="01" label="The difference" meta="chat vs agent" />
+        <div style={{ maxWidth: 820, marginBottom: 40 }}>
+          <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+            Chat tools answer questions.<br />
+            <span style={{ color: LT.cyan }}>dialekt finishes the task.</span>
+          </h2>
+          <p style={{ color: LT.muted, fontSize: 16, marginTop: 14, maxWidth: 640 }}>
+            A chat is a conversation. An agent is a loop — it reads, reasons, runs tools, checks its work, and keeps going. The output is not prose. The output is your code, changed.
+          </p>
+        </div>
+        <div className="diff-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+          <ChatSide />
+          <AgentSide />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ChatSide() {
+  return (
+    <div style={{ background: LT.bg1, padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <span className="mono" style={{ fontSize: 10, color: LT.dim, padding: '3px 7px', border: `1px solid ${LT.border}`, letterSpacing: '0.1em' }}>CHAT</span>
+        <span className="mono" style={{ fontSize: 10, color: LT.dim }}>answers</span>
+      </div>
+      <div style={{ minHeight: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Bubble who="you">Why is verifyToken failing when JWKS rotates keys?</Bubble>
+        <Bubble who="ai" dim>
+          Likely the signing key is cached and never re-fetched when the <code>kid</code> rotates. You'll want to invalidate on unknown kid, re-fetch the JWKS, and retry verification. Here's a sketch:
+          <div className="mono" style={{ marginTop: 10, padding: '10px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, fontSize: 11, color: LT.muted, whiteSpace: 'pre-wrap' }}>{`if (!key) {\n  const keys = await jwks.getKeys(...)\n  key = keys.find(k => k.kid === kid)\n}`}</div>
+          <div style={{ marginTop: 10, color: LT.dim, fontSize: 12 }}>Hope this helps! Let me know if you want me to explain further.</div>
+        </Bubble>
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: '10px 12px', background: LT.bg0, border: `1px dashed ${LT.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="mono" style={{ fontSize: 10, color: LT.dim }}>you still have to:</span>
+          <span className="mono" style={{ fontSize: 10, color: LT.muted }}>open file · paste · fix syntax · run tests · debug · repeat</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Bubble({ who, children, dim }) {
+  const right = who === 'you';
+  return (
+    <div style={{ display: 'flex', justifyContent: right ? 'flex-end' : 'flex-start' }}>
+      <div style={{ maxWidth: '88%' }}>
+        <div className="upper" style={{ fontSize: 9, color: LT.dim, marginBottom: 4, textAlign: right ? 'right' : 'left' }}>{right ? 'you' : 'assistant'}</div>
+        <div style={{ padding: '10px 14px', background: right ? LT.bg2 : LT.bg0, border: `1px solid ${LT.border}`, fontSize: 13, lineHeight: 1.55, color: dim ? LT.muted : LT.text, borderRadius: 2 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function AgentSide() {
+  const feed = [
+    { t: '00.0', k: 'USER', c: 'task received', d: 'fix JWKS rotation in verifyToken',        col: LT.muted },
+    { t: '00.2', k: 'TOOL', c: 'grep',          d: '"verifyToken" src/**/*.ts',                col: LT.cyan,  r: '14 matches / 4 files' },
+    { t: '00.4', k: 'TOOL', c: 'fs.read',       d: 'middleware/auth.ts',                       col: LT.cyan,  r: '342 lines' },
+    { t: '00.5', k: 'TOOL', c: 'fs.read',       d: '__tests__/auth.test.ts',                   col: LT.cyan,  r: 'test at L47' },
+    { t: '00.8', k: 'PLAN', c: 'hypothesis',    d: 'stale key cache on kid rotation',          col: LT.amber },
+    { t: '01.1', k: 'TOOL', c: 'fs.write',      d: 'middleware/auth.ts · +4 −1',               col: LT.amber, r: 'awaiting approval', pending: true },
+    { t: '01.4', k: 'USER', c: 'approved',      d: '⌘↵ by @you',                               col: LT.green },
+    { t: '01.5', k: 'TOOL', c: 'exec',          d: 'pnpm test auth',                           col: LT.cyan,  r: 'pid 42819' },
+    { t: '04.2', k: 'OBS',  c: 'exit 0',        d: '24 passed, 0 failed',                      col: LT.green },
+    { t: '04.3', k: 'TOOL', c: 'exec',          d: 'git diff --stat',                          col: LT.cyan,  r: '1 file · +4 −1' },
+    { t: '04.4', k: 'DONE', c: 'task complete', d: 'fix/jwks-rotation · ready to commit',      col: LT.green },
+  ];
+  return (
+    <div style={{ background: LT.bg1, padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <span className="mono" style={{ fontSize: 10, color: LT.bg0, background: LT.cyan, padding: '3px 7px', letterSpacing: '0.1em', fontWeight: 600 }}>AGENT</span>
+        <span className="mono" style={{ fontSize: 10, color: LT.muted }}>completes</span>
+        <div style={{ flex: 1 }} />
+        <span className="mono" style={{ fontSize: 9, color: LT.dim }}>11 steps · 4.4s · 0 hand-offs</span>
+      </div>
+      <div style={{ background: LT.bg0, border: `1px solid ${LT.border}`, padding: '10px 0' }}>
+        {feed.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 14px', fontSize: 11 }} className="mono">
+            <span style={{ color: LT.dim, width: 36, flexShrink: 0 }}>{e.t}s</span>
+            <span style={{ fontSize: 9, color: e.col, padding: '1px 4px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em', height: 'fit-content', marginTop: 1, width: 42, textAlign: 'center', flexShrink: 0 }}>{e.k}</span>
+            <span style={{ color: e.col, width: 80, flexShrink: 0, fontSize: 11 }}>{e.c}</span>
+            <span style={{ color: LT.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.d}</span>
+            {e.r && <span style={{ color: e.pending ? LT.amber : LT.green, fontSize: 10, flexShrink: 0 }}>{e.pending ? '◇' : '✓'} {e.r}</span>}
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, padding: '10px 12px', background: LT.bg0, border: `1px solid ${LT.green}44`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span className="dot" style={{ background: LT.green }} />
+        <span className="mono" style={{ fontSize: 11, color: LT.green, letterSpacing: '0.06em' }}>TASK COMPLETE</span>
+        <span className="mono" style={{ fontSize: 10, color: LT.muted }}>you didn't leave the composer</span>
+      </div>
+    </div>
+  );
+}
+
+function SectionHow() {
+  return (
+    <section id="how" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
+      <div className="wrap-wide">
+        <SecTag n="02" label="How it works" meta="three steps" />
+        <div style={{ maxWidth: 820, marginBottom: 48 }}>
+          <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+            Give it the task. Watch it work.<br />
+            <span style={{ color: LT.muted }}>Approve what matters.</span>
+          </h2>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 100 }}>
+          <HowStep num="01" title="Give it the task." blurb="One prompt, grounded in the files you care about. No chain-of-thought theatre — write what you want fixed." kbd="⌘ K" mock={<MockComposer />} />
+          <HowStep num="02" title="Watch it work." blurb="Tool calls stream in real time. Reads, greps, diffs, exec — every action is visible, with outputs attached. Nothing hidden in a black box." kbd="LIVE" reverse mock={<MockActivityFull />} />
+          <HowStep num="03" title="Approve what matters." blurb="Anything that touches the filesystem, runs code, or reaches the network asks first. Approve per-call, per-session, or flip on autopilot for sandboxed paths." kbd="⌥ Y" mock={<MockApproval />} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HowStep({ num, title, blurb, kbd, mock, reverse }) {
+  return (
+    <div className="how-step" style={{ display: 'grid', gridTemplateColumns: reverse ? '1.2fr 1fr' : '1fr 1.2fr', gap: 48, alignItems: 'start' }}>
+      <div style={{ order: reverse ? 2 : 1 }}>
+        <div className="mono" style={{ fontSize: 11, color: LT.cyan, letterSpacing: '0.18em', marginBottom: 14 }}>STEP {num} / 03</div>
+        <h3 style={{ fontSize: 36, lineHeight: 1.05, fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 16 }}>{title}</h3>
+        <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.6, maxWidth: 460 }}>{blurb}</p>
+        <div className="mono" style={{ marginTop: 22, display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: LT.dim, letterSpacing: '0.1em' }}>
+          <span style={{ padding: '3px 7px', border: `1px solid ${LT.border}`, color: LT.cyan }}>{kbd}</span>
+          <span>shortcut</span>
+        </div>
+      </div>
+      <div style={{ order: reverse ? 1 : 2, minWidth: 0 }}>{mock}</div>
+    </div>
+  );
+}
+
+function MockComposer() {
+  return (
+    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)' }}>
+      <WinChrome title="dialekt.ai  —  new task" />
+      <div style={{ padding: 24 }}>
+        <div className="mono" style={{ fontSize: 10, color: LT.dim, marginBottom: 10, letterSpacing: '0.12em' }}>COMPOSE · ~/code/acme-api</div>
+        <div style={{ border: `1px solid ${LT.borderHi}`, background: LT.bg1, padding: 14 }}>
+          <div className="mono" style={{ fontSize: 13, color: LT.text, lineHeight: 1.55, minHeight: 80 }}>
+            <span style={{ color: LT.cyan }}>›</span> In <span style={{ color: LT.cyan, background: LT.bg0, padding: '1px 5px' }}>middleware/auth.ts</span> <span style={{ color: LT.cyan, background: LT.bg0, padding: '1px 5px' }}>verifyToken</span> fails when JWKS rotates keys mid-request.{'\n'}
+            Fix the retry logic and make <span style={{ color: LT.cyan, background: LT.bg0, padding: '1px 5px' }}>auth.test.ts</span> pass
+            <span className="caret" style={{ height: 14, width: 7 }} />
+          </div>
+          <div style={{ marginTop: 14, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Tag icon="file" text="middleware/auth.ts" />
+            <Tag icon="file" text="__tests__/auth.test.ts" />
+            <Tag icon="folder" text="lib/" />
+            <button className="mono" style={{ padding: '3px 7px', background: LT.bg0, border: `1px dashed ${LT.border}`, color: LT.muted, fontSize: 10, cursor: 'pointer' }}>+ attach</button>
+            <div style={{ flex: 1 }} />
+            <span className="mono" style={{ fontSize: 10, color: LT.dim }}>1,247 tokens · 128k ctx</span>
+          </div>
+          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: `1px solid ${LT.border}` }}>
+            <div className="mono" style={{ fontSize: 10, color: LT.muted }}>model: <span style={{ color: LT.cyan }}>llama3.1:70b</span></div>
+            <div className="mono" style={{ fontSize: 10, color: LT.muted }}>autonomy: <span style={{ color: LT.amber }}>ask before write</span></div>
+            <div style={{ flex: 1 }} />
+            <button className="btn primary" style={{ padding: '7px 14px' }}>Run task <span style={{ fontSize: 10, opacity: 0.7 }}>⌘↵</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tag({ icon, text }) {
+  return (
+    <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: LT.bg0, border: `1px solid ${LT.border}`, fontSize: 10, color: LT.muted }}>
+      <LIcon name={icon} size={10} color={LT.cyan} />{text}
+    </span>
+  );
+}
+
+function MockActivityFull() {
+  const events = [
+    { t: '14:32:04.102', k: 'SYS',  c: 'session.open',   d: '~/code/acme-api',                              col: LT.dim },
+    { t: '14:32:04.118', k: 'SYS',  c: 'index.load',     d: '3,847 files · 412 MB · ready',                 col: LT.dim },
+    { t: '14:32:06.441', k: 'TOOL', c: 'grep',            d: 'pattern "verifyToken" · src/**/*.ts',          col: LT.cyan,  r: '14 matches / 4 files · 24ms' },
+    { t: '14:32:06.602', k: 'TOOL', c: 'fs.read',         d: 'middleware/auth.ts',                           col: LT.cyan,  r: '342 lines · 8.2 KB' },
+    { t: '14:32:06.771', k: 'TOOL', c: 'fs.read',         d: '__tests__/auth.test.ts',                       col: LT.cyan,  r: '112 lines' },
+    { t: '14:32:07.091', k: 'TOOL', c: 'fs.read',         d: 'lib/jwks-cache.ts',                            col: LT.cyan,  r: '58 lines' },
+    { t: '14:32:08.410', k: 'PLAN', c: 'plan.update',     d: 'step 1/4 · identify stale key cache',          col: LT.amber },
+    { t: '14:32:10.922', k: 'THNK', c: 'reason',          d: 'key is cached indefinitely · kid rotation',    col: LT.muted },
+    { t: '14:32:12.341', k: 'TOOL', c: 'fs.write',        d: 'middleware/auth.ts · +4 −1',                   col: LT.amber, r: 'pending approval', pending: true },
+    { t: '14:32:14.002', k: 'USER', c: 'approved',        d: '⌘↵ · by @you',                                 col: LT.green },
+    { t: '14:32:14.156', k: 'TOOL', c: 'fs.write',        d: 'middleware/auth.ts · applied',                 col: LT.green, r: 'ok' },
+    { t: '14:32:14.812', k: 'TOOL', c: 'exec',            d: 'pnpm test auth',                               col: LT.cyan,  r: 'pid 42819 · running' },
+    { t: '14:32:17.223', k: 'OBS',  c: 'stdout',          d: 'PASS src/__tests__/auth.test.ts (2.4s)',        col: LT.green },
+    { t: '14:32:17.225', k: 'OBS',  c: 'exit',            d: 'code 0 · 24 passed',                           col: LT.green, r: 'ok' },
+    { t: '14:32:17.301', k: 'DONE', c: 'task.complete',   d: '1 file changed · tests green',                 col: LT.green },
+  ];
+  return (
+    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)' }}>
+      <div style={{ padding: '8px 14px', borderBottom: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 10, background: LT.bg1 }}>
+        <LIcon name="bolt" size={12} color={LT.cyan} />
+        <span className="mono" style={{ fontSize: 11, color: LT.text, letterSpacing: '0.08em' }}>ACTIVITY · live</span>
+        <span className="mono" style={{ fontSize: 10, color: LT.dim }}>events: {events.length}</span>
+        <div style={{ flex: 1 }} />
+        <span className="dot live" style={{ background: LT.cyan }} />
+        <span className="mono" style={{ fontSize: 10, color: LT.cyan }}>STREAMING</span>
+      </div>
+      <div style={{ padding: '10px 0', maxHeight: 440, overflow: 'hidden' }}>
+        {events.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10, padding: '3px 14px', fontSize: 11 }} className="mono">
+            <span style={{ color: LT.dim, width: 88, flexShrink: 0 }}>{e.t}</span>
+            <span style={{ fontSize: 9, color: e.col, padding: '1px 4px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em', height: 'fit-content', marginTop: 1, width: 44, textAlign: 'center', flexShrink: 0 }}>{e.k}</span>
+            <span style={{ color: e.col, width: 110, flexShrink: 0 }}>{e.c}</span>
+            <span style={{ color: LT.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.d}</span>
+            {e.r && <span style={{ color: e.pending ? LT.amber : LT.green, fontSize: 10, flexShrink: 0 }}>{e.pending ? '◇' : '✓'} {e.r}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MockApproval() {
+  return (
+    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)', position: 'relative' }}>
+      <WinChrome title="dialekt.ai  —  permission required" />
+      <div style={{ padding: 0, position: 'relative' }}>
+        <div style={{ padding: '20px 24px', opacity: 0.24, pointerEvents: 'none' }}>
+          <div className="mono" style={{ fontSize: 10, color: LT.muted, marginBottom: 10 }}>ACTIVITY</div>
+          {['TOOL · grep · pattern "verifyToken"','TOOL · fs.read · middleware/auth.ts','PLAN · hypothesis: stale key cache','TOOL · fs.write · middleware/auth.ts'].map((l, i) => (
+            <div key={i} className="mono" style={{ fontSize: 11, color: LT.muted, padding: '4px 0' }}>{l}</div>
+          ))}
+        </div>
+        <div style={{ position: 'absolute', left: 24, right: 24, top: 24, border: `1px solid ${LT.amber}`, background: LT.bg1, boxShadow: `0 0 0 4px ${LT.amber}12, 0 20px 40px -10px rgba(0,0,0,0.8)` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${LT.amber}44`, background: LT.amber + '12' }}>
+            <LIcon name="shield" size={14} color={LT.amber} />
+            <span className="mono" style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>PERMISSION REQUIRED</span>
+            <div style={{ flex: 1 }} />
+            <span className="mono" style={{ fontSize: 10, color: LT.dim }}>request #7 · session 00:47</span>
+          </div>
+          <div style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 14, marginBottom: 12 }}><span style={{ color: LT.text }}>dialekt wants to run a shell command.</span></div>
+            <div style={{ background: LT.bg0, border: `1px solid ${LT.border}`, padding: '10px 14px', marginBottom: 14 }}>
+              <div className="mono" style={{ fontSize: 10, color: LT.dim, marginBottom: 4, letterSpacing: '0.1em' }}>EXEC · in ~/code/acme-api</div>
+              <div className="mono" style={{ fontSize: 13, color: LT.text }}><span style={{ color: LT.cyan }}>$</span> pnpm test auth <span style={{ color: LT.dim }}>--reporter=dot</span></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: LT.border, marginBottom: 16, border: `1px solid ${LT.border}` }}>
+              {[['WHY','verify patched retry logic passes failing test'],['CWD','~/code/acme-api'],['READS','package.json · node_modules · src/'],['WRITES','none · .vitest/ cache only'],['NETWORK','none'],['TIMEOUT','30s']].map(([k,v],i) => (
+                <div key={i} style={{ padding: '8px 12px', background: LT.bg0 }}>
+                  <div className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.12em' }}>{k}</div>
+                  <div className="mono" style={{ fontSize: 11, color: LT.text, marginTop: 2 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label className="mono" style={{ fontSize: 11, color: LT.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <span style={{ width: 12, height: 12, border: `1px solid ${LT.borderHi}`, display: 'inline-block', background: LT.bg0 }} />
+                allow this tool for the session
+              </label>
+              <div style={{ flex: 1 }} />
+              <button className="btn" style={{ padding: '8px 14px', fontSize: 12 }}>Deny <span style={{ fontSize: 10, color: LT.dim }}>Esc</span></button>
+              <button className="btn" style={{ padding: '8px 14px', fontSize: 12, background: LT.amber, borderColor: LT.amber, color: LT.bg0, fontWeight: 600 }}>Approve once <span style={{ fontSize: 10, opacity: 0.7 }}>⌥Y</span></button>
+              <button className="btn primary" style={{ padding: '8px 14px', fontSize: 12 }}>Approve &amp; trust <span style={{ fontSize: 10, opacity: 0.7 }}>⌘↵</span></button>
+            </div>
+          </div>
+        </div>
+        <div style={{ height: 60 }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SECTIONS B
+// ─────────────────────────────────────────────────────────────
+function SectionLocal() {
+  const localRows = [
+    '┌─ YOUR MACHINE ────────────────────────────────┐',
+    '│                                               │',
+    '│   [composer] ──▶ [agent loop] ──▶ [ollama]    │',
+    '│        │              │              │        │',
+    '│        │              ▼              ▼        │',
+    '│        │         [sandbox]      [70B model]   │',
+    '│        │         ┌──┴──┐                      │',
+    '│        ▼         ▼     ▼                      │',
+    '│    ~/code   [fs]   [exec]                     │',
+    '│                                               │',
+    '│   network ·· [ ] off    cloud ·· [ ] none     │',
+    '└───────────────────────────────────────────────┘',
+  ];
+  const cloudRows = [
+    '┌─ YOUR MACHINE ─┐    ┌─ THEIR SERVERS ────────┐',
+    '│                │    │                        │',
+    '│  [editor] ───▶ │══▶ │  [their model]         │',
+    '│                │    │       │                │',
+    '│  ~/code ─────▶ │══▶ │  [their logs]          │',
+    '│                │    │       │                │',
+    '│                │    │  [their training?]     │',
+    '│                │    │                        │',
+    '└────────────────┘    └────────────────────────┘',
+  ];
+  return (
+    <section id="local" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
+      <div className="wrap-wide">
+        <SecTag n="03" label="Local by design" meta="architecture, not marketing" />
+        <div className="local-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
+          <div>
+            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+              Your code stays on disk.<br />
+              <span style={{ color: LT.muted }}>Not as a promise. As a wire.</span>
+            </h2>
+            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 18, maxWidth: 520 }}>
+              Inference runs on Ollama, on your machine. Filesystem access is sandboxed to paths you allow-list. No telemetry. No cloud sync. No account. You can pull the plug on your wifi and everything still works.
+            </p>
+            <div style={{ marginTop: 28, display: 'grid', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+              {[['inference','ollama · localhost:11434',LT.green],['filesystem','allow-listed paths only',LT.green],['network','ask per call · off by default',LT.amber],['telemetry','none · verifiable in source',LT.green],['account','not required · no login',LT.green],['cloud sync','disabled · no endpoint exists',LT.green]].map(([k,v,col],i) => (
+                <div key={i} style={{ background: LT.bg1, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12 }} className="mono">
+                  <span className="dot" style={{ background: col, width: 6, height: 6 }} />
+                  <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.14em', textTransform: 'uppercase', width: 100 }}>{k}</span>
+                  <span style={{ fontSize: 11, color: LT.text }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {[{title:'DIALEKT · local',tag:'one machine',rows:localRows,accent:LT.cyan},{title:'CLOUD TOOLS · typical',tag:'everything leaves',rows:cloudRows,accent:LT.red,muted:true}].map((d,i) => (
+              <div key={i} style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: `1px solid ${LT.border}`, background: LT.bg2 }}>
+                  <span style={{ width: 8, height: 8, background: d.accent, display: 'inline-block' }} />
+                  <span className="mono" style={{ fontSize: 10, color: LT.text, letterSpacing: '0.12em' }}>{d.title}</span>
+                  <div style={{ flex: 1 }} />
+                  <span className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.1em' }}>// {d.tag}</span>
+                </div>
+                <pre style={{ margin: 0, padding: '14px 16px', fontFamily: LT.mono, fontSize: 11.5, lineHeight: 1.5, color: d.muted ? LT.dim : LT.text, overflow: 'auto', whiteSpace: 'pre' }}>{d.rows.join('\n')}</pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionCapabilities() {
+  const caps = [
+    { icon:'search', tag:'INDEX', title:'Read your codebase.', body:'Semantic search across the workspace. Files are indexed locally on first open and kept in sync as you edit.', tail:'3,847 files · 412 MB index' },
+    { icon:'terminal', tag:'EXEC', title:'Run tools.', body:'fs, grep, exec, git, plus MCP servers for github, postgres, linear, figma. Bring your own.', tail:'built-in · 6 tools · MCP · +42' },
+    { icon:'file', tag:'EDIT', title:'Edit files.', body:'Every write is a diff. Preview, review, undo. Nothing leaves the review drawer without your keystroke.', tail:'diff-first · per-hunk approval' },
+    { icon:'flask', tag:'TEST', title:'Run tests.', body:"Execute, capture stdout, read the failure, iterate. The agent keeps going until green — or tells you it can't.", tail:'stdout · exit code · wall time' },
+    { icon:'globe', tag:'DRIVE', soon:true, title:'Drive the browser.', body:'A headed Chromium the agent can navigate, click, type into. Useful for anything that lives behind a login.', tail:'coming in 0.9 · opt-in' },
+    { icon:'cpu', tag:'SWAP', title:'Switch models.', body:'Llama, Qwen, DeepSeek, Mistral — any Ollama model. Swap mid-session. 42 GB loaded in ~11 s on NVMe.', tail:'any Ollama tag · live-swap' },
+  ];
+  return (
+    <section id="capabilities" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
+      <div className="wrap-wide">
+        <SecTag n="04" label="What it can do" meta="six tools · all local" />
+        <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1, maxWidth: 820, marginBottom: 40 }}>
+          A tool, not a toy.<br />
+          <span style={{ color: LT.muted }}>Every capability is one it actually has.</span>
+        </h2>
+        <div className="cap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+          {caps.map((c, i) => (
+            <div key={i} style={{ background: LT.bg1, padding: 24, minHeight: 200, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <span className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.16em' }}>{String(i+1).padStart(2,'0')}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', border: `1px solid ${LT.border}`, fontFamily: LT.mono, fontSize: 10, letterSpacing: '0.1em', color: LT.cyan }}>
+                  <LIcon name={c.icon} size={11} color={LT.cyan} />{c.tag}
+                </span>
+                {c.soon && <span className="mono" style={{ fontSize: 9, color: LT.amber, padding: '2px 6px', border: `1px solid ${LT.amber}44`, letterSpacing: '0.08em' }}>SOON</span>}
+              </div>
+              <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>{c.title}</div>
+              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.55, flex: 1 }}>{c.body}</p>
+              <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 14, letterSpacing: '0.06em', paddingTop: 12, borderTop: `1px dashed ${LT.border}` }}>→ {c.tail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionHardware() {
+  const models = [
+    { name:'llama3.1:8b',       size:'4.7 GB',  tps:'84 tok/s', ok:true,  rec:false },
+    { name:'qwen2.5-coder:14b', size:'8.4 GB',  tps:'52 tok/s', ok:true,  rec:false },
+    { name:'deepseek-r1:32b',   size:'19.2 GB', tps:'34 tok/s', ok:true,  rec:false },
+    { name:'llama3.1:70b-q4',   size:'42.1 GB', tps:'22 tok/s', ok:true,  rec:true  },
+    { name:'qwen2.5:72b-q4',    size:'43.5 GB', tps:'19 tok/s', ok:true,  rec:false },
+    { name:'llama3.1:405b-q2',  size:'141 GB',  tps:'—',        ok:false, rec:false },
+  ];
+  return (
+    <section id="hardware" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
+      <div className="wrap-wide">
+        <SecTag n="05" label="Built for your hardware" meta="honest numbers" />
+        <div className="hw-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 48 }}>
+          <div>
+            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+              Serious work needs<br />
+              <span style={{ color: LT.cyan }}>serious silicon.</span>
+            </h2>
+            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 480 }}>
+              dialekt runs on the weights you can hold in RAM. A 7B model will code, a 70B will reason. We're not going to pretend 8 GB is enough — it isn't.
+            </p>
+            <div style={{ marginTop: 28, display: 'grid', gap: 12 }}>
+              {[{tier:'min',ram:'16 GB',note:'7–13B models · autocomplete-class',col:LT.dim},{tier:'ok',ram:'32 GB',note:'34B quantized · most tasks',col:LT.muted},{tier:'rec',ram:'48 GB',note:'70B q4 · real reasoning',col:LT.cyan,active:true},{tier:'max',ram:'128 GB',note:'405B · bring the stampede',col:LT.amber}].map((h,i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '50px 110px 1fr', alignItems: 'center', padding: '14px 16px', background: h.active ? LT.bg2 : LT.bg1, border: `1px solid ${h.active ? h.col : LT.border}`, borderLeft: `3px solid ${h.col}` }}>
+                  <span className="mono" style={{ fontSize: 10, color: h.col, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{h.tier}</span>
+                  <span className="mono" style={{ fontSize: 20, color: LT.text, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{h.ram}</span>
+                  <span style={{ fontSize: 13, color: LT.muted }}>{h.note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
+            <WinChrome title="dialekt.ai  —  hardware matcher" />
+            <div style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <LIcon name="cpu" size={14} color={LT.cyan} />
+                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.1em' }}>DETECTED</span>
+                <span className="mono" style={{ fontSize: 11, color: LT.muted }}>Apple M3 Max · 48 GB · 16-core GPU</span>
+                <div style={{ flex: 1 }} />
+                <span className="mono" style={{ fontSize: 10, color: LT.green, letterSpacing: '0.08em' }}>COMPATIBLE WITH 5 MODELS</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', padding: '8px 14px', background: LT.bg2, fontSize: 9, color: LT.dim, letterSpacing: '0.14em' }} className="mono">
+                  <span>MODEL</span><span>SIZE</span><span>SPEED</span><span>STATUS</span>
+                </div>
+                {models.map((m,i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', padding: '9px 14px', background: m.rec ? LT.bg2 : LT.bg0, alignItems: 'center', borderLeft: m.rec ? `2px solid ${LT.cyan}` : '2px solid transparent' }} className="mono">
+                    <span style={{ fontSize: 12, color: m.ok ? LT.text : LT.dim }}>{m.name}</span>
+                    <span style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums' }}>{m.size}</span>
+                    <span style={{ fontSize: 11, color: m.ok ? LT.text : LT.dim, fontVariantNumeric: 'tabular-nums' }}>{m.tps}</span>
+                    <span style={{ fontSize: 10 }}>
+                      {m.rec ? <span style={{ color: LT.cyan }}>✓ RECOMMENDED</span> : m.ok ? <span style={{ color: LT.green }}>✓ ok</span> : <span style={{ color: LT.red }}>✗ too large</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mono" style={{ marginTop: 14, fontSize: 10, color: LT.dim, lineHeight: 1.6 }}>── we measure tok/s on first-token sustained throughput · not marketing numbers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionWho() {
+  const personas = [
+    { tag:'FINTECH', name:'The engineer under compliance.', body:"Your SOC 2 auditor was very clear: source cannot leave the environment. Cursor is off the table. You're writing Go against a legacy settlement engine and you want help.", quote:'"if it sends the diff to someone else\'s server it\'s gone. period."' },
+    { tag:'INDIE', name:"The indie who won't train their model.", body:"You're shipping a small, sharp product. You refuse on principle to feed your codebase into a free plan. You already run Ollama. You want the loop.", quote:'"i like my code. i don\'t want anyone else to have it."' },
+    { tag:'ML', name:'The ML engineer who wants agency.', body:"You already serve llama3.1:70b from your workstation. You've outgrown the chat UI — you want something that can hold a plan, run tests, and iterate without your hand on the wheel.", quote:'"i\'m tired of being the bus between the model and the filesystem."' },
+  ];
+  return (
+    <section id="who" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
+      <div className="wrap-wide">
+        <SecTag n="06" label="Who it's for" meta="three kinds of developer" />
+        <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
+          If your code can't go to the cloud,<br />
+          <span style={{ color: LT.muted }}>the agent has to come to you.</span>
+        </h2>
+        <div className="cap-grid who-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+          {personas.map((p, i) => (
+            <div key={i} style={{ background: LT.bg1, padding: 28, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
+                <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.18em' }}>{String(i+1).padStart(2,'0')} // {p.tag}</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.2, marginBottom: 14 }}>{p.name}</div>
+              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{p.body}</p>
+              <div className="mono" style={{ marginTop: 18, padding: '12px 14px', background: LT.bg0, borderLeft: `2px solid ${LT.cyan}`, fontSize: 12, color: LT.text, lineHeight: 1.55 }}>{p.quote}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionInstall() {
+  return (
+    <section id="install" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
+      <div className="wrap-wide">
+        <SecTag n="07" label="Install" meta="one command or one click" />
+        <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
+          <div>
+            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+              Download it.<br />
+              <span style={{ color: LT.muted }}>Or build it.</span>
+            </h2>
+            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 460 }}>
+              Open source core. No account. No license key. No telemetry handshake on first launch. Signed binaries for macOS, AppImage for Linux, MSI for Windows.
+            </p>
+            <div className="mono" style={{ marginTop: 24, fontSize: 11, color: LT.dim, lineHeight: 1.8 }}>
+              → requires ollama 0.4+<br />
+              → requires 16 GB ram (48 GB recommended)<br />
+              → version 0.8.2 · apr 2026 · <span style={{ color: LT.muted }}>changelog</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+            {[
+              { platform:'macOS',   arch:'arm64 · x64',        size:'84 MB',  cmd:'brew install --cask dialekt',                         primary:true  },
+              { platform:'Linux',   arch:'x64 AppImage · deb · rpm', size:'92 MB',  cmd:'curl -fsSL dialekt.ai/install.sh | sh'              },
+              { platform:'Windows', arch:'x64 MSI',            size:'96 MB',  cmd:'winget install dialekt'                               },
+              { platform:'Source',  arch:'rust + tauri',       size:'git',    cmd:'git clone github.com/weloveclaude/dialekt', code:true  },
+            ].map((r,i) => (
+              <div key={i} className="install-row" style={{ background: LT.bg1, padding: '16px 18px', display: 'grid', gridTemplateColumns: '110px 1fr 90px 140px', gap: 16, alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{r.platform}</div>
+                  <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 2 }}>{r.arch}</div>
+                </div>
+                <div className="mono" style={{ fontSize: 12, color: LT.text, padding: '8px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: LT.cyan }}>$</span> {r.cmd}
+                </div>
+                <div className="mono" style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{r.size}</div>
+                {r.code ? (
+                  <a className="btn" href="#source" style={{ justifyContent: 'center' }}><LIcon name="github" size={12} color={LT.text} />View source</a>
+                ) : (
+                  <a className={`btn${r.primary ? ' primary' : ''}`} href="#" style={{ justifyContent: 'center' }}><LIcon name="down" size={12} color={r.primary ? LT.bg0 : LT.text} />Download</a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginTop: 40, padding: '16px 18px', border: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }} className="mono">
+          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● OPEN SOURCE CORE</span>
+          <span style={{ color: LT.border }}>/</span>
+          <span style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>● PRO FEATURES COMING</span>
+          <span style={{ color: LT.border }}>/</span>
+          <span style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.1em' }}>NO ACCOUNT REQUIRED</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>apache-2.0 · sha256 4f8c…e1a2</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{ padding: '80px 0 40px', borderTop: `1px solid ${LT.border}`, background: LT.bg1 }}>
+      <div className="wrap-wide">
+        <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <HeroMark size={18} />
+              <span className="mono" style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>dialekt<span style={{ color: LT.cyan }}>.ai</span></span>
+              <span className="mono" style={{ fontSize: 10, color: LT.dim, padding: '2px 6px', border: `1px solid ${LT.border}` }}>v0.8.2</span>
+            </div>
+            <p style={{ color: LT.muted, fontSize: 13, lineHeight: 1.55, marginTop: 14, maxWidth: 380 }}>A local-first AI agent for developers. Built in a cabin with the wifi off.</p>
+            <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 18, letterSpacing: '0.06em', lineHeight: 1.8 }}>
+              made by <a href="#" style={{ color: LT.cyan }}>@weloveclaude</a><br />
+              apache-2.0 · no telemetry · no account · no pricing page
+            </div>
+          </div>
+          {[['PRODUCT',[['download','#install'],['changelog','#'],['roadmap','#'],['source','#']]],['RESOURCES',[['docs','#'],['mcp servers','#'],['model guide','#'],['privacy','#']]],['COMMUNITY',[['github','#'],['twitter / x','#'],['youtube · weloveclaude','#'],['telegram','#']]]].map(([title,links],i) => (
+            <div key={i}>
+              <div className="mono" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.16em', marginBottom: 14 }}>{title}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {links.map(([l,h],j) => <a key={j} href={h} className="mono" style={{ fontSize: 12, color: LT.muted, letterSpacing: '0.02em' }}>{l}</a>)}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 56, paddingTop: 20, borderTop: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }} className="mono">
+          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>© 2026 dialekt · cabin-built · cold-brewed</span>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 10, color: LT.green, display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="dot live" style={{ background: LT.green }} /> all systems local</span>
+          <span style={{ fontSize: 10, color: LT.dim }}>// sha256 · 4f8c9a…e1a278 · signed</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// APP
+// ─────────────────────────────────────────────────────────────
+function App() {
+  return (
+    <div className="dlk-land scanlines">
+      <Nav />
+      <Hero />
+      <SectionChatVsAgent />
+      <SectionHow />
+      <SectionLocal />
+      <SectionCapabilities />
+      <SectionHardware />
+      <SectionWho />
+      <SectionInstall />
+      <Footer />
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>

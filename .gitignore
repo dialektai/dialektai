@@ -1,0 +1,56 @@
+# Python
+python/venv/
+python/__pycache__/
+python/*.pyc
+python/*.pyo
+*.egg-info/
+.pytest_cache/
+__pycache__/
+
+# SQLite (user data — never commit)
+*.db
+*.db-wal
+*.db-shm
+
+# User config & secrets (never commit)
+.env
+.env.*
+*.local
+config.json
+credentials.json
+
+# Tauri / Rust build artifacts
+frontend/src-tauri/target/
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+
+# Production sidecar binaries (built by CI via PyInstaller, not committed)
+# Dev stubs (shell scripts) in binaries/ ARE committed — see build.sh
+frontend/src-tauri/binaries/*-release
+frontend/src-tauri/binaries/*.exe
+
+# Test fixtures / scratch files
+python/sunset.png
+
+# Default framework README (project README is at root)
+frontend/README.md
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.sw?
+
+# Logs
+*.log
+logs/
+
+# PyInstaller / distribution artifacts (but keep the spec source file)
+dist/
+build/
+python/dist/
+python/build/
