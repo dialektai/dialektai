@@ -29,8 +29,9 @@ Stage 2, Week 1 of 13 — Goal 1 backend in progress
 - [x] Import/export via dialekt-manifest-validator
 - [x] Two app modes (structural): GET/POST /config/mode
 - [x] Tests: agents API, import, migration (42/42 passing)
-- [ ] First-launch mode selector screen (frontend)
-- [ ] `useAgents.js` hook + "My Agents" sidebar section
+- [x] First-launch mode selector screen (ModeSetupScreen.jsx)
+- [x] `useAgents.js` hook + "My Agents" sidebar (LeftPanel builder mode)
+- [ ] Session history grouped by agent (deferred to Week 2)
 
 ## Founder parallel (this week)
 - [ ] Rotate PyPI token
