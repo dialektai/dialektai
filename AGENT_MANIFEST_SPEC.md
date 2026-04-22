@@ -1,7 +1,7 @@
 # Agent Manifest Specification
 
-**Version:** 1.0.0
-**Status:** Draft
+**Version:** 1.0.1
+**Status:** Draft (reviewed)
 **Last updated:** 22 April 2026
 
 ---
@@ -43,7 +43,7 @@ YAML (YAML Ain't Markup Language). Причины:
 Это полный пример минимально-валидного manifest'а:
 
 ```yaml
-spec_version: "1.0.0"
+spec_version: "1.0.1"
 minimum_dialekt_version: "1.0.0"
 
 metadata:
@@ -63,6 +63,10 @@ model:
     - "qwen2.5-coder:14b"
     - "deepseek-coder:6.7b"
   min_context_window: 32000
+  requirements:
+    min_ram_gb: 24
+    min_vram_gb: 0          # 0 = CPU-only acceptable
+    recommended_ram_gb: 32
   parameters:
     temperature: 0.2
     top_p: 0.9
@@ -86,8 +90,10 @@ capabilities:
 connections:
   required:
     - type: postgres
-      name_hint: "analytics-readonly"
+      role: "readonly"
+      database_category: "analytics"
       purpose: "Reading sales and analytics data"
+      required_permissions: ["SELECT"]
 
 autonomy:
   recommended: "ask-before-write"
@@ -98,6 +104,7 @@ input:
 
 output:
   format: "table"
+  streaming: true
   destination:
     type: "notification"
 
@@ -150,7 +157,18 @@ metadata:
   tags: ["sql", "analytics", "russian"]        # для категоризации
   icon: "📊"                                    # emoji или путь к файлу
   language: "multi"                             # "ru", "en", "kk", "multi"
+  ui:                                           # UI customization
+    primary_action_label: "Проанализировать"   # кастомная надпись на кнопке запуска
 ```
+
+**`ui.primary_action_label`:** опциональное поле. По умолчанию кнопка запуска
+агента подписана "Запустить" (Run). Этим полем автор может задать контекстную
+надпись — "Проанализировать", "Сгенерировать отчет", "Создать карусель" — что
+делает UX заметно лучше. Максимум 30 символов.
+
+**Зарезервировано в v1.1:** другие UI-поля (accent_color, theme, layout) —
+отложены до появления реального запроса от пользователей, чтобы избежать
+UI-chaos на раннем этапе.
 
 **Поведение при обновлении агента:** когда автор выпускает новую версию
 (увеличивает `metadata.version`), пользователи, которым назначен этот агент,
@@ -168,6 +186,10 @@ model:
     - "qwen2.5-coder:14b"
     - "deepseek-coder:6.7b"
   min_context_window: 32000                    # required, в токенах
+  requirements:                                 # required
+    min_ram_gb: 24                             # минимум RAM для preferred
+    min_vram_gb: 0                             # 0 если CPU-only, иначе требуемый VRAM
+    recommended_ram_gb: 32                     # рекомендуемый RAM для комфортной работы
   parameters:                                   # required
     temperature: 0.2                           # 0.0-2.0
     top_p: 0.9                                  # 0.0-1.0
@@ -175,7 +197,8 @@ model:
 ```
 
 **Поведение при несовпадении модели:**
-1. Если `preferred` модель установлена — использовать её
+1. Если `preferred` модель установлена **и** железо удовлетворяет `requirements` —
+   использовать её
 2. Если нет — пройти по `acceptable` по порядку, использовать первую
    доступную с warning'ом: "Агент оптимизирован для X, запущен на Y, качество
    может отличаться"
@@ -185,17 +208,23 @@ model:
 **Context window:** если ни одна из установленных моделей не удовлетворяет
 `min_context_window`, агент не запускается.
 
+**Hardware requirements:** dialekt при импорте проверяет установленный RAM и
+VRAM пользователя. Если железо не удовлетворяет `min_ram_gb` для preferred —
+автоматически предлагает `acceptable` альтернативы с меньшими требованиями.
+Если ни одна не подходит — ясное сообщение: "Этому агенту требуется минимум
+24 GB RAM. На этой машине доступно 16 GB. Агент не может быть запущен."
+
 ---
 
 ### `system_prompt`
 
 Inline-текст системного промпта. Поддерживает подстановку переменных
-через синтаксис `{variable_name}`.
+через синтаксис `{{variable_name}}` (двойные фигурные скобки).
 
 ```yaml
 system_prompt: |
-  Ты SQL-аналитик для отдела {department} компании {company_name}.
-  Используй таблицы с префиксом {table_prefix}_*.
+  Ты SQL-аналитик для отдела {{department}} компании {{company_name}}.
+  Используй таблицы с префиксом {{table_prefix}}_*.
   Отвечай на языке пользователя (русский, английский, казахский).
 
 variables:
@@ -222,6 +251,14 @@ environments:
     company_name: "Halyk Bank"
     table_prefix: "mkt"
 ```
+
+**Почему двойные скобки:** одинарные `{}` часто встречаются в технических
+промптах (JSON-примеры, SQL с JSONB-полями, Python f-strings, примеры кода).
+Двойные `{{}}` позволяют безконфликтно подставлять переменные даже в
+промптах с кодом. Это тот же подход, что в Handlebars, Mustache, Jinja2.
+
+**Escape:** если нужно вывести буквально `{{text}}` в результате — используйте
+`\{{text\}}` (обратная косая отключает подстановку).
 
 **Multi-language:** prompt должен быть написан так, чтобы модель сама
 определяла язык пользователя и отвечала соответственно. Правило в prompt'е
@@ -273,11 +310,13 @@ capabilities:
 connections:
   required:
     - type: postgres
-      name_hint: "analytics-readonly"
+      role: "readonly"
+      database_category: "analytics"
       purpose: "Reading sales and analytics data"
       required_permissions: ["SELECT"]
     - type: mcp-server
       server: "@modelcontextprotocol/server-github"
+      role: "readonly"
       purpose: "Reading issues and PRs"
 ```
 
@@ -288,10 +327,30 @@ connections с подключениями, которые пользовател
 
 **Поля:**
 - `type` — тип подключения (`postgres`, `mysql`, `clickhouse`, `mcp-server`, `http-api`)
-- `name_hint` — предлагаемое имя подключения (пользователь может переименовать)
-- `purpose` — что агент делает с этим подключением (для прозрачности)
-- `required_permissions` — минимальные требования (помогают пользователю не
-  выбрать избыточно привилегированное подключение)
+- `role` — роль доступа: `readonly`, `readwrite`, `admin`
+- `database_category` — категория данных (для БД): `analytics`, `transactional`,
+  `warehouse`, `reporting`, `operational`
+- `purpose` — человекочитаемое описание, что агент делает с этим подключением
+- `required_permissions` — минимальные SQL-привилегии (для БД): `["SELECT"]`,
+  `["SELECT", "INSERT"]`, и т.д.
+
+**Matching logic:** при импорте агента dialekt ищет у пользователя подключения,
+удовлетворяющие всем критериям (`type`, `role`, `database_category`). Показывает
+пользователю список кандидатов:
+
+```
+Агент требует: postgres readonly, категория analytics
+Доступные у вас подключения:
+  ✓ prod-analytics-ro (postgres, readonly, analytics) — рекомендуется
+  ✓ staging-analytics (postgres, readonly, analytics)
+  ✗ prod-transactional (не подходит: категория "transactional")
+
+Выбрать: [prod-analytics-ro] [staging-analytics] [Создать новое]
+```
+
+**Строгая типизация** (вместо `name_hint`) обеспечивает надёжное сопоставление
+и защищает от ошибок — агент для аналитики не подключится случайно к
+production OLTP-базе.
 
 ---
 
@@ -309,12 +368,19 @@ autonomy:
 - `review-only` — агент только объясняет, ничего не выполняет
 - `ask-before-write` — спрашивает подтверждение перед записью/выполнением
 - `autonomous` — действует в пределах capabilities без подтверждения
-- `yolo` — никаких подтверждений (только для sandbox-окружений)
+- `sandbox-only` — никаких подтверждений (только для изолированных sandbox-окружений)
 
 **Поведение:** автор manifest'а задаёт `recommended` (что он считает
 правильным) и `max_allowed` (максимум, на который пользователь может
 повысить). Пользователь может **понизить** автономию всегда, **повысить** —
 только до `max_allowed`.
+
+**`sandbox-only` safety:** этот уровень автоматически требует, чтобы агент
+работал в изолированном окружении (Docker-контейнер, VM, Tauri sandbox).
+Dialekt проверяет sandbox-environment при попытке повысить до этого уровня.
+Имя `sandbox-only` выбрано специально, чтобы явно коммуницировать ограничение
+использования — в отличие от более неформальных названий, которые могут
+ввести в заблуждение.
 
 ---
 
@@ -415,6 +481,7 @@ input:
 ```yaml
 output:
   format: "table"
+  streaming: true                  # показывать промежуточный вывод (default: true)
   destination:
     type: "notification"
 ```
@@ -425,6 +492,13 @@ output:
 - `image` — изображение (для креативных агентов)
 - `file` — файл (Excel, PDF, CSV, PNG)
 - `json` — структурированные данные
+
+**Streaming (`streaming`):** true/false, default: true.
+- `true` — UI показывает промежуточный вывод по мере генерации модели
+  (аналогично ChatGPT). Критично для долгих задач (отчёты 3+ минут).
+- `false` — показывается только финальный результат. Используется когда
+  промежуточное состояние бессмысленно (например, для `format: image` —
+  показывать наполовину нарисованную картинку нет смысла).
 
 **Каналы доставки (`destination.type`):**
 - `notification` — OS notification + сохранение в истории (v1.0)
@@ -448,11 +522,17 @@ output:
 ```
 
 **Path variables:**
+**Path variables:** используют **одинарные** фигурные скобки, чтобы отличать
+системные path-переменные от пользовательских переменных в system_prompt.
 - `{user_home}` — домашняя директория пользователя
 - `{workspace}` — рабочая директория агента
 - `{date}` — текущая дата (YYYY-MM-DD)
 - `{datetime}` — текущее datetime (YYYY-MM-DD-HHMM)
 - `{agent_id}` — UUID агента
+
+**Важно:** path variables — это **закрытый список системных плейсхолдеров**,
+которые dialekt подставляет автоматически. Они не пересекаются с переменными
+из секции `variables` (которые используют `{{double}}` в system_prompt).
 
 ---
 
@@ -623,7 +703,7 @@ Migration tool пишется только при выпуске major-верс�
 ### Example 1: SQL Analyst for Sales
 
 ```yaml
-spec_version: "1.0.0"
+spec_version: "1.0.1"
 minimum_dialekt_version: "1.0.0"
 
 metadata:
@@ -639,22 +719,28 @@ metadata:
   tags: ["sql", "analytics", "sales"]
   icon: "📊"
   language: "multi"
+  ui:
+    primary_action_label: "Проанализировать"
 
 model:
   preferred: "qwen2.5-coder:32b"
   acceptable:
     - "qwen2.5-coder:14b"
   min_context_window: 32000
+  requirements:
+    min_ram_gb: 24
+    min_vram_gb: 0
+    recommended_ram_gb: 32
   parameters:
     temperature: 0.2
     top_p: 0.9
     max_tokens: 4096
 
 system_prompt: |
-  Ты опытный SQL-аналитик для отдела продаж {company_name}.
+  Ты опытный SQL-аналитик для отдела продаж {{company_name}}.
   Отвечай на языке пользователя (русский, английский, казахский).
 
-  Работаешь с таблицами: {table_list}
+  Работаешь с таблицами: {{table_list}}
 
   Правила:
   1. Всегда показывай SQL-запрос перед выполнением
@@ -687,7 +773,8 @@ capabilities:
 connections:
   required:
     - type: postgres
-      name_hint: "sales-readonly"
+      role: "readonly"
+      database_category: "analytics"
       purpose: "Reading sales data"
       required_permissions: ["SELECT"]
 
@@ -701,6 +788,7 @@ input:
 
 output:
   format: "table"
+  streaming: true
   destination:
     type: "notification"
 
@@ -713,11 +801,11 @@ trigger:
 ### Example 2: Instagram Carousel Generator
 
 ```yaml
-spec_version: "1.0.0"
+spec_version: "1.0.1"
 minimum_dialekt_version: "1.0.0"
 
 metadata:
-  id: "2c4d5e6f-7890-1234-5678-abcdef567890"
+  id: "b0971d56-092b-4ce4-8c39-9b30a2688439"
   name: "Instagram Carousel Generator"
   description: "Creates multi-slide Instagram carousels as PNG images"
   version: "1.0.0"
@@ -728,20 +816,26 @@ metadata:
   updated_at: "2026-04-22T11:00:00+06:00"
   tags: ["marketing", "social-media", "creative"]
   icon: "🎨"
+  ui:
+    primary_action_label: "Создать карусель"
 
 model:
   preferred: "llama3.1:70b"
   acceptable:
     - "mistral-nemo:12b"
   min_context_window: 8192
+  requirements:
+    min_ram_gb: 48
+    min_vram_gb: 0
+    recommended_ram_gb: 64
   parameters:
     temperature: 0.8
     top_p: 0.95
     max_tokens: 4096
 
 system_prompt: |
-  Ты креативный маркетолог-копирайтер для {brand_name}.
-  Tone of voice: {brand_tone}
+  Ты креативный маркетолог-копирайтер для {{brand_name}}.
+  Tone of voice: {{brand_tone}}
 
   Задача: создать многостраничную карусель для Instagram.
 
@@ -813,6 +907,7 @@ input:
 
 output:
   format: "file"
+  streaming: false
   destination:
     type: "filesystem"
     path: "{user_home}/Desktop/carousels/{date}-{topic}.png"
@@ -827,11 +922,11 @@ trigger:
 ### Example 3: Daily Sales Report
 
 ```yaml
-spec_version: "1.0.0"
+spec_version: "1.0.1"
 minimum_dialekt_version: "1.0.0"
 
 metadata:
-  id: "9a8b7c6d-5432-1098-7654-fedcba098765"
+  id: "add9891b-6e9a-427a-b2ff-a64c61ef389f"
   name: "Daily Sales Report"
   description: "Generates Excel sales report every morning at 9 AM"
   version: "1.0.0"
@@ -848,6 +943,10 @@ model:
   acceptable:
     - "qwen2.5-coder:14b"
   min_context_window: 16000
+  requirements:
+    min_ram_gb: 16
+    min_vram_gb: 0
+    recommended_ram_gb: 24
   parameters:
     temperature: 0.1
     top_p: 0.9
@@ -875,7 +974,8 @@ capabilities:
 connections:
   required:
     - type: postgres
-      name_hint: "sales-readonly"
+      role: "readonly"
+      database_category: "analytics"
       purpose: "Reading sales data for reports"
       required_permissions: ["SELECT"]
 
@@ -888,6 +988,7 @@ input:
 
 output:
   format: "file"
+  streaming: false
   destination:
     type: "filesystem"
     path: "{user_home}/Reports/sales/{date}-daily-sales.xlsx"
@@ -905,11 +1006,11 @@ trigger:
 ### Example 4: Code Review Assistant
 
 ```yaml
-spec_version: "1.0.0"
+spec_version: "1.0.1"
 minimum_dialekt_version: "1.0.0"
 
 metadata:
-  id: "4e5f6a7b-8901-2345-6789-abcdef123456"
+  id: "b400a3f4-d2f7-4433-8950-3aee9b93682f"
   name: "Code Review Assistant"
   description: "Senior-level code review on git diff"
   version: "1.0.0"
@@ -920,12 +1021,18 @@ metadata:
   updated_at: "2026-04-22T14:00:00+06:00"
   tags: ["code-review", "developer-tools"]
   icon: "🔍"
+  ui:
+    primary_action_label: "Провести review"
 
 model:
   preferred: "deepseek-r1:32b"
   acceptable:
     - "qwen2.5-coder:32b"
   min_context_window: 64000
+  requirements:
+    min_ram_gb: 24
+    min_vram_gb: 0
+    recommended_ram_gb: 32
   parameters:
     temperature: 0.3
     top_p: 0.9
@@ -966,6 +1073,7 @@ input:
 
 output:
   format: "markdown"
+  streaming: true
   destination:
     type: "notification"
 
@@ -994,7 +1102,7 @@ trigger:
 - Timestamps в ISO 8601 с timezone
 - Cron expression (если `trigger.type` = "scheduled") — валидный
 - Timezone — валидный IANA timezone identifier
-- Variables, упомянутые в system_prompt (`{variable}`) — все определены в `variables`
+- Variables, упомянутые в system_prompt (`{{variable}}`) — все определены в `variables`
 - Environments consistency — каждое environment содержит все required variables
 
 ### Security validation
@@ -1034,6 +1142,22 @@ trigger:
 ---
 
 ## Changelog
+
+### Version 1.0.1 (2026-04-22)
+- Incorporated external technical review feedback
+- **Added:** `model.requirements` block with `min_ram_gb`, `min_vram_gb`,
+  `recommended_ram_gb` — dialekt checks hardware before loading
+- **Added:** `output.streaming` field (boolean, default true) — UI shows
+  intermediate results during long tasks
+- **Added:** `metadata.ui.primary_action_label` (optional) — custom CTA
+  button label for better UX
+- **Changed:** variable syntax `{variable}` → `{{variable}}` — prevents
+  conflicts with code/JSON/SQL in prompts
+- **Changed:** autonomy level `yolo` → `sandbox-only` — clearer, more
+  professional naming that explicitly signals restriction
+- **Changed:** `connections` schema — strict typing via `role` +
+  `database_category` instead of fragile `name_hint`
+- All four example manifests updated to reflect changes
 
 ### Version 1.0.0 (2026-04-22)
 - Initial release
