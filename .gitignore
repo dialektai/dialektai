@@ -67,3 +67,8 @@ frontend/node_modules/
 frontend/dist/
 dist/
 *.pyc
+
+# Built PyInstaller sidecar binaries (produced by build_sidecar.sh / CI).
+# The committed stubs in binaries/ are shell scripts used for `tauri dev`;
+# real ELF binaries are always rebuilt and never committed.
+frontend/src-tauri/binaries/dialekt-server-x86_64-unknown-linux-gnu
