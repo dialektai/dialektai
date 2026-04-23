@@ -3,17 +3,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dialekt.llm.sql_language import DialektSQL, _format_result
+from dialekt.llm.sql_language import DialektSQL, _format_result, _prefix_for
 
 
 class _FakeInterpreter:
-    def __init__(self, conn_id=None):
+    def __init__(self, conn_id=None, driver=None):
         self._dialekt_sql_conn = conn_id
+        self._dialekt_sql_driver = driver
 
 
 class _FakeComputer:
-    def __init__(self, conn_id=None):
-        self.interpreter = _FakeInterpreter(conn_id)
+    def __init__(self, conn_id=None, driver=None):
+        self.interpreter = _FakeInterpreter(conn_id, driver)
 
 
 def test_format_result_renders_markdown_table():
@@ -131,3 +132,82 @@ def test_run_with_transport_error_surfaces_it():
 
     assert len(chunks) == 1
     assert "SQL transport error" in chunks[0]["content"]
+
+
+# ── _prefix_for: driver → router prefix routing ──────────────────────────────
+
+
+@pytest.mark.parametrize("driver,expected", [
+    (None,         "/connections"),
+    ("",           "/connections"),
+    ("postgres",   "/connections"),
+    ("postgresql", "/connections"),
+    ("pg",         "/connections"),
+    ("POSTGRES",   "/connections"),  # case-insensitive
+    ("mysql",      "/mysql-connections"),
+    ("MySQL",      "/mysql-connections"),
+    ("clickhouse", "/ch-connections"),
+    ("ch",         "/ch-connections"),
+    ("unknown",    "/connections"),  # graceful fallback
+])
+def test_prefix_for_driver_routes_to_correct_backend(driver, expected):
+    assert _prefix_for(driver) == expected
+
+
+def test_run_with_mysql_driver_hits_mysql_connections_prefix():
+    """Regression: before this fix DialektSQL always POSTed to
+    /connections/{id}/query, so mysql conn_ids got a 400 from the
+    postgres router. Now it must route via /mysql-connections.
+    """
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"columns": ["n"], "rows": [[4]], "row_count": 1}
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post = MagicMock(return_value=mock_resp)
+
+    with patch("httpx.Client", return_value=mock_client):
+        handler = DialektSQL(_FakeComputer(conn_id="mysql-xyz", driver="mysql"))
+        list(handler.run("SELECT COUNT(*) FROM orders"))
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/mysql-connections/mysql-xyz/query" in call_url
+    assert "/connections/mysql-xyz/query" not in call_url.replace("/mysql-connections", "")
+
+
+def test_run_with_clickhouse_driver_hits_ch_connections_prefix():
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"columns": ["n"], "rows": [[1]], "row_count": 1}
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post = MagicMock(return_value=mock_resp)
+
+    with patch("httpx.Client", return_value=mock_client):
+        handler = DialektSQL(_FakeComputer(conn_id="ch-abc", driver="clickhouse"))
+        list(handler.run("SELECT 1"))
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/ch-connections/ch-abc/query" in call_url
+
+
+def test_run_without_driver_defaults_to_postgres_prefix():
+    """Backward compatibility — agents bound before the driver field existed
+    have no _dialekt_sql_driver attribute; we must not break them.
+    """
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"columns": [], "rows": [], "row_count": 0}
+    mock_client = MagicMock()
+    mock_client.__enter__ = MagicMock(return_value=mock_client)
+    mock_client.__exit__ = MagicMock(return_value=False)
+    mock_client.post = MagicMock(return_value=mock_resp)
+
+    with patch("httpx.Client", return_value=mock_client):
+        handler = DialektSQL(_FakeComputer(conn_id="legacy-pg"))  # driver=None
+        list(handler.run("SELECT 1"))
+
+    call_url = mock_client.post.call_args[0][0]
+    assert "/connections/legacy-pg/query" in call_url

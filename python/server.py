@@ -1555,9 +1555,13 @@ def make_interpreter(
 
     # Register dialekt's SQL executor so agents with a bound DB connection
     # can actually run the sql blocks they emit. The handler reads the
-    # connection id from the stashed attribute at execution time.
+    # connection id + driver from the stashed attributes at execution time.
+    # Driver picks which backend router receives the query (/connections,
+    # /mysql-connections, /ch-connections).
     conn_id = (agent_context or {}).get("connection_id") if agent_context else None
+    driver = (agent_context or {}).get("database_type") if agent_context else None
     interpreter._dialekt_sql_conn = conn_id
+    interpreter._dialekt_sql_driver = driver
     try:
         from dialekt.llm.sql_language import DialektSQL
         langs = interpreter.computer.terminal.languages

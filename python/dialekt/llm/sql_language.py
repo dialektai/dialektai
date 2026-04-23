@@ -24,6 +24,26 @@ DIALEKT_API = os.environ.get("DIALEKT_API", "http://127.0.0.1:8765")
 MAX_DISPLAY_ROWS = 50
 QUERY_TIMEOUT_SECONDS = 30.0
 
+# Map the agent_bindings.connection_type value to the right backend router.
+# The dialekt server mounts three separate routers, one per database type,
+# and they do not share connection ids — a mysql conn_id posted to
+# /connections/{id}/query gets a 400 from the postgres router.
+_DRIVER_PREFIX = {
+    "postgres":   "/connections",
+    "postgresql": "/connections",
+    "pg":         "/connections",
+    "mysql":      "/mysql-connections",
+    "clickhouse": "/ch-connections",
+    "ch":         "/ch-connections",
+}
+
+
+def _prefix_for(driver: str | None) -> str:
+    """Pick the router prefix for a connection_type, defaulting to postgres."""
+    if not driver:
+        return "/connections"
+    return _DRIVER_PREFIX.get(driver.lower(), "/connections")
+
 
 def _format_result(data: dict) -> str:
     """Render a /connections/{id}/query response as a markdown-ish block."""
@@ -62,19 +82,23 @@ def _format_result(data: dict) -> str:
     return "\n".join(lines).strip()
 
 
-def _execute(conn_id: str, sql: str) -> Iterable[dict]:
+def _execute(conn_id: str, sql: str, driver: str | None = None) -> Iterable[dict]:
     """POST SQL to the dialekt backend and yield OI-shaped console chunks.
 
     `retry: false` is passed to avoid the server-side SQLRetryLoop — the
     LLM that wrote the SQL can correct itself on the next turn if the
     statement fails, and the server's retry path currently triggers a
     recursive validate_sql → /query loop when enabled.
+
+    `driver` selects the backend router. Missing / unknown → postgres
+    for backward compatibility.
     """
     import httpx
+    prefix = _prefix_for(driver)
     try:
         with httpx.Client(timeout=QUERY_TIMEOUT_SECONDS) as c:
             r = c.post(
-                f"{DIALEKT_API}/connections/{conn_id}/query",
+                f"{DIALEKT_API}{prefix}/{conn_id}/query",
                 json={"sql": sql.strip(), "retry": False},
             )
     except Exception as e:
@@ -128,6 +152,10 @@ class DialektSQL:
         itp = getattr(self.computer, "interpreter", None)
         return getattr(itp, "_dialekt_sql_conn", None) if itp else None
 
+    def _driver(self) -> str | None:
+        itp = getattr(self.computer, "interpreter", None)
+        return getattr(itp, "_dialekt_sql_driver", None) if itp else None
+
     def run(self, code: str) -> Iterable[dict]:
         conn_id = self._connection_id()
         if not conn_id:
@@ -141,8 +169,9 @@ class DialektSQL:
                 ),
             }
             return
-        log.info(f"DialektSQL: executing on conn={conn_id[:8]} sql={code.strip()[:120]!r}")
-        yield from _execute(conn_id, code)
+        driver = self._driver()
+        log.info(f"DialektSQL: executing on conn={conn_id[:8]} driver={driver or 'postgres'} sql={code.strip()[:120]!r}")
+        yield from _execute(conn_id, code, driver=driver)
 
     def stop(self):  # pragma: no cover — HTTP client is short-lived
         pass
