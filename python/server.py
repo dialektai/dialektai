@@ -1446,6 +1446,74 @@ async def resolve_agent_context(agent: dict) -> dict:
     return result
 
 
+def get_installed_ollama_models() -> set[str]:
+    """Fetch currently installed Ollama models via /api/tags.
+
+    Returns an empty set on any error so callers can cleanly fall back to
+    the global default model.
+    """
+    try:
+        import httpx
+        with httpx.Client(timeout=2.0) as c:
+            r = c.get("http://127.0.0.1:11434/api/tags")
+            r.raise_for_status()
+            return {m["name"] for m in r.json().get("models", [])}
+    except Exception as e:
+        log.warning(f"pick_model: could not fetch Ollama models: {e}")
+        return set()
+
+
+def pick_model_for_agent(manifest: dict | None, installed: set[str], default: str) -> str:
+    """Pick the best local model for an agent.
+
+    Fallback chain:
+      1. manifest.model.preferred (exact match in installed)
+      2. first manifest.model.acceptable installed
+      3. family match of preferred (e.g. qwen2.5-coder:32b -> qwen2.5-coder:7b)
+      4. family match of any acceptable
+      5. global default
+    """
+    model_config = (manifest or {}).get("model") or {}
+    preferred = model_config.get("preferred")
+    acceptable = model_config.get("acceptable") or []
+
+    if preferred and preferred in installed:
+        log.info(f"pick_model: using preferred {preferred}")
+        return preferred
+
+    for candidate in acceptable:
+        if candidate in installed:
+            log.info(f"pick_model: using acceptable fallback {candidate}")
+            return candidate
+
+    def family_of(name: str) -> str:
+        return name.split(":", 1)[0] if ":" in name else name
+
+    def best_family_match(name: str) -> str | None:
+        family = family_of(name)
+        matches = [m for m in installed if family_of(m) == family]
+        # Prefer smallest tag (more likely to fit on the local machine).
+        return sorted(matches)[0] if matches else None
+
+    if preferred:
+        m = best_family_match(preferred)
+        if m:
+            log.info(f"pick_model: family-match {preferred} -> {m}")
+            return m
+
+    for candidate in acceptable:
+        m = best_family_match(candidate)
+        if m:
+            log.info(f"pick_model: family-match {candidate} -> {m}")
+            return m
+
+    log.warning(
+        f"pick_model: no match for preferred={preferred!r} acceptable={acceptable!r}, "
+        f"using default {default!r}"
+    )
+    return default
+
+
 def make_interpreter(
     agent: dict | None = None,
     agent_context: dict | None = None,
@@ -1459,7 +1527,24 @@ def make_interpreter(
     )
     s = load_settings()
     interpreter.reset()
-    model = s.get("model", "gemma3-12b")
+
+    default_model = s.get("model", "gemma3-12b")
+    manifest_dict: dict | None = None
+    if agent and agent.get("manifest_yaml"):
+        try:
+            import yaml as _yml
+            manifest_dict = _yml.safe_load(agent["manifest_yaml"]) or {}
+        except Exception as e:
+            log.warning(f"pick_model: manifest parse failed for {agent.get('name')!r}: {e}")
+
+    if manifest_dict and (manifest_dict.get("model") or {}):
+        installed = get_installed_ollama_models()
+        model = pick_model_for_agent(manifest_dict, installed, default_model)
+        log.info(f"Agent {agent.get('name')!r}: using model {model}")
+    else:
+        model = default_model
+        log.info(f"No agent manifest, using session default model {model}")
+
     interpreter.llm.model = f"ollama_chat/{model}"
     interpreter.llm.api_base = "http://localhost:11434"
     interpreter.llm.context_window = int(s.get("context_window", 8192))
