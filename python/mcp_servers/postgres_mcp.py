@@ -366,6 +366,24 @@ async def execute_query(conn_id: str, body: dict):
 
     _check_sql_safety(sql)
 
+    # ── Goal 8.3: optional self-correcting retry loop ────────────────────────
+    # Controlled by DIALEKT_SQL_RETRY env var (default "1" / on).
+    # When on, a pre-flight EXPLAIN validates the SQL before we execute it.
+    # On failure, SQLRetryLoop asks a local LLM to fix the SQL using the
+    # PG error message as feedback, and retries up to max_retries times.
+    # Callers can disable per-request by passing {"retry": false} in the body.
+    # `retry_context` may include {"question": "...", "agent_id": "..."} to
+    # give the fix-up LLM more context.
+    import os
+    retry_enabled = (
+        body.get("retry", True)
+        and os.environ.get("DIALEKT_SQL_RETRY", "1").lower() in ("1", "true", "yes")
+    )
+    retry_context = body.get("retry_context") or {}
+    retry_attempts_log: list[dict] = []
+    if retry_enabled:
+        sql, retry_attempts_log = await _retry_fix_sql(conn_id, sql, retry_context)
+
     pool = await _get_pool(conn_id, conn)
     async with pool.acquire() as c:
         # EXPLAIN check — warn if estimated rows > 10k
@@ -392,20 +410,121 @@ async def execute_query(conn_id: str, body: dict):
             raise HTTPException(400, f"SQL error: {e}")
 
     if not result:
-        return {"columns": [], "rows": [], "row_count": 0, "warning": explain_warning}
+        payload: dict = {"columns": [], "rows": [], "row_count": 0, "warning": explain_warning}
+    else:
+        columns = list(result[0].keys())
+        rows = result[:row_limit]
+        truncated = len(result) > row_limit
+        payload = {
+            "columns": columns,
+            "rows": [[str(v) if v is not None else None for v in r.values()] for r in rows],
+            "row_count": len(rows),
+            "truncated": truncated,
+            "row_limit": row_limit,
+            "warning": explain_warning,
+        }
 
-    columns = list(result[0].keys())
-    rows = result[:row_limit]
-    truncated = len(result) > row_limit
+    if retry_attempts_log:
+        payload["retry_attempts"] = retry_attempts_log
+        payload["executed_sql"] = sql
+    return payload
 
-    return {
-        "columns": columns,
-        "rows": [[str(v) if v is not None else None for v in r.values()] for r in rows],
-        "row_count": len(rows),
-        "truncated": truncated,
-        "row_limit": row_limit,
-        "warning": explain_warning,
-    }
+
+# ── Goal 8.3 retry helper ─────────────────────────────────────────────────────
+
+async def _retry_fix_sql(
+    conn_id: str,
+    sql: str,
+    retry_context: dict,
+) -> tuple[str, list[dict]]:
+    """Validate SQL via EXPLAIN; on failure, ask a local LLM to fix it
+    (up to SQLRetryLoop.max_retries). Returns (final_sql, attempt_log).
+    Always returns — even if retries exhausted — the last SQL tried, so
+    the normal execution path surfaces the error to the caller.
+    """
+    from dialekt.llm.retry_loop import SQLRetryLoop, validate_sql
+
+    # First check: is the initial SQL already valid? If so, short-circuit.
+    ok, _ = await validate_sql(conn_id, sql)
+    if ok:
+        return sql, []
+
+    loop = SQLRetryLoop(conn_id, max_retries=3)
+    log.warning(f"🔄 SQL retry: initial SQL failed EXPLAIN validation; starting fix-up loop")
+
+    async def llm_regenerate(bad_sql: str, error_feedback: str) -> str:
+        attempt_n = len(loop.attempts) + 1
+        log.warning(
+            f"🔄 SQL retry attempt {attempt_n}/{loop.max_retries} — "
+            f"previous error: {error_feedback.splitlines()[0][:120]}"
+        )
+        return await _ollama_fix_sql(
+            bad_sql=bad_sql,
+            error_msg=error_feedback,
+            question=retry_context.get("question", ""),
+            schema_hint=retry_context.get("schema_hint", ""),
+        )
+
+    try:
+        # SQLRetryLoop expects a full code block; give it a fenced wrapper.
+        fenced = f"```sql\n{sql}\n```"
+        fixed_fenced = await loop.validate_and_maybe_retry(fenced, llm_regenerate)
+        # Extract the corrected SQL back out of the fence.
+        import re as _re
+        m = _re.search(r"```(?:sql)?\s*([\s\S]+?)```", fixed_fenced, _re.IGNORECASE)
+        fixed_sql = m.group(1).strip() if m else fixed_fenced.strip()
+        if fixed_sql != sql:
+            log.info(f"🔄 SQL retry succeeded on attempt {len(loop.attempts)} — using corrected SQL")
+        return fixed_sql, loop.attempts
+    except Exception as e:
+        # Retries exhausted or regeneration failed — fall through with original SQL
+        # so the caller gets the raw PG error from the execution path.
+        log.warning(f"🔄 SQL retry exhausted ({e}); falling back to original SQL")
+        return sql, loop.attempts
+
+
+async def _ollama_fix_sql(
+    bad_sql: str,
+    error_msg: str,
+    question: str,
+    schema_hint: str,
+) -> str:
+    """Call local Ollama to produce a corrected SQL query.
+    Returns a fenced ```sql ... ``` block (matches SQLRetryLoop expectations)."""
+    import httpx as _httpx
+    import os
+
+    model = os.environ.get("DIALEKT_RETRY_MODEL", "gemma3-12b")
+    base = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+
+    prompt = (
+        "You are a PostgreSQL expert. A query failed validation. Produce a corrected "
+        "version. OUTPUT ONLY the corrected SQL inside a ```sql fenced block — no prose.\n\n"
+    )
+    if question:
+        prompt += f"USER QUESTION: {question}\n\n"
+    if schema_hint:
+        prompt += f"SCHEMA HINT:\n{schema_hint}\n\n"
+    prompt += f"FAILED SQL:\n```sql\n{bad_sql}\n```\n\nPG ERROR: {error_msg}\n\nCORRECTED SQL:"
+
+    try:
+        async with _httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                f"{base}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False},
+            )
+            r.raise_for_status()
+            data = r.json()
+            text = (data.get("response") or "").strip()
+    except Exception as e:
+        log.warning(f"🔄 ollama fix-sql call failed: {e}")
+        # Return the original so validate-and-retry breaks out of the loop.
+        return f"```sql\n{bad_sql}\n```"
+
+    # If the model produced a fenced block, return as-is; otherwise wrap.
+    if "```" in text:
+        return text
+    return f"```sql\n{text}\n```"
 
 
 @router.post("/{conn_id}/reindex")
