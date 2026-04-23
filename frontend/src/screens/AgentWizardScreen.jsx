@@ -1075,6 +1075,29 @@ export default function AgentWizardScreen({ onNav }) {
         if (errs.length > 8) addToast(`…and ${errs.length - 8} more errors`, 'error');
         return;
       }
+      const created = await res.json().catch(() => ({}));
+
+      // Persist the DB binding so SQL Analyst (and similar agents) work
+      // out-of-the-box. Without this, the binding only lives inside the
+      // YAML manifest and agent_bindings stays empty, so DialektSQL has
+      // no connection_id at runtime.
+      if (created.id && data.connection_id && data.connection_type && data.connection_type !== 'none') {
+        try {
+          await fetch(`${API}/agents/${created.id}/binding`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              connection_id: data.connection_id,
+              connection_type: data.connection_type,
+            }),
+          });
+        } catch (bindErr) {
+          // Agent itself was saved — don't fail the flow; user can set
+          // the binding later from Settings → Agents.
+          addToast('Agent saved but connection binding failed — set it in Settings → Agents', 'warning');
+        }
+      }
+
       addToast(status === 'draft' ? 'Agent saved as draft' : 'Agent published successfully', 'success');
       setTimeout(() => onNav('settings'), 600);
     } catch (err) {
