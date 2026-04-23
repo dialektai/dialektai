@@ -689,7 +689,7 @@ function AutonomyPicker({ value, onChange }) {
 
 // ── Composer ──────────────────────────────────────────────────────
 
-function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, messages }) {
+function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, messages, disabled, disabledHint }) {
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const taRef = useRef(null);
@@ -702,12 +702,12 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
 
   const submit = useCallback(() => {
     const t = text.trim();
-    if (!t || streaming || !connected) return;
+    if (!t || streaming || !connected || disabled) return;
     // onSend may be wrapped by parent to inject activeAgentId — pass text only here.
     onSend(t);
     setText('');
     if (taRef.current) taRef.current.style.height = 'auto';
-  }, [text, streaming, connected, onSend]);
+  }, [text, streaming, connected, disabled, onSend]);
 
   const onKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
@@ -795,19 +795,23 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
           </div>
         )}
 
-        <div style={{ border: `1px solid ${connected ? T.borderHi : T.border}`, background: T.bg0, borderRadius: 3 }}>
+        <div style={{ border: `1px solid ${connected ? T.borderHi : T.border}`, background: T.bg0, borderRadius: 3, opacity: disabled ? 0.6 : 1 }}>
           <textarea
             ref={taRef}
             value={text}
             onChange={autoResize}
             onKeyDown={onKey}
-            disabled={streaming}
-            placeholder={streaming ? 'dialekt is working…' : '› Ask, instruct, paste a trace…'}
+            disabled={streaming || disabled}
+            placeholder={
+              disabled ? (disabledHint || 'Agent needs more setup before it can chat')
+              : streaming ? 'dialekt is working…'
+              : '› Ask, instruct, paste a trace…'
+            }
             rows={1}
             style={{
               display: 'block', width: '100%', boxSizing: 'border-box',
               background: 'transparent', border: 'none', outline: 'none',
-              fontFamily: T.mono, fontSize: 13, color: streaming ? T.dim : T.text,
+              fontFamily: T.mono, fontSize: 13, color: (streaming || disabled) ? T.dim : T.text,
               padding: '12px 14px', resize: 'none', lineHeight: 1.55,
               caretColor: T.cyan, minHeight: 44,
             }}
@@ -829,9 +833,9 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
             <span className="mono" style={{ fontSize: 10, color: T.dim }}>⇧⏎ newline</span>
             <button
               className="dlk-btn primary"
-              style={{ padding: '5px 12px', opacity: (!text.trim() || streaming || !connected) ? 0.4 : 1 }}
+              style={{ padding: '5px 12px', opacity: (!text.trim() || streaming || !connected || disabled) ? 0.4 : 1 }}
               onClick={submit}
-              disabled={!text.trim() || streaming || !connected}
+              disabled={!text.trim() || streaming || !connected || disabled}
             >
               {streaming ? 'Working…' : 'Send'}{' '}
               <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
@@ -854,10 +858,62 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
 
 // ── Main export ───────────────────────────────────────────────────
 
+function BindingNotice({ agentName, requiredTypes, onPickConnection, onAddConnection }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 14,
+      border: `1px solid ${T.cyan}55`,
+      background: `${T.cyan}0a`,
+      padding: '14px 18px',
+      marginBottom: 14,
+    }}>
+      <div style={{
+        width: 22, height: 22, flexShrink: 0,
+        borderRadius: '50%', border: `1px solid ${T.cyan}`,
+        color: T.cyan, fontSize: 13, fontFamily: T.mono,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>ℹ</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, color: T.text, marginBottom: 4 }}>
+          <span style={{ fontWeight: 600 }}>{agentName}</span>
+          {' '}needs a database connection before it can answer questions.
+        </div>
+        <div className="mono" style={{ fontSize: 11, color: T.muted, marginBottom: 12 }}>
+          Required type{requiredTypes.length > 1 ? 's' : ''}: {requiredTypes.join(', ')}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onPickConnection}
+            style={{
+              background: T.cyan, color: '#000', border: 'none',
+              padding: '7px 14px', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', letterSpacing: '.04em',
+            }}
+          >
+            PICK A DATABASE
+          </button>
+          <button
+            onClick={onAddConnection}
+            style={{
+              background: 'transparent', color: T.cyan,
+              border: `1px solid ${T.cyan}`,
+              padding: '6px 13px', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', letterSpacing: '.04em',
+            }}
+          >
+            + ADD NEW DATABASE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatColumn({
   messages = [], streaming = false, connected = false,
   sessionTitle, sessionId, autonomy = 'ask-write', activeModel,
   onSend, onStop, onNewSession, onSessionTitleChange, onAutonomyChange, onConfirm,
+  bindingNotice,
 }) {
   const bottomRef = useRef(null);
   const [ctxMenu, setCtxMenu] = useState(null); // {x, y, msgs}
@@ -1003,6 +1059,11 @@ export default function ChatColumn({
         <div ref={bottomRef} />
       </div>
 
+      {bindingNotice && (
+        <div style={{ padding: '0 28px', marginTop: 12 }}>
+          <BindingNotice {...bindingNotice} />
+        </div>
+      )}
       <Composer
         onSend={onSend}
         streaming={streaming}
@@ -1010,6 +1071,8 @@ export default function ChatColumn({
         autonomy={autonomy}
         onAutonomyChange={onAutonomyChange}
         messages={messages}
+        disabled={!!bindingNotice}
+        disabledHint={bindingNotice ? 'Сначала подключите базу данных' : null}
       />
     </main>
   );
