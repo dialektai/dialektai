@@ -36,12 +36,18 @@ async def validate_sql(conn_id: str, sql: str) -> tuple[bool, str]:
     """
     Dry-run a SELECT via EXPLAIN. Returns (ok, error_message).
     Uses the local dialekt MCP REST API.
+
+    `retry: False` is critical — without it, /connections/{id}/query would
+    call _retry_fix_sql → validate_sql → /query → _retry_fix_sql → …,
+    spamming the logs with '🔄 SQL retry attempt N/3' forever until the
+    client times out. The validator does its own retry here; the server
+    must not try to double-retry.
     """
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.post(
                 f"{_BACKEND}/connections/{conn_id}/query",
-                json={"sql": f"EXPLAIN {sql}"},
+                json={"sql": f"EXPLAIN {sql}", "retry": False},
             )
         data = r.json()
         if not data.get("ok", True) or r.status_code >= 400:

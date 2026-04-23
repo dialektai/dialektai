@@ -153,3 +153,49 @@ async def test_retry_exhausted_attributes():
     err = exc.value
     assert isinstance(err.attempts, list)
     assert len(err.attempts) == 1
+
+
+# ── validate_sql wire format (regression: recursive retry storm) ──────────────
+
+
+@pytest.mark.asyncio
+async def test_validate_sql_disables_server_side_retry():
+    """validate_sql POSTs EXPLAIN to /connections/{id}/query. That endpoint
+    triggers SQLRetryLoop when retry is enabled, which would call
+    validate_sql again — infinite loop. Guard: retry must be False in the
+    body so the server does one-shot validation and returns.
+    """
+    from dialekt.llm.retry_loop import validate_sql
+    import httpx as _httpx
+
+    captured = {}
+
+    class _FakeResponse:
+        status_code = 200
+        def json(self):
+            return {"ok": True}
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *a):
+            return False
+        async def post(self, url, json=None, **kwargs):
+            captured["url"] = url
+            captured["json"] = json
+            return _FakeResponse()
+
+    with patch.object(_httpx, "AsyncClient", _FakeClient):
+        ok, err = await validate_sql("conn-x", "SELECT 1")
+
+    assert ok is True
+    assert err == ""
+    assert captured["url"].endswith("/connections/conn-x/query")
+    assert captured["json"].get("retry") is False, (
+        "validate_sql must pass retry:false to avoid recursive SQLRetryLoop "
+        "on the server side — see postgres_mcp._retry_fix_sql."
+    )
+    # Sanity — the SQL sent is wrapped in EXPLAIN.
+    assert captured["json"].get("sql", "").startswith("EXPLAIN ")
