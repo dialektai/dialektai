@@ -52,8 +52,15 @@ class EmailService:
             if self.user:
                 smtp_kwargs["username"] = self.user
                 smtp_kwargs["password"] = self.password
+            # Port 465 = implicit TLS, 587 = STARTTLS, 25 = plain.
+            # `use_tls` in the .env controls "encryption expected"; map it to
+            # the correct aiosmtplib flag based on port so Gmail (587) works
+            # alongside providers that only speak implicit TLS (465).
             if self.use_tls:
-                smtp_kwargs["use_tls"] = True
+                if self.port == 465:
+                    smtp_kwargs["use_tls"] = True
+                else:
+                    smtp_kwargs["start_tls"] = True
 
             await aiosmtplib.send(msg, **smtp_kwargs)
             logger.info("Email sent to %s (template=%s)", to, template)
