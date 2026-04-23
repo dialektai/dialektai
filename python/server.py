@@ -457,6 +457,7 @@ async def system_stats():
     return {
         "cpu": round(cpu),
         "ram": round(vm.percent),
+        "ram_total_gb": round(vm.total / (1024**3)),
         "gpu": gpu,
         "disk": round(dsk.percent),
     }
