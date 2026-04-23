@@ -34,7 +34,9 @@ OLD_SETTINGS_FILE = _HOME / ".config" / "dialekt" / "settings.json"  # migration
 
 DEFAULT_SETTINGS: dict = {
     "model": "gemma3-12b",
-    "cloud_api_url": "https://api.dialekt.ai",
+    # Default cloud endpoint. Pilots / dev can override this via Settings → Cloud
+    # (POST /settings with cloud_api_url) or by editing ~/.dialekt/config.json.
+    "cloud_api_url": "https://api.dias.now",
     "cloud_bearer_token": None,
     "tenant_info": None,
     "user_info": None,
@@ -71,25 +73,53 @@ DEFAULT_SETTINGS: dict = {
 
 
 def load_settings() -> dict:
+    from dialekt.secrets import get_secret, SENSITIVE_KEYS
     try:
         if SETTINGS_FILE.exists():
             stored = json.loads(SETTINGS_FILE.read_text())
-            return {**DEFAULT_SETTINGS, **stored}
-        # Migrate from old ~/.config/dialekt/settings.json location
-        if OLD_SETTINGS_FILE.exists():
+            merged = {**DEFAULT_SETTINGS, **stored}
+        elif OLD_SETTINGS_FILE.exists():
+            # Migrate from old ~/.config/dialekt/settings.json location
             stored = json.loads(OLD_SETTINGS_FILE.read_text())
             merged = {**DEFAULT_SETTINGS, **stored}
             save_settings(merged)
             log.info("Migrated settings from ~/.config/dialekt/ to ~/.dialekt/")
-            return merged
+        else:
+            merged = DEFAULT_SETTINGS.copy()
     except Exception:
-        pass
-    return DEFAULT_SETTINGS.copy()
+        merged = DEFAULT_SETTINGS.copy()
+    # Pull sensitive fields out of the keychain (if present). Plaintext copies
+    # in config.json are removed by the boot-time migration — see `main()`.
+    for name in SENSITIVE_KEYS:
+        try:
+            v = get_secret(name)
+            if v:
+                merged[name] = v
+        except Exception:
+            pass
+    return merged
 
 
 def save_settings(data: dict) -> None:
+    """Persist settings to disk, routing sensitive fields to the OS keychain.
+
+    The on-disk JSON only ever contains non-sensitive preferences.
+    """
+    from dialekt.secrets import set_secret, delete_secret, SENSITIVE_KEYS
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(data, indent=2))
+    to_write = dict(data)
+    for name in SENSITIVE_KEYS:
+        val = to_write.pop(name, None)
+        try:
+            if val:
+                set_secret(name, val)
+            else:
+                # When the caller is explicitly clearing (e.g. revocation),
+                # mirror that into the keychain too.
+                delete_secret(name)
+        except Exception as e:
+            log.warning("secret %s not persisted to keychain: %s", name, e)
+    SETTINGS_FILE.write_text(json.dumps(to_write, indent=2, ensure_ascii=False))
 
 
 import aiosqlite
@@ -228,6 +258,24 @@ async def _maybe_import_bundled_agent(manifest_path: Path) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db
+    # ── secrets migration (v0.8 → v0.9): move plaintext secrets out of
+    #    config.json into the OS keychain. Idempotent, runs every boot.
+    try:
+        from dialekt.secrets import migrate_from_config, backend_info
+        rep = migrate_from_config(SETTINGS_FILE)
+        info = backend_info()
+        if rep["migrated"]:
+            log.warning("secrets migrated to %s: %s", info["kind"], rep["migrated"])
+        log.info("secrets backend: %s (%s) — secure=%s",
+                 info["kind"], info["name"], info["secure"])
+        if not info["secure"]:
+            log.warning(
+                "no OS keychain detected; secrets are in %s with best-effort "
+                "obfuscation. Install gnome-keyring or kwallet for real protection.",
+                info["path"])
+    except Exception as e:
+        log.error("secrets migration skipped: %s", e)
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
@@ -245,11 +293,20 @@ async def lifespan(app: FastAPI):
     # Non-blocking: warn if embedding model isn't pulled yet
     from mcp_servers import schema_rag as _rag
     asyncio.create_task(_rag.check_model())
+
+    # Blocker 3: start background license refresher (runs every 30 min)
+    from dialekt.license_refresh import start_refresher, stop_refresher
+    app.state.license_refresher = asyncio.create_task(start_refresher(load_settings, save_settings))
+
     yield
     from mcp_servers.postgres_mcp import close_all_pools
     from mcp_servers.mysql_mcp import close_all_pools_mysql
     await close_all_pools()
     await close_all_pools_mysql()
+    try:
+        await stop_refresher(app.state.license_refresher)
+    except Exception:
+        pass
     await db.close()
 
 
@@ -512,7 +569,7 @@ async def sync_pull():
         if s.get("cloud_api_key"):
             return {"ok": True, "pulled": 0, "message": "Validate your license key to enable agent sync."}
         raise HTTPException(402, "No cloud bearer token. Validate your license first.")
-    cloud_url = s.get("cloud_api_url", "https://api.dialekt.ai")
+    cloud_url = s.get("cloud_api_url") or DEFAULT_SETTINGS["cloud_api_url"]
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.get(
@@ -571,20 +628,42 @@ async def license_status():
     trial_valid = False
     if trial_started:
         trial_valid = (time.time() - trial_started) < 30 * 86400
+    last = s.get("last_license_validated_at")
+    status = s.get("last_license_revalidation_status")
+    reason = s.get("last_license_revocation_reason")
+    from dialekt.secrets import backend_info
     return {
         "valid": bool(key) or trial_valid,
         "license_key": key,
         "trial": bool(trial_started),
         "trial_valid": trial_valid,
         "tenant": s.get("tenant_info"),
+        "last_validated_at": last,
+        "last_validation_status": status,
+        "revocation_reason": reason,
+        "age_seconds": (time.time() - last) if last else None,
+        "secrets_backend": backend_info(),
     }
+
+
+@app.post("/license/refresh")
+async def license_refresh():
+    """Force an immediate cloud revalidation. Called by the frontend when
+    the user hits 'Check license' or when an inline check deemed the
+    cached status stale."""
+    from dialekt.license_refresh import refresh_once
+    return await refresh_once(load_settings, save_settings)
 
 
 @app.post("/license/save")
 async def license_save(body: dict):
+    import time
     s = load_settings()
     if body.get("license_key"):
         s["license_key"] = body["license_key"]
+        s["last_license_validated_at"] = time.time()
+        s["last_license_revalidation_status"] = "ok"
+        s.pop("last_license_revocation_reason", None)
     if body.get("tenant"):
         s["tenant_info"] = body["tenant"]
     if body.get("user"):
@@ -1554,6 +1633,15 @@ async def ws_chat(ws: WebSocket):
             content = msg.get("content", "").strip()
             if not content:
                 continue
+
+            # Blocker 3.2: inline license revalidation — don't block the UI,
+            # but do kick off a stale check. If the result is "revoked", the
+            # next /license/status poll from the frontend will show it.
+            try:
+                from dialekt.license_refresh import refresh_if_stale
+                asyncio.create_task(refresh_if_stale(load_settings, save_settings))
+            except Exception:
+                pass
 
             if session_id is None:
                 sid_from_client = msg.get("session_id")
