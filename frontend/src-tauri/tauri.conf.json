@@ -61,5 +61,15 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": [
+        "https://github.com/dialektai/dialektai/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
   }
 }

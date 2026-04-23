@@ -51,9 +51,9 @@ function PermsBody() {
   );
 }
 
-export default function OnboardingPermsScreen({ onNav }) {
+export default function OnboardingPermsScreen({ onNav, onComplete }) {
   return (
-    <OnboardingShell step={3} onNav={onNav}
+    <OnboardingShell step={4} onNav={onNav} onCtaClick={onComplete}
       title={<>Grant the agent<br /><span style={{ color: T.cyan }}>the keys it needs.</span></>}
       blurb="Off by default. Pick what dialekt can touch — you can change any of this later.">
       <PermsBody />

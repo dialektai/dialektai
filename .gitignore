@@ -54,3 +54,16 @@ dist/
 build/
 python/dist/
 python/build/
+
+# Stage 2 additions
+dialekt-cloud/venv/
+dialekt-cloud/.pytest_cache/
+dialekt-cloud/**/__pycache__/
+python/venv/
+python/**/__pycache__/
+python/tests/__pycache__/
+frontend/src-tauri/target/
+frontend/node_modules/
+frontend/dist/
+dist/
+*.pyc

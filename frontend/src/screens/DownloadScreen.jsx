@@ -1,152 +1,297 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame, Logo } from '../components/Shell.jsx';
 
-function Stat({ k, v, mono, accent, last }) {
+const API = 'http://localhost:8765';
+
+const DEFAULT_MODELS = [
+  { name: 'qwen2.5-coder', tag: '32b-instruct-q5_K_M', size: '22.8 GB', purpose: 'SQL & code generation' },
+  { name: 'nomic-embed-text', tag: 'v1.5', size: '274 MB', purpose: 'Schema RAG embeddings' },
+];
+
+function fmt(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function fmtPct(completed, total) {
+  if (!total) return 0;
+  return Math.min(100, Math.round((completed / total) * 100));
+}
+
+function LayerRow({ digest, total, completed, status }) {
+  const pct = fmtPct(completed, total);
+  const short = digest ? digest.replace('sha256:', 'sha256:').slice(0, 19) + '…' : status;
   return (
-    <div style={{ padding: '10px 14px', borderRight: last ? 'none' : `1px solid ${T.border}` }}>
-      <div className="upper" style={{ color: T.dim, fontSize: 9 }}>{k}</div>
-      <div className={mono || accent ? 'mono' : ''} style={{ fontSize: 14, fontWeight: 500, marginTop: 4, color: accent ? T.cyan : T.text }}>{v}</div>
+    <div style={{
+      display: 'grid', gridTemplateColumns: '20px 1fr auto auto',
+      gap: 12, alignItems: 'center', padding: '8px 12px',
+      borderBottom: `1px solid ${T.border}`,
+      background: status === 'active' ? T.bg2 : 'transparent',
+    }}>
+      {status === 'done'
+        ? <Icon name="check" size={13} color={T.green} />
+        : status === 'active'
+          ? <span className="dlk-dot cyan live" />
+          : <span style={{ width: 6, height: 6, border: `1px solid ${T.dim}`, borderRadius: '50%', display: 'inline-block' }} />}
+      <span className="mono" style={{ fontSize: 11, color: status === 'queue' ? T.dim : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {short}
+      </span>
+      {status === 'active'
+        ? <div style={{ width: 160, height: 4, background: T.bg0, border: `1px solid ${T.border}` }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: T.cyan, transition: 'width .3s' }} />
+          </div>
+        : <span />}
+      <span className="mono" style={{ fontSize: 11, minWidth: 80, textAlign: 'right',
+        color: status === 'done' ? T.green : status === 'active' ? T.cyan : T.dim }}>
+        {status === 'done' ? `✓ ${fmt(total)}` : status === 'active' ? `${pct}% · ${fmt(total)}` : fmt(total) || '—'}
+      </span>
     </div>
   );
 }
 
-function Sparkline() {
-  const pts = [40,58,72,65,80,92,88,74,96,110,124,118,132,120,140,168,150,124,112,124,138,124,118,124,132,124];
-  const max = 180;
-  const w = 800, h = 56;
-  const step = w / (pts.length - 1);
-  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${i * step} ${h - (p / max) * h}`).join(' ');
-  const area = `${d} L ${w} ${h} L 0 ${h} Z`;
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id="sp" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={T.cyan} stopOpacity=".35" />
-          <stop offset="100%" stopColor={T.cyan} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#sp)" />
-      <path d={d} stroke={T.cyan} strokeWidth="1.2" fill="none" />
-    </svg>
-  );
-}
+export default function DownloadScreen({ onNav, model: modelProp, onComplete }) {
+  const modelName = modelProp || 'qwen2.5-coder:32b-instruct-q5_K_M';
+  const [layers, setLayers] = useState({});
+  const [overallStatus, setOverallStatus] = useState('idle'); // idle | connecting | pulling | done | error | cancelled
+  const [errorMsg, setErrorMsg] = useState('');
+  const [currentStatusText, setCurrentStatusText] = useState('');
+  const [overallCompleted, setOverallCompleted] = useState(0);
+  const [overallTotal, setOverallTotal] = useState(0);
+  const abortRef = useRef(null);
 
-const layers = [
-  { id: 'sha256:a1f3…', size: '4.2 GB', status: 'done' },
-  { id: 'sha256:82ae…', size: '4.2 GB', status: 'done' },
-  { id: 'sha256:b74c…', size: '4.2 GB', status: 'done' },
-  { id: 'sha256:dd10…', size: '4.2 GB', status: 'active', pct: 58 },
-  { id: 'sha256:e3cb…', size: '4.2 GB', status: 'queue' },
-  { id: 'sha256:5fba…', size: '4.2 GB', status: 'queue' },
-  { id: 'sha256:9c11…', size: '4.2 GB', status: 'queue' },
-  { id: 'sha256:2a48…', size: '4.1 GB', status: 'queue' },
-  { id: 'sha256:3f92…', size: '2.0 GB', status: 'queue' },
-  { id: 'manifest.json', size: '1.8 KB', status: 'queue' },
-];
-const overall = 36;
+  const startDownload = useCallback(async () => {
+    setOverallStatus('connecting');
+    setLayers({});
+    setErrorMsg('');
+    setOverallCompleted(0);
+    setOverallTotal(0);
 
-export default function DownloadScreen({ onNav }) {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    try {
+      const url = `${API}/ollama/pull/stream?model=${encodeURIComponent(modelName)}`;
+      const resp = await fetch(url, { signal: ctrl.signal });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      setOverallStatus('pulling');
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+          try {
+            const ev = JSON.parse(raw);
+            if (ev.error) {
+              setOverallStatus('error');
+              setErrorMsg(ev.error);
+              return;
+            }
+
+            const status = ev.status || '';
+            setCurrentStatusText(status);
+
+            if (ev.digest) {
+              const digest = ev.digest;
+              const total = ev.total || 0;
+              const completed = ev.completed || 0;
+              const layerStatus = (completed > 0 && completed < total)
+                ? 'active'
+                : (completed >= total && total > 0) ? 'done' : 'queue';
+
+              setLayers(prev => ({
+                ...prev,
+                [digest]: { digest, total, completed, status: layerStatus },
+              }));
+
+              // aggregate totals for overall progress
+              setLayers(prev => {
+                const allLayers = Object.values({ ...prev, [digest]: { digest, total, completed, status: layerStatus } });
+                const tc = allLayers.reduce((s, l) => s + (l.completed || 0), 0);
+                const tt = allLayers.reduce((s, l) => s + (l.total || 0), 0);
+                setOverallCompleted(tc);
+                setOverallTotal(tt);
+                return prev;
+              });
+            }
+
+            if (status === 'success') {
+              setOverallStatus('done');
+              if (onComplete) onComplete(modelName);
+              return;
+            }
+          } catch { /* malformed line */ }
+        }
+      }
+      // stream ended without 'success' — check if cancelled
+      if (!ctrl.signal.aborted) setOverallStatus('done');
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        setOverallStatus('cancelled');
+      } else {
+        setOverallStatus('error');
+        setErrorMsg(String(e));
+      }
+    }
+  }, [modelName, onComplete]);
+
+  useEffect(() => { startDownload(); return () => abortRef.current?.abort(); }, []);
+
+  const cancel = () => { abortRef.current?.abort(); setOverallStatus('cancelled'); };
+
+  const overallPct = fmtPct(overallCompleted, overallTotal);
+  const layerList = Object.values(layers);
+  const doneCount = layerList.filter(l => l.status === 'done').length;
+  const activeLayer = layerList.find(l => l.status === 'active');
+
+  const statusColor = { done: T.green, error: T.red, cancelled: T.amber }[overallStatus] || T.cyan;
+
   return (
-    <AppFrame title="dialekt.ai — pulling llama3.1:70b">
+    <AppFrame title={`dialekt.ai — pulling ${modelName}`}>
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
-        <div style={{ width: 320, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '36px 32px' }}>
+        {/* Sidebar */}
+        <div style={{ width: 300, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '36px 28px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
             <Logo />
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>dialekt<span style={{ color: T.cyan }}>.ai</span></div>
-              <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.1em' }}>LOCAL-FIRST · v0.8.2</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>dialekt<span style={{ color: T.cyan }}>.ai</span></div>
+              <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.1em' }}>SETUP · STEP 3/5</div>
             </div>
           </div>
-          <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em', marginBottom: 10 }}>02 / 05 · DOWNLOAD</div>
-          <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.18, marginBottom: 10 }}>
+
+          <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em', marginBottom: 10 }}>DOWNLOADING</div>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 10, color: T.text }}>
             Pulling weights<br />to <span style={{ color: T.cyan }}>this machine.</span>
           </div>
-          <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.55 }}>
-            Downloaded once, runs forever. Safe to close — we'll resume on the next launch.
+          <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.55, marginBottom: 24 }}>
+            Downloaded once, runs forever. You can close dialekt — download resumes on next launch.
           </div>
-          <div style={{ marginTop: 28, padding: 12, border: `1px solid ${T.border}`, background: T.bg0 }}>
-            <div className="upper" style={{ color: T.dim, marginBottom: 8 }}>Destination</div>
-            <div className="mono" style={{ fontSize: 11, color: T.text }}>~/Library/dialekt/models</div>
-            <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2 }}>612 GB free · verified with SHA-256</div>
+
+          <div style={{ padding: 12, border: `1px solid ${T.border}`, background: T.bg0, marginBottom: 16 }}>
+            <div style={{ fontSize: 9, letterSpacing: '.1em', color: T.dim, marginBottom: 6 }}>MODEL</div>
+            <div className="mono" style={{ fontSize: 12, color: T.text, wordBreak: 'break-all' }}>{modelName}</div>
           </div>
+
+          <div style={{ flex: 1 }} />
+
+          {overallStatus === 'done'
+            ? <button
+                onClick={() => onNav?.('onboarding-step4')}
+                style={{ padding: '10px 20px', background: T.cyan, color: T.bg0, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >CONTINUE →</button>
+            : overallStatus === 'pulling' || overallStatus === 'connecting'
+              ? <button onClick={() => { cancel(); onNav?.('main'); }}
+                  style={{ padding: '10px 20px', background: 'none', border: `1px solid ${T.border}`, color: T.muted, fontSize: 12, cursor: 'pointer' }}
+                >Continue in background</button>
+              : null}
+
+          {overallStatus === 'cancelled' && (
+            <button onClick={startDownload}
+              style={{ padding: '10px 20px', background: T.bg2, border: `1px solid ${T.border}`, color: T.text, fontSize: 12, cursor: 'pointer', marginBottom: 8 }}
+            >RESUME DOWNLOAD</button>
+          )}
         </div>
 
-        <div className="dlk-scroll" style={{ flex: 1, overflowY: 'auto', padding: '36px 44px' }}>
+        {/* Main */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '36px 40px' }}>
+          {/* Overall progress block */}
           <div style={{ border: `1px solid ${T.border}`, background: T.bg1, padding: 22, marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
-              <span className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em' }}>DOWNLOADING</span>
-              <span className="dlk-dot cyan live" />
-            </div>
-            <div className="mono" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 18 }}>
-              llama3.1:<span style={{ color: T.cyan }}>70b-instruct-q4_K_M</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <span className="mono" style={{ fontSize: 10, color: statusColor, letterSpacing: '.14em' }}>
+                {overallStatus.toUpperCase()}
+              </span>
+              {(overallStatus === 'pulling' || overallStatus === 'connecting') && <span className="dlk-dot cyan live" />}
             </div>
 
-            <div style={{ position: 'relative', height: 28, background: T.bg0, border: `1px solid ${T.border}` }}>
-              <div style={{ position: 'absolute', inset: 0, width: `${overall}%`, background: T.cyan }} className="dlk-scan" />
+            <div className="mono" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 18, color: T.text, wordBreak: 'break-all' }}>
+              {modelName.split(':')[0]}
+              <span style={{ color: T.cyan }}>:{modelName.split(':')[1] || 'latest'}</span>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ position: 'relative', height: 28, background: T.bg0, border: `1px solid ${T.border}`, marginBottom: 16 }}>
+              <div style={{
+                position: 'absolute', inset: 0, width: `${overallPct}%`,
+                background: overallStatus === 'done' ? T.green : overallStatus === 'error' ? T.red : T.cyan,
+                transition: 'width .5s, background .3s',
+              }} className={overallStatus === 'pulling' ? 'dlk-scan' : undefined} />
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: T.text, letterSpacing: '.08em' }}>
-                  15.2 / 42.1 GB · <span style={{ color: T.cyan }}>{overall}%</span>
+                  {overallStatus === 'done' ? '✓ Complete' :
+                   overallStatus === 'error' ? `✗ Error` :
+                   overallStatus === 'cancelled' ? '— Cancelled' :
+                   overallStatus === 'connecting' ? 'Connecting…' :
+                   overallTotal > 0
+                     ? `${fmt(overallCompleted)} / ${fmt(overallTotal)} · ${overallPct}%`
+                     : currentStatusText || 'Waiting…'}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 18, border: `1px solid ${T.border}` }}>
-              <Stat k="Speed"    v="124 MB/s" accent />
-              <Stat k="ETA"      v="03:42"    mono />
-              <Stat k="Layer"    v="4 / 10"   mono />
-              <Stat k="Verified" v="12 / 42 GB" mono last />
+            {/* Stats row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', border: `1px solid ${T.border}` }}>
+              {[
+                ['Layers', `${doneCount} / ${layerList.length}`],
+                ['Downloaded', fmt(overallCompleted)],
+                ['Status', currentStatusText || (overallStatus === 'connecting' ? 'connecting' : '—')],
+              ].map(([k, v], i) => (
+                <div key={k} style={{ padding: '10px 14px', borderRight: i < 2 ? `1px solid ${T.border}` : 'none' }}>
+                  <div style={{ fontSize: 9, letterSpacing: '.1em', color: T.dim }}>{k.toUpperCase()}</div>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-            <span className="upper" style={{ color: T.dim }}>Layers</span>
-            <div style={{ flex: 1, height: 1, margin: '0 10px', background: `repeating-linear-gradient(90deg, ${T.border} 0 4px, transparent 4px 8px)` }} />
-            <span className="mono" style={{ fontSize: 10, color: T.dim }}>3 done · 1 active · 6 queued</span>
-          </div>
+          {/* Error message */}
+          {overallStatus === 'error' && (
+            <div style={{ padding: '12px 16px', background: T.bg1, border: `1px solid ${T.red}`, color: T.red, fontSize: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{errorMsg}</span>
+              <button onClick={startDownload} style={{ background: 'none', border: `1px solid ${T.red}`, color: T.red, padding: '4px 12px', fontSize: 11, cursor: 'pointer' }}>RETRY</button>
+            </div>
+          )}
 
-          <div style={{ border: `1px solid ${T.border}`, background: T.bg1 }}>
-            {layers.map((l, i) => (
-              <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '20px 1fr auto auto', gap: 12, alignItems: 'center',
-                padding: '8px 12px', borderBottom: i < layers.length - 1 ? `1px solid ${T.border}` : 'none',
-                background: l.status === 'active' ? T.bg2 : 'transparent',
-              }}>
-                {l.status === 'done'   && <Icon name="check" size={13} color={T.green} />}
-                {l.status === 'active' && <span className="dlk-dot cyan live" />}
-                {l.status === 'queue'  && <span style={{ width: 6, height: 6, border: `1px solid ${T.dim}`, borderRadius: '50%', display: 'inline-block' }} />}
-                <span className="mono" style={{ fontSize: 11, color: l.status === 'queue' ? T.dim : T.text }}>{l.id}</span>
-                {l.status === 'active' ? (
-                  <div style={{ width: 180, height: 4, background: T.bg0, border: `1px solid ${T.border}` }}>
-                    <div style={{ width: `${l.pct}%`, height: '100%', background: T.cyan }} />
-                  </div>
-                ) : <span />}
-                <span className="mono" style={{ fontSize: 11, color: l.status === 'done' ? T.green : l.status === 'active' ? T.cyan : T.dim, minWidth: 70, textAlign: 'right' }}>
-                  {l.status === 'done' ? `✓ ${l.size}` : l.status === 'active' ? `${l.pct}% · ${l.size}` : l.size}
+          {/* Layer list */}
+          {layerList.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 9, letterSpacing: '.1em', color: T.dim }}>LAYERS</span>
+                <div style={{ flex: 1, height: 1, margin: '0 10px', background: `repeating-linear-gradient(90deg, ${T.border} 0 4px, transparent 4px 8px)` }} />
+                <span className="mono" style={{ fontSize: 10, color: T.dim }}>
+                  {doneCount} done · {layerList.length - doneCount} remaining
                 </span>
               </div>
-            ))}
-          </div>
+              <div style={{ border: `1px solid ${T.border}`, background: T.bg1 }}>
+                {layerList.map((l, i) => (
+                  <LayerRow key={l.digest || i} {...l} />
+                ))}
+              </div>
+            </>
+          )}
 
-          <div style={{ marginTop: 18, padding: 14, border: `1px solid ${T.border}`, background: T.bg1 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
-              <span className="upper" style={{ color: T.dim }}>Bandwidth · last 60s</span>
-              <span className="mono" style={{ fontSize: 11, color: T.cyan }}>124 MB/s</span>
-              <span className="mono" style={{ fontSize: 10, color: T.dim }}>peak 168 · avg 112</span>
+          {/* Action row */}
+          {overallStatus === 'pulling' && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button onClick={cancel}
+                style={{ padding: '7px 14px', background: 'none', border: `1px solid ${T.border}`, color: T.muted, fontSize: 11, cursor: 'pointer' }}>
+                Cancel
+              </button>
             </div>
-            <Sparkline />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22 }}>
-            <div style={{ flex: 1 }} className="mono">
-              <span style={{ fontSize: 11, color: T.dim }}>downloading from </span>
-              <span style={{ fontSize: 11, color: T.muted }}>registry.ollama.ai</span>
-              <span style={{ fontSize: 11, color: T.dim }}> · resumable</span>
-            </div>
-            <button className="dlk-btn"><Icon name="stop" size={11} color={T.amber} />Pause</button>
-            <button className="dlk-btn">Cancel</button>
-            <button className="dlk-btn primary" style={{ padding: '7px 14px' }} onClick={() => onNav?.('main')}>Continue in background</button>
-          </div>
+          )}
         </div>
       </div>
     </AppFrame>

@@ -52,7 +52,10 @@ export function SectionLabel({ n, children, right }) {
   );
 }
 
-export function AppFrame({ children, title = 'dialekt.ai' }) {
+export function AppFrame({ children, title = 'dialekt.ai', ollamaOnline }) {
+  const showOllama = ollamaOnline !== undefined;
+  const dotColor = ollamaOnline ? '#27c93f' : '#ff5f56';
+  const dotTitle = ollamaOnline ? 'Ollama running' : 'Ollama offline';
   return (
     <div style={{ width: '100%', height: '100%', background: T.bg0, display: 'flex', flexDirection: 'column' }}>
       <div
@@ -83,7 +86,19 @@ export function AppFrame({ children, title = 'dialekt.ai' }) {
         >
           {title}
         </div>
-        <div style={{ width: 52 }} />
+        <div style={{ width: 52, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+          {showOllama && (
+            <div
+              title={dotTitle}
+              style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: dotColor,
+                boxShadow: `0 0 4px ${dotColor}`,
+                transition: 'background 0.4s, box-shadow 0.4s',
+              }}
+            />
+          )}
+        </div>
       </div>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {children}

@@ -44,7 +44,7 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
   };
 
   return (
-    <AppFrame title={displayTitle ? `dialekt.ai — ${displayTitle}` : 'dialekt.ai'}>
+    <AppFrame title={displayTitle ? `dialekt.ai — ${displayTitle}` : 'dialekt.ai'} ollamaOnline={ollamaOnline}>
       <LeftPanel
         onNav={onNav}
         currentSessionId={sessionId}

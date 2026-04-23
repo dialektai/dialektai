@@ -58,7 +58,8 @@ export default function ModeSetupScreen({ onNav }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode }),
       });
-      onNav('main');
+      // Check Ollama before proceeding to model download
+      onNav('onboarding-ollama');
     } catch {
       setSaving(false);
     }

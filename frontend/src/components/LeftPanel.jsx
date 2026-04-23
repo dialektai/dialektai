@@ -282,8 +282,16 @@ export default function LeftPanel({
             <div style={{ display: 'flex', gap: 4 }}>
               <button
                 className="dlk-btn ghost"
+                style={{ padding: '2px 6px', fontSize: 9, letterSpacing: '.06em' }}
+                title="Open agent wizard"
+                onClick={e => { e.stopPropagation(); onNav?.('wizard'); }}
+              >
+                WIZARD
+              </button>
+              <button
+                className="dlk-btn ghost"
                 style={{ padding: 3 }}
-                title="New agent"
+                title="Quick create"
                 onClick={e => { e.stopPropagation(); setShowNewAgent(v => !v); setAgentsOpen(true); }}
               >
                 <Icon name="plus" size={10} color={T.muted} />

@@ -12,6 +12,11 @@ starlette>=0.37.0
 pydantic>=2.0.0
 python-multipart>=0.0.9
 dialekt-manifest-validator>=0.1.0
+asyncpg>=0.29.0
+aiomysql>=0.2.0
+clickhouse-connect>=0.7.0
+keyring>=25.0.0
+sqlite-vec>=0.1.9
 
 # Dev / test only
 pytest>=8.0.0

@@ -96,6 +96,9 @@ export function useChat() {
   useEffect(() => {
     checkHealth();
     fetchSessions();
+    // Goal 1.7: 30-second Ollama heartbeat
+    const hb = setInterval(checkHealth, 30_000);
+    return () => clearInterval(hb);
   }, [checkHealth, fetchSessions]);
 
   // ── Chunk assembler ───────────────────────────────────────────────

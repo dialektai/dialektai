@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dialekt_cloud
+      POSTGRES_USER: dialekt_cloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dialekt_cloud_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dialekt_cloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://dialekt_cloud:${POSTGRES_PASSWORD:-dialekt_cloud_pass}@db:5432/dialekt_cloud
+    ports:
+      - "8080:8080"
+    volumes:
+      - invoices:/app/invoices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  invoices:

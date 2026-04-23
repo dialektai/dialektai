@@ -1463,6 +1463,412 @@ function AboutSection() {
   );
 }
 
+// ── Section: Connections ──────────────────────────────────────────────────────
+
+function ConnectionsSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [conns, setConns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [testStatus, setTestStatus] = useState({});
+  const [reindexStatus, setReindexStatus] = useState({});
+  const [modelStatus, setModelStatus] = useState(null);
+  const [pulling, setPulling] = useState(false);
+  const [nomicPendingId, setNomicPendingId] = useState(null);
+  const EMPTY_FORM = { name: '', host: 'localhost', port: '5432', database: '', username: '', password: '', row_limit: '500', ssl: 'prefer' };
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    fetch(`${API}/schema-rag/model-status`)
+      .then(r => r.json())
+      .then(d => setModelStatus(d))
+      .catch(() => {});
+  }, []);
+
+  const pullModel = async () => {
+    setPulling(true);
+    addToast(`Pulling ${modelStatus?.model ?? 'embedding model'}… this may take a few minutes`, 'ok');
+    try {
+      const r = await fetch(`${API}/schema-rag/pull-model`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        setModelStatus(m => ({ ...m, available: true, pull_command: null }));
+        addToast('Embedding model ready — you can now reindex connections', 'ok');
+      } else {
+        addToast('Pull failed — check Ollama is running', 'error');
+      }
+    } catch { addToast('Pull failed', 'error'); }
+    setPulling(false);
+  };
+
+  const load = () => {
+    fetch(`${API}/connections`)
+      .then(r => r.json())
+      .then(d => { setConns(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const fset = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const create = async () => {
+    const body = {
+      name: form.name.trim(), host: form.host.trim(),
+      port: parseInt(form.port) || 5432, database: form.database.trim(),
+      username: form.username.trim(), password: form.password,
+      row_limit: parseInt(form.row_limit) || 500, ssl: form.ssl,
+    };
+    if (!body.name || !body.database || !body.username) {
+      addToast('Name, database, and username are required', 'error'); return;
+    }
+    try {
+      const r = await fetch(`${API}/connections`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!r.ok) { addToast('Failed to save connection', 'error'); return; }
+      addToast('Connection saved', 'ok');
+      setAdding(false); setForm(EMPTY_FORM); load();
+    } catch { addToast('Network error', 'error'); }
+  };
+
+  const reindexConn = async (id) => {
+    // Goal 1.5: intercept when embedding model not available
+    if (modelStatus && !modelStatus.available) {
+      setNomicPendingId(id);
+      return;
+    }
+    setReindexStatus(s => ({ ...s, [id]: 'indexing' }));
+    try {
+      const r = await fetch(`${API}/connections/${id}/reindex`, { method: 'POST' });
+      const data = await r.json();
+      setReindexStatus(s => ({ ...s, [id]: 'done' }));
+      const msg = data.error
+        ? `Indexed ${data.indexed ?? 0}, skipped ${data.skipped ?? 0}: ${data.error}`
+        : `Indexed ${data.indexed ?? 0} tables${data.skipped ? ` (${data.skipped} skipped — Ollama unavailable)` : ''}`;
+      addToast(msg, data.error ? 'warn' : 'ok');
+    } catch { setReindexStatus(s => ({ ...s, [id]: 'error' })); addToast('Reindex failed', 'error'); }
+  };
+
+  const handleNomicDownload = async () => {
+    const pendingId = nomicPendingId;
+    setNomicPendingId(null);
+    setPulling(true);
+    addToast('Pulling nomic-embed-text:v1.5 (274 MB)…', 'ok');
+    try {
+      const r = await fetch(`${API}/schema-rag/pull-model`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        setModelStatus(m => ({ ...m, available: true }));
+        addToast('Embedding model ready', 'ok');
+        if (pendingId) reindexConn(pendingId);
+      } else {
+        addToast('Pull failed — check Ollama is running', 'error');
+      }
+    } catch { addToast('Pull failed', 'error'); }
+    setPulling(false);
+  };
+
+  const testConn = async (id) => {
+    setTestStatus(s => ({ ...s, [id]: 'testing' }));
+    try {
+      const r = await fetch(`${API}/connections/${id}/test`, { method: 'POST' });
+      const data = await r.json();
+      const ok = r.ok && data.ok !== false;
+      setTestStatus(s => ({ ...s, [id]: ok ? 'ok' : 'error' }));
+      addToast(ok ? 'Connection successful' : `Connection failed${data.error ? ': ' + data.error : ''}`, ok ? 'ok' : 'error');
+    } catch { setTestStatus(s => ({ ...s, [id]: 'error' })); addToast('Test failed', 'error'); }
+  };
+
+  const remove = (id, name) => showConfirm({
+    title: `Remove "${name}"?`,
+    body: 'The connection and its stored credentials will be deleted. This cannot be undone.',
+    action: 'Remove connection', danger: true,
+    onConfirm: async () => {
+      try {
+        await fetch(`${API}/connections/${id}`, { method: 'DELETE' });
+        setConns(c => c.filter(x => x.id !== id));
+        addToast('Connection removed', 'ok');
+      } catch { addToast('Delete failed', 'error'); }
+    },
+  });
+
+  const FInput = ({ label, k, type = 'text', placeholder, style: s }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...s }}>
+      <label style={{ fontSize: 11, color: T.dim }}>{label}</label>
+      <input type={type} value={form[k]} onChange={e => fset(k, e.target.value)}
+        placeholder={placeholder} style={{
+          background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+          padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+        }} />
+    </div>
+  );
+
+  const ConnRow = ({ c, i }) => {
+    const st = testStatus[c.id];
+    const dot = st === 'ok' ? T.green : st === 'error' ? T.red : st === 'testing' ? T.amber : T.dim;
+    const label = st === 'ok' ? 'connected' : st === 'error' ? 'failed' : st === 'testing' ? '…' : 'untested';
+    return (
+      <Card key={c.id} title={c.name} n={String(i + 1).padStart(2, '0')} right={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+            <span className="mono" style={{ fontSize: 10, color: dot }}>{label}</span>
+          </div>
+          <button onClick={() => testConn(c.id)} style={{
+            background: T.bg2, border: `1px solid ${T.border}`, color: T.muted,
+            padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+          }}>TEST</button>
+          <button onClick={() => reindexConn(c.id)} disabled={reindexStatus[c.id] === 'indexing'} style={{
+            background: T.bg2, border: `1px solid ${T.border}`,
+            color: reindexStatus[c.id] === 'indexing' ? T.dim : T.muted,
+            padding: '4px 10px', fontSize: 11, cursor: reindexStatus[c.id] === 'indexing' ? 'default' : 'pointer',
+          }}>{reindexStatus[c.id] === 'indexing' ? '…' : 'REINDEX'}</button>
+          <button onClick={() => remove(c.id, c.name)} style={{
+            background: 'transparent', border: `1px solid ${T.border}`, color: T.red,
+            padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+          }}>REMOVE</button>
+        </div>
+      }>
+        <div style={{ padding: '10px 14px', display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+          {[['host', c.host], ['port', c.port], ['database', c.database], ['user', c.username], ['rows', c.row_limit], ['ssl', c.ssl || 'prefer']].map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span className="mono" style={{ fontSize: 9, color: T.dim, letterSpacing: '.1em' }}>{k.toUpperCase()}</span>
+              <span className="mono" style={{ fontSize: 12, color: T.text }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  };
+
+  return (
+    <BodyShell crumb="02 / CAPABILITIES → CONNECTIONS" title="Database Connections"
+      desc="Connect to PostgreSQL databases for SQL analytics. Credentials are stored in your OS keychain — never in config files or logs.">
+
+      {modelStatus && !modelStatus.available && (
+        <div style={{ border: `1px solid ${T.amber}44`, background: `${T.amber}0a`, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.amber, flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 12, color: T.muted }}>
+            Schema RAG: <span className="mono" style={{ color: T.amber }}>{modelStatus.model}</span> not pulled.
+            REINDEX will skip until the model is available.
+          </div>
+          <button onClick={pullModel} disabled={pulling} style={{
+            background: T.amber, color: '#000', border: 'none', padding: '5px 12px',
+            fontSize: 11, fontWeight: 600, cursor: pulling ? 'default' : 'pointer', letterSpacing: '.04em', flexShrink: 0,
+          }}>{pulling ? 'PULLING…' : 'PULL MODEL'}</button>
+        </div>
+      )}
+      {modelStatus?.available && (
+        <div style={{ border: `1px solid ${T.green}33`, background: `${T.green}08`, padding: '8px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: T.green, flexShrink: 0 }} />
+          <span className="mono" style={{ fontSize: 11, color: T.green }}>{modelStatus.model} ready</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : conns.length === 0 && !adding ? (
+        <Card>
+          <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <Icon name="folder" size={28} color={T.dim} />
+            <div style={{ color: T.dim, fontSize: 13 }}>No connections yet. Add one to start querying databases.</div>
+            <button onClick={() => setAdding(true)} style={{
+              background: T.cyan, color: '#000', border: 'none', padding: '8px 18px',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '.04em',
+            }}>+ ADD CONNECTION</button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {conns.map((c, i) => <ConnRow key={c.id} c={c} i={i} />)}
+          {!adding && (
+            <button onClick={() => setAdding(true)} style={{
+              background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+              width: '100%', padding: '11px', fontSize: 12, cursor: 'pointer', marginBottom: 16,
+              letterSpacing: '.04em', boxSizing: 'border-box',
+            }}>+ ADD CONNECTION</button>
+          )}
+        </>
+      )}
+
+      {adding && (
+        <Card title="New connection" n="NEW">
+          <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <FInput label="Name *" k="name" placeholder="My Analytics DB" style={{ gridColumn: '1 / -1' }} />
+              <FInput label="Host *" k="host" placeholder="localhost" />
+              <FInput label="Port" k="port" placeholder="5432" />
+              <FInput label="Database *" k="database" placeholder="analytics" />
+              <FInput label="Username *" k="username" placeholder="readonly" />
+              <FInput label="Password" k="password" type="password" placeholder="••••••••" style={{ gridColumn: '1 / -1' }} />
+              <FInput label="Row limit" k="row_limit" placeholder="500" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: T.dim }}>SSL</label>
+                <select value={form.ssl} onChange={e => fset('ssl', e.target.value)} style={{
+                  background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                  padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
+                }}>
+                  {['prefer', 'require', 'disable', 'verify-full'].map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button onClick={() => { setAdding(false); setForm(EMPTY_FORM); }} style={{
+                background: 'transparent', border: `1px solid ${T.border}`, color: T.muted,
+                padding: '7px 16px', fontSize: 12, cursor: 'pointer',
+              }}>CANCEL</button>
+              <button onClick={create} style={{
+                background: T.cyan, color: '#000', border: 'none',
+                padding: '7px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '.04em',
+              }}>SAVE</button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card title="Security" n="i">
+        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[
+            'Passwords are stored in your OS keychain (Keyring / Secret Service). They never appear in config files or logs.',
+            'Only SELECT queries are allowed. DDL and DML statements are rejected before any database connection is made.',
+            'Each query runs inside a read-only transaction. The row limit protects against accidental full-table scans.',
+          ].map((note, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, fontSize: 12, color: T.muted, lineHeight: 1.6 }}>
+              <span style={{ color: T.cyan, flexShrink: 0 }}>—</span>
+              <span>{note}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {nomicPendingId && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999,
+        }}>
+          <div style={{
+            background: T.bg1, border: `1px solid ${T.border}`,
+            padding: '28px 32px', maxWidth: 440, width: '100%',
+          }}>
+            <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.12em', marginBottom: 10 }}>SCHEMA RAG · MODEL REQUIRED</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>nomic-embed-text not found</div>
+            <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6, marginBottom: 24 }}>
+              Schema indexing requires <span className="mono" style={{ color: T.text }}>nomic-embed-text:v1.5</span> (274 MB).
+              This model runs locally and enables semantic search over your database schema. Download now?
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setNomicPendingId(null)} style={{
+                background: 'transparent', border: `1px solid ${T.border}`, color: T.muted,
+                padding: '7px 18px', fontSize: 12, cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={handleNomicDownload} disabled={pulling} style={{
+                background: T.cyan, color: '#000', border: 'none',
+                padding: '7px 22px', fontSize: 12, fontWeight: 600,
+                cursor: pulling ? 'default' : 'pointer', letterSpacing: '.04em',
+              }}>{pulling ? 'Downloading…' : 'Download & index'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </BodyShell>
+  );
+}
+
+// ── Section: Admin ───────────────────────────────────────────────────────────
+
+function AdminSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    fetch(`${API}/admin/stats`)
+      .then(r => r.json())
+      .then(d => { setStats(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const wipeAll = () => showConfirm({
+    title: 'Wipe all conversations?',
+    body: `Delete ${stats?.sessions ?? '?'} sessions and ${stats?.messages ?? '?'} messages. Models and agents are kept.`,
+    action: 'Wipe conversations', danger: true,
+    onConfirm: async () => {
+      try {
+        await fetch(`${API}/sessions`, { method: 'DELETE' });
+        addToast('Conversations wiped', 'warn');
+        load();
+      } catch { addToast('Failed', 'error'); }
+    },
+  });
+
+  const StatCard = ({ label, value, color }) => (
+    <div style={{ flex: 1, border: `1px solid ${T.border}`, background: T.bg1, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.12em' }}>{label}</span>
+      <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', color: color || T.text }}>{value ?? '—'}</span>
+    </div>
+  );
+
+  const fmtBytes = (b) => b > 1e6 ? `${(b/1e6).toFixed(1)} MB` : b > 1e3 ? `${(b/1e3).toFixed(0)} KB` : `${b} B`;
+
+  return (
+    <BodyShell crumb="03 / SYSTEM → ADMIN" title="Admin Panel"
+      desc="System-wide usage statistics, agent breakdown, and maintenance actions.">
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '16px 0' }}>Loading…</div>
+      ) : stats ? (
+        <>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <StatCard label="SESSIONS"    value={stats.sessions}    color={T.cyan}  />
+            <StatCard label="MESSAGES"    value={stats.messages}    color={T.muted} />
+            <StatCard label="AGENTS"      value={stats.agents}      color={T.amber} />
+            <StatCard label="CONNECTIONS" value={stats.connections}  color={T.green} />
+          </div>
+          <Card title="Database" n="A" right={<span className="mono" style={{ fontSize: 11, color: T.dim }}>{fmtBytes(stats.db_size_bytes)}</span>}>
+            <div style={{ padding: '10px 14px', display: 'flex', gap: 6 }}>
+              <span className="mono" style={{ fontSize: 11, color: T.muted }}>{`${API.replace('http://', '')}/admin/stats`}</span>
+            </div>
+          </Card>
+          <Card title="Agents breakdown" n="B">
+            {(stats.agents_detail || []).length === 0 ? (
+              <div style={{ padding: '16px 14px', color: T.dim, fontSize: 12 }}>No agents.</div>
+            ) : (
+              stats.agents_detail.map((a, i, arr) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', gap: 12 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: a.status === 'published' ? T.green : a.status === 'draft' ? T.amber : T.dim, flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 12, color: T.text }}>{a.name}</span>
+                  <span className="mono" style={{ fontSize: 10, color: T.dim }}>{a.status}</span>
+                  <span className="mono" style={{ fontSize: 11, color: T.muted }}>{a.session_count} sessions</span>
+                </div>
+              ))
+            )}
+          </Card>
+          <Card title="Maintenance" n="C">
+            <Row label="Wipe conversations" sub="Delete all sessions and messages. Models and agents are kept." last>
+              <button onClick={wipeAll} style={{
+                background: 'transparent', border: `1px solid ${T.red}`, color: T.red,
+                padding: '6px 14px', fontSize: 11, cursor: 'pointer', letterSpacing: '.04em',
+              }}>WIPE</button>
+            </Row>
+          </Card>
+          <Card title="Cloud Sync" n="D">
+            <Row label="Cloud API key" sub="Connect to dialekt Cloud for sync, licensing, and pilot management." last>
+              <button onClick={() => addToast('Cloud sync coming in Week 8–9', 'ok')} style={{
+                background: T.bg2, border: `1px solid ${T.border}`, color: T.muted,
+                padding: '6px 14px', fontSize: 11, cursor: 'pointer',
+              }}>CONFIGURE</button>
+            </Row>
+          </Card>
+        </>
+      ) : (
+        <div style={{ color: T.red, fontSize: 13 }}>Failed to load stats — backend offline?</div>
+      )}
+    </BodyShell>
+  );
+}
+
 // ── Nav + routing ─────────────────────────────────────────────────────────────
 
 const NAV_GROUPS = [
@@ -1479,11 +1885,13 @@ const NAV_GROUPS = [
     { k: 'Browser',         icon: 'globe'   },
     { k: 'Screen control',  icon: 'screen'  },
     { k: 'MCP tools',       icon: 'cog', n: 6 },
+    { k: 'Connections',     icon: 'folder'  },
   ]},
   { title: 'System', items: [
     { k: 'Storage & memory',   icon: 'file'   },
     { k: 'Performance',        icon: 'cpu'    },
     { k: 'Privacy & telemetry',icon: 'shield' },
+    { k: 'Admin',              icon: 'cog'    },
     { k: 'About',              icon: 'diamond'},
   ]},
 ];
@@ -1500,9 +1908,11 @@ function renderSection(s) {
     case 'Browser':            return <BrowserSection />;
     case 'Screen control':     return <ScreenSection />;
     case 'MCP tools':          return <MCPSection />;
+    case 'Connections':        return <ConnectionsSection />;
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;
+    case 'Admin':              return <AdminSection />;
     case 'About':              return <AboutSection />;
     default:                   return <PermissionsSection />;
   }
