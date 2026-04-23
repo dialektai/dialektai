@@ -12,7 +12,7 @@ Built with **Tauri + React** (frontend) and **FastAPI + Open Interpreter** (back
 - **Local-first** — all inference via Ollama (Gemma 3, Llama 3, Mistral, etc.)
 - **Image & video generation** — integrates with local ComfyUI (Flux Schnell, LTX-Video)
 - **Persistent sessions** — chat history stored in SQLite under `~/.dialekt/`
-- **Cross-platform** — macOS, Linux, Windows (via Tauri bundles)
+- **Cross-platform** — Linux binaries shipping now; macOS and Windows builds planned for Q3 2026
 - **Autonomy modes** — `ask-write` (confirms destructive actions) or `auto` (fully autonomous)
 
 ---
