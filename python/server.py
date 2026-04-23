@@ -1678,4 +1678,7 @@ async def ws_chat(ws: WebSocket):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8765, log_level="info")
+    import os
+    port = int(os.environ.get("DIALEKT_PORT", "8765"))
+    host = os.environ.get("DIALEKT_HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=port, log_level="info")
