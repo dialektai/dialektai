@@ -406,13 +406,17 @@ function StepSystemPrompt({ data, setData, errors }) {
 
 // ── Step 3: Capabilities ──────────────────────────────────────────────────────
 
+// Keys here must match the manifest schema's CAPABILITY_GROUPS set
+// (dialekt_manifest/schema.py:11). Before this fix the wizard emitted
+// `filesystem`, `terminal`, `screen` which the validator rejects with
+// 422 on publish. Labels are user-facing and can stay friendly.
 const CAP_META = {
-  filesystem:    { label: 'Filesystem',    desc: 'Read and write local files and directories' },
-  network:       { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
-  browser:       { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
-  database_read: { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
-  terminal:      { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
-  screen:        { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
+  filesystem_read: { label: 'Filesystem',    desc: 'Read and write local files and directories' },
+  network:         { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
+  browser:         { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
+  database_read:   { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
+  shell_execute:   { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
+  screen_capture:  { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
 };
 
 function StepCapabilities({ data, setData }) {
@@ -1009,12 +1013,12 @@ export default function AgentWizardScreen({ onNav }) {
     recommended_ram_gb: '16',
     system_prompt: '',
     capabilities: {
-      filesystem: false,
+      filesystem_read: false,
       network: false,
       browser: false,
       database_read: false,
-      terminal: false,
-      screen: false,
+      shell_execute: false,
+      screen_capture: false,
     },
     connection_type: 'none',
     connection_id: '',
