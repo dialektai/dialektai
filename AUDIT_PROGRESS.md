@@ -11,9 +11,10 @@ until after the first investor pitch.
 | P1 | Honest DIALEKT_STATE.md | ✓ | ab9b259, 31e33f1 |
 | P1b | Flip Goal 8.3 back to COMPLETE | ✓ | 31e33f1 |
 | P2 | Wire SQLRetryLoop into live chat path | ✓ | 3c3a46e |
-| P3 | CI Release (Linux) producing artifacts | ⏳ | awaiting run 24827362027 after d202d42 |
+| P3 | CI Release (Linux) producing artifacts | ✓ | run 24828297439 @ e998256 (11.5 min, deb + AppImage published) |
 | P3b | Fix slow pip install in CI | ✓ | 1870905 (wheel cache + --only-binary fast-fail + 15-min timeout) |
 | P3c | Exclude integration tests from release gate | ✓ | d202d42 |
+| P3d | Skip sidecar smoke test on CI (Ollama-unreachable hang) | ✓ | e998256 |
 | P4 | Integration test URL drift | ✓ | 267157b |
 
 ## 🟡 Important (post-pitch)
