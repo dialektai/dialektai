@@ -57,6 +57,18 @@ jobs:
           cache: 'pip'
           cache-dependency-path: python/requirements.txt
 
+      # Separate wheel cache — setup-python's built-in cache only covers pip's
+      # download cache. We additionally cache compiled wheels (~/.cache/pip/wheels)
+      # so heavy C-extension deps (tokenizers, tiktoken etc.) don't rebuild from
+      # source on every run.
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip/wheels
+          key: pip-wheels-${{ runner.os }}-py3.12-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            pip-wheels-${{ runner.os }}-py3.12-
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: System deps (GTK + WebKit + appindicator)
@@ -68,12 +80,20 @@ jobs:
             file
 
       - name: Build Python sidecar (native on 22.04 — GLIBC 2.35 baseline)
+        timeout-minutes: 15
         run: |
           cd python
           python -m venv venv
           source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install --upgrade pip wheel
+          # Prefer pre-built wheels to avoid compiling C-extensions on the
+          # runner (the previous v0.9.0 run got stuck >90 min here, almost
+          # certainly on a heavy transitive like tokenizers/tiktoken building
+          # from source). Two-pass install: first --only-binary=:all: so we
+          # fail fast if a wheel is missing; if that fails (pure-python sdists
+          # are fine to build), fall back to --prefer-binary.
+          pip install --prefer-binary --only-binary=:all: -r requirements.txt pyinstaller \
+              || pip install --prefer-binary -r requirements.txt pyinstaller
           # Skip smoke test inside the sandbox — Ollama isn't present in CI.
           DIALEKT_BUILD_MODE=native bash build_sidecar.sh || true
           # The script's copy step runs regardless of smoke; verify output:
