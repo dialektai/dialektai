@@ -1,0 +1,48 @@
+# Ubuntu 22.04 LTS build environment for the dialekt sidecar.
+#
+# PyInstaller binaries are dynamically linked against the build host's
+# libc / libm. To produce a binary that runs on all Ubuntu 22.04+ / Debian
+# 12+ / Fedora 38+ systems, we must build on the LOWEST GLIBC baseline
+# (Ubuntu 22.04 LTS — GLIBC 2.35).
+#
+# Build:
+#   docker build -f Dockerfile.build -t dialekt-sidecar-builder .
+#   docker run --rm -v "$(pwd):/src" dialekt-sidecar-builder \
+#       /src/build_sidecar.sh
+#
+# The outer build_sidecar.sh handles "host on 22.04" vs "must go into
+# Docker" automatically — see that script.
+FROM ubuntu:22.04
+
+# Noninteractive apt
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# System packages required by:
+#   - Python 3.12 (backport via deadsnakes)
+#   - open-interpreter / litellm (C extensions)
+#   - WeasyPrint stack (cairo, pango) — only pulled in if cloud/desktop share code
+#   - PyInstaller bootloader (GCC)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        software-properties-common ca-certificates curl gnupg \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3.12 python3.12-venv python3.12-dev \
+        build-essential gcc pkg-config \
+        libffi-dev libssl-dev libxml2-dev libxslt1-dev \
+        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+        libgdk-pixbuf-2.0-0 libharfbuzz0b \
+        zlib1g-dev \
+        file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Make python3.12 the default `python3`
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3
+
+WORKDIR /src
+
+# Entry is overridden by docker run; provide a sensible default.
+CMD ["bash"]

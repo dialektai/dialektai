@@ -1,0 +1,205 @@
+name: Release (Linux)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. v0.9.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 1. Sanity tests before shipping ──────────────────────────────────────
+
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+      - name: Install Python deps
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      - name: Run pytest
+        run: |
+          cd python && source venv/bin/activate
+          pytest -q --tb=short
+
+  # ── 2. Linux build (.deb + .AppImage) ────────────────────────────────────
+  # ubuntu-22.04 runner has GLIBC 2.35 — matching our support baseline.
+
+  build-linux:
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+
+      # Separate wheel cache — setup-python's built-in cache only covers pip's
+      # download cache. We additionally cache compiled wheels (~/.cache/pip/wheels)
+      # so heavy C-extension deps (tokenizers, tiktoken etc.) don't rebuild from
+      # source on every run.
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip/wheels
+          key: pip-wheels-${{ runner.os }}-py3.12-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            pip-wheels-${{ runner.os }}-py3.12-
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: System deps (GTK + WebKit + appindicator)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev \
+            file
+
+      - name: Build Python sidecar (native on 22.04 — GLIBC 2.35 baseline)
+        timeout-minutes: 15
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip wheel
+          # Prefer pre-built wheels to avoid compiling C-extensions on the
+          # runner (the previous v0.9.0 run got stuck >90 min here, almost
+          # certainly on a heavy transitive like tokenizers/tiktoken building
+          # from source). Two-pass install: first --only-binary=:all: so we
+          # fail fast if a wheel is missing; if that fails (pure-python sdists
+          # are fine to build), fall back to --prefer-binary.
+          pip install --prefer-binary --only-binary=:all: -r requirements.txt pyinstaller \
+              || pip install --prefer-binary -r requirements.txt pyinstaller
+          # Skip smoke test inside the sandbox — Ollama isn't present in CI.
+          DIALEKT_BUILD_MODE=native bash build_sidecar.sh || true
+          # The script's copy step runs regardless of smoke; verify output:
+          TRIPLE="x86_64-unknown-linux-gnu"
+          test -f "../frontend/src-tauri/binaries/dialekt-server-$TRIPLE"
+          file "../frontend/src-tauri/binaries/dialekt-server-$TRIPLE"
+
+      - name: Build Tauri bundles (.deb + .AppImage)
+        run: |
+          cd frontend
+          npm ci
+          npm run tauri -- build --bundles deb appimage
+
+      - name: Collect + hash artifacts
+        run: |
+          VERSION="$(grep -oP '"version":\s*"\K[0-9.]+' frontend/src-tauri/tauri.conf.json)"
+          mkdir -p release
+          cp frontend/src-tauri/target/release/bundle/deb/*.deb      "release/dialekt_${VERSION}_amd64.deb"
+          cp frontend/src-tauri/target/release/bundle/appimage/*.AppImage "release/dialekt_${VERSION}_amd64.AppImage"
+          cd release
+          for f in *.deb *.AppImage; do
+            sha256sum "$f" > "${f}.sha256"
+          done
+          ls -la
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: release/*
+          if-no-files-found: error
+
+  # ── 3. Publish release ───────────────────────────────────────────────────
+
+  release:
+    needs: build-linux
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog from git log
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s" --no-merges | head -30)
+          fi
+          {
+            echo "CHANGES<<EOF"
+            echo "$CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-artifacts
+          path: release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: dialekt ${{ github.ref_name }}
+          body: |
+            ## What's new in ${{ github.ref_name }}
+
+            ${{ steps.changelog.outputs.CHANGES }}
+
+            ---
+
+            ### Installation (Linux)
+
+            **Ubuntu / Debian / Mint**:
+            ```sh
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_amd64.deb
+            sudo dpkg -i dialekt_*_amd64.deb
+            sudo apt-get install -f   # if missing system libs
+            ```
+
+            **Fedora / Arch / openSUSE / any glibc 2.35+**:
+            ```sh
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_amd64.AppImage
+            chmod +x dialekt_*.AppImage
+            ./dialekt_*.AppImage
+            ```
+
+            **Requirements**:
+            - glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 38+, anything newer)
+            - Ollama 0.4+ running locally (see https://ollama.com)
+            - 16 GB RAM (48 GB recommended for 32B models)
+
+            **Verify downloads**:
+            ```sh
+            sha256sum -c dialekt_*.sha256
+            ```
+
+            macOS and Windows builds are coming in a later release.
+          files: |
+            release/*.deb
+            release/*.AppImage
+            release/*.sha256
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

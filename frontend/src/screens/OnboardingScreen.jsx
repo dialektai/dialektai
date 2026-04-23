@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { T } from '../tokens.js';
 import { AppFrame, Logo } from '../components/Shell.jsx';
 
 const MODELS = [
   {
-    rank: '01', selected: true,
+    rank: '01',
     name: 'llama3.1', tag: '70b-instruct-q4_K_M', vendor: 'Meta · via Ollama',
     blurb: 'Best all-rounder. Strong reasoning, full tool-use. Fits this machine.',
     specs: [['Size','42.1 GB'],['Ctx','128k'],['Speed','≈ 22 tok/s'],['RAM','48 GB']],
@@ -46,6 +47,8 @@ const MODELS = [
   },
 ];
 
+const DEFAULT_IDX = 0;
+
 function Filter({ label, n, active }) {
   return (
     <div style={{
@@ -61,17 +64,22 @@ function Filter({ label, n, active }) {
   );
 }
 
-function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected }) {
+function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected, onClick }) {
   const tooBig = fit === 'too-big';
   const ramTotal = 32;
   const ramVal = parseInt(specs[3][1]);
   return (
-    <div style={{
-      border: `1px solid ${selected ? T.cyan : T.border}`,
-      background: selected ? T.bg2 : T.bg1,
-      padding: 16, position: 'relative',
-      opacity: tooBig ? 0.65 : 1,
-    }}>
+    <div
+      onClick={tooBig ? undefined : onClick}
+      style={{
+        border: `1px solid ${selected ? T.cyan : T.border}`,
+        background: selected ? T.bg2 : T.bg1,
+        padding: 16, position: 'relative',
+        opacity: tooBig ? 0.55 : 1,
+        cursor: tooBig ? 'not-allowed' : 'pointer',
+        transition: 'border-color .15s, background .15s',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
         <span className="mono" style={{ fontSize: 10, color: selected ? T.cyan : T.dim, letterSpacing: '.14em' }}>{rank}</span>
         <div style={{ flex: 1 }}>
@@ -147,6 +155,17 @@ const STEPS = [
 ];
 
 export default function OnboardingScreen({ onNav }) {
+  const [selectedIdx, setSelectedIdx] = useState(DEFAULT_IDX);
+  const sel = MODELS[selectedIdx];
+  const fullName = `${sel.name}:${sel.tag}`;
+
+  const handleDownload = () => {
+    onNav?.('download', {
+      model: fullName,
+      onComplete: () => onNav?.('onboarding-step4'),
+    });
+  };
+
   return (
     <AppFrame title="dialekt.ai — welcome">
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
@@ -209,9 +228,17 @@ export default function OnboardingScreen({ onNav }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
-            {MODELS.map((m, i) => <ModelCard key={i} {...m} />)}
+            {MODELS.map((m, i) => (
+              <ModelCard
+                key={i}
+                {...m}
+                selected={i === selectedIdx}
+                onClick={() => setSelectedIdx(i)}
+              />
+            ))}
           </div>
 
+          {/* Sticky footer */}
           <div style={{
             position: 'sticky', bottom: -36, marginTop: 28,
             borderTop: `1px solid ${T.border}`, padding: '16px 0 0',
@@ -221,12 +248,12 @@ export default function OnboardingScreen({ onNav }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, color: T.muted }}>Selected</div>
               <div className="mono" style={{ fontSize: 13, color: T.text }}>
-                llama3.1:70b-instruct-q4_K_M <span style={{ color: T.dim }}>· 42.1 GB download</span>
+                {fullName} <span style={{ color: T.dim }}>· {sel.specs[0][1]} download</span>
               </div>
             </div>
-            <button className="dlk-btn">Back</button>
-            <button className="dlk-btn">Skip for now</button>
-            <button className="dlk-btn primary" style={{ padding: '7px 16px' }} onClick={() => onNav && onNav('main')}>
+            <button className="dlk-btn" onClick={() => onNav?.('onboarding-step2')}>Back</button>
+            <button className="dlk-btn" onClick={() => onNav?.('onboarding-step4')}>Skip for now</button>
+            <button className="dlk-btn primary" style={{ padding: '7px 16px' }} onClick={handleDownload}>
               Download & continue <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
             </button>
           </div>

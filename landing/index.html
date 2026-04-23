@@ -211,6 +211,110 @@ function WinChrome({ title }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// DOWNLOADS — platform detection + GitHub Releases API
+// ─────────────────────────────────────────────────────────────
+const GH_LATEST_RELEASE = 'https://api.github.com/repos/dialektai/dialektai/releases/latest';
+
+function detectPlatform() {
+  const ua = (navigator.userAgent || '').toLowerCase();
+  const platform = (navigator.platform || '').toLowerCase();
+  if (ua.includes('linux') || platform.includes('linux')) {
+    // Default Linux users to .deb (Ubuntu/Debian majority)
+    // Fedora / Arch / SUSE users can click the AppImage row.
+    if (ua.includes('fedora') || ua.includes('arch') || ua.includes('suse')) return 'linux-appimage';
+    return 'linux-deb';
+  }
+  if (ua.includes('mac') || platform.includes('mac')) return 'macos';
+  if (ua.includes('win')) return 'windows';
+  return 'linux-deb';  // fall back to the only platform we ship today
+}
+
+function fmtBytes(n) {
+  if (!n || isNaN(n)) return null;
+  const mb = n / (1024 * 1024);
+  return `${mb.toFixed(0)} MB`;
+}
+
+function useReleases() {
+  const [state, setState] = React.useState({
+    version: null,
+    publishedAt: null,
+    debUrl: null,
+    debSize: null,
+    appimageUrl: null,
+    appimageSize: null,
+    loading: true,
+    error: null,
+  });
+  React.useEffect(() => {
+    fetch(GH_LATEST_RELEASE, { headers: { 'Accept': 'application/vnd.github+json' } })
+      .then(r => {
+        if (!r.ok) throw new Error(`GitHub API: HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(release => {
+        const assets = release.assets || [];
+        const deb = assets.find(a => /\.deb$/i.test(a.name));
+        const app = assets.find(a => /\.AppImage$/i.test(a.name));
+        setState({
+          version: (release.tag_name || '').replace(/^v/, '') || '0.9.0',
+          publishedAt: release.published_at ? release.published_at.substring(0, 10) : null,
+          debUrl: deb ? deb.browser_download_url : null,
+          debSize: deb ? fmtBytes(deb.size) : null,
+          appimageUrl: app ? app.browser_download_url : null,
+          appimageSize: app ? fmtBytes(app.size) : null,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch(err => {
+        setState(s => ({ ...s, loading: false, error: err.message }));
+      });
+  }, []);
+  return state;
+}
+
+const DownloadsContext = React.createContext({
+  releases: { version: null, debUrl: null, appimageUrl: null, loading: true },
+  detectedPlatform: 'linux-deb',
+});
+
+function HeroCTA() {
+  const { releases, detectedPlatform } = React.useContext(DownloadsContext);
+  const primary = detectedPlatform === 'linux-appimage'
+    ? { label: 'AppImage', url: releases.appimageUrl, size: releases.appimageSize || '~130 MB' }
+    : { label: '.deb for Ubuntu / Debian', url: releases.debUrl, size: releases.debSize || '~130 MB' };
+  const macWinLabel = detectedPlatform === 'macos' || detectedPlatform === 'windows' ? 'Linux only for now' : 'macOS / Windows soon';
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+      <a
+        className="btn primary"
+        href={primary.url || '#install'}
+        target={primary.url ? '_blank' : '_self'}
+        rel="noopener"
+        style={{ padding: '12px 18px', fontSize: 13, opacity: primary.url ? 1 : 0.75 }}
+      >
+        <LIcon name="down" size={14} color={LT.bg0} />
+        {primary.url ? `Download ${primary.label}` : 'Loading latest release…'}
+        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· x64 · {primary.size}</span>
+      </a>
+      <a className="btn" href="#install" style={{ padding: '12px 16px', fontSize: 12 }}>
+        other platforms
+        <span className="mono" style={{ color: LT.dim, marginLeft: 4, fontSize: 10 }}>({macWinLabel})</span>
+      </a>
+      <a className="btn" href="https://github.com/dialektai/dialektai" target="_blank" rel="noopener" style={{ padding: '12px 16px', fontSize: 12 }}>
+        <LIcon name="github" size={13} color={LT.text} />View source
+      </a>
+      {releases.version && (
+        <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>
+          v{releases.version} · {releases.publishedAt || ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // HERO
 // ─────────────────────────────────────────────────────────────
 function HeroMark({ size = 20, color = LT.cyan }) {
@@ -284,18 +388,7 @@ function Hero() {
             with your models, asking permission at every step that matters.{' '}
             <span style={{ color: LT.text }}>Your code never leaves the disk.</span>
           </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-            <a className="btn primary" href="#install" style={{ padding: '12px 18px', fontSize: 13 }}>
-              <LIcon name="down" size={14} color={LT.bg0} />
-              Download for macOS
-              <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· arm64 · 84 MB</span>
-            </a>
-            <a className="btn" href="#install" style={{ padding: '12px 16px', fontSize: 12 }}>Linux <span className="mono" style={{ color: LT.dim }}>/</span> Windows</a>
-            <a className="btn" href="#source" style={{ padding: '12px 16px', fontSize: 12 }}>
-              <LIcon name="github" size={13} color={LT.text} />View source
-            </a>
-            <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>sha256 · 4f8c…e1a2 · signed</div>
-          </div>
+          <HeroCTA />
         </div>
       </div>
 
@@ -1065,10 +1158,52 @@ function SectionWho() {
 }
 
 function SectionInstall() {
+  const { releases, detectedPlatform } = React.useContext(DownloadsContext);
+  const rows = [
+    {
+      platform: 'Linux (deb)',
+      arch: 'Ubuntu 22.04+ · Debian 12+ · x64',
+      size: releases.debSize || '~130 MB',
+      cmd: releases.debUrl ? `curl -fsSLO ${releases.debUrl} && sudo dpkg -i *.deb` : 'curl -fsSLO <download> && sudo dpkg -i *.deb',
+      url: releases.debUrl,
+      primary: detectedPlatform === 'linux-deb',
+    },
+    {
+      platform: 'Linux (AppImage)',
+      arch: 'Fedora · Arch · any glibc 2.35+ · x64',
+      size: releases.appimageSize || '~130 MB',
+      cmd: releases.appimageUrl ? `curl -fsSLO ${releases.appimageUrl} && chmod +x *.AppImage` : 'curl -fsSLO <download> && chmod +x *.AppImage',
+      url: releases.appimageUrl,
+      primary: detectedPlatform === 'linux-appimage',
+    },
+    {
+      platform: 'macOS',
+      arch: 'coming soon',
+      size: '—',
+      cmd: 'brew install --cask dialekt',
+      url: null,
+      disabled: true,
+    },
+    {
+      platform: 'Windows',
+      arch: 'coming soon',
+      size: '—',
+      cmd: 'winget install dialekt',
+      url: null,
+      disabled: true,
+    },
+    {
+      platform: 'Source',
+      arch: 'rust + tauri + python',
+      size: 'git',
+      cmd: 'git clone github.com/dialektai/dialektai',
+      code: true,
+    },
+  ];
   return (
     <section id="install" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
       <div className="wrap-wide">
-        <SecTag n="07" label="Install" meta="one command or one click" />
+        <SecTag n="07" label="Install" meta="linux first · macos/windows coming" />
         <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
           <div>
             <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
@@ -1076,22 +1211,18 @@ function SectionInstall() {
               <span style={{ color: LT.muted }}>Or build it.</span>
             </h2>
             <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 460 }}>
-              Open source core. No account. No license key. No telemetry handshake on first launch. Signed binaries for macOS, AppImage for Linux, MSI for Windows.
+              Open-source core. No account. No license key for local use. No telemetry on first launch. Linux binaries available today; macOS and Windows land next.
             </p>
             <div className="mono" style={{ marginTop: 24, fontSize: 11, color: LT.dim, lineHeight: 1.8 }}>
               → requires ollama 0.4+<br />
+              → requires glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 38)<br />
               → requires 16 GB ram (48 GB recommended)<br />
-              → version 0.8.2 · apr 2026 · <span style={{ color: LT.muted }}>changelog</span>
+              → version {releases.version || '0.9.0'} · {releases.publishedAt || 'apr 2026'} · <a href="https://github.com/dialektai/dialektai/releases" style={{ color: LT.muted }}>changelog</a>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-            {[
-              { platform:'macOS',   arch:'arm64 · x64',        size:'84 MB',  cmd:'brew install --cask dialekt',                         primary:true  },
-              { platform:'Linux',   arch:'x64 AppImage · deb · rpm', size:'92 MB',  cmd:'curl -fsSL dialekt.ai/install.sh | sh'              },
-              { platform:'Windows', arch:'x64 MSI',            size:'96 MB',  cmd:'winget install dialekt'                               },
-              { platform:'Source',  arch:'rust + tauri',       size:'git',    cmd:'git clone github.com/weloveclaude/dialekt', code:true  },
-            ].map((r,i) => (
-              <div key={i} className="install-row" style={{ background: LT.bg1, padding: '16px 18px', display: 'grid', gridTemplateColumns: '110px 1fr 90px 140px', gap: 16, alignItems: 'center' }}>
+            {rows.map((r, i) => (
+              <div key={i} className="install-row" style={{ background: LT.bg1, padding: '16px 18px', display: 'grid', gridTemplateColumns: '110px 1fr 90px 140px', gap: 16, alignItems: 'center', opacity: r.disabled ? 0.45 : 1 }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{r.platform}</div>
                   <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 2 }}>{r.arch}</div>
@@ -1101,9 +1232,20 @@ function SectionInstall() {
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{r.size}</div>
                 {r.code ? (
-                  <a className="btn" href="#source" style={{ justifyContent: 'center' }}><LIcon name="github" size={12} color={LT.text} />View source</a>
+                  <a className="btn" href="https://github.com/dialektai/dialektai" target="_blank" rel="noopener" style={{ justifyContent: 'center' }}><LIcon name="github" size={12} color={LT.text} />View source</a>
+                ) : r.disabled ? (
+                  <span className="mono" style={{ fontSize: 10, color: LT.dim, textAlign: 'center', letterSpacing: '.08em' }}>soon</span>
                 ) : (
-                  <a className={`btn${r.primary ? ' primary' : ''}`} href="#" style={{ justifyContent: 'center' }}><LIcon name="down" size={12} color={r.primary ? LT.bg0 : LT.text} />Download</a>
+                  <a
+                    className={`btn${r.primary ? ' primary' : ''}`}
+                    href={r.url || '#'}
+                    target="_blank"
+                    rel="noopener"
+                    style={{ justifyContent: 'center', opacity: r.url ? 1 : 0.6, pointerEvents: r.url ? 'auto' : 'none' }}
+                  >
+                    <LIcon name="down" size={12} color={r.primary ? LT.bg0 : LT.text} />
+                    {r.url ? 'Download' : 'Loading…'}
+                  </a>
                 )}
               </div>
             ))}
@@ -1164,19 +1306,23 @@ function Footer() {
 // APP
 // ─────────────────────────────────────────────────────────────
 function App() {
+  const releases = useReleases();
+  const detectedPlatform = React.useMemo(detectPlatform, []);
   return (
-    <div className="dlk-land scanlines">
-      <Nav />
-      <Hero />
-      <SectionChatVsAgent />
-      <SectionHow />
-      <SectionLocal />
-      <SectionCapabilities />
-      <SectionHardware />
-      <SectionWho />
-      <SectionInstall />
-      <Footer />
-    </div>
+    <DownloadsContext.Provider value={{ releases, detectedPlatform }}>
+      <div className="dlk-land scanlines">
+        <Nav />
+        <Hero />
+        <SectionChatVsAgent />
+        <SectionHow />
+        <SectionLocal />
+        <SectionCapabilities />
+        <SectionHardware />
+        <SectionWho />
+        <SectionInstall />
+        <Footer />
+      </div>
+    </DownloadsContext.Provider>
   );
 }
 

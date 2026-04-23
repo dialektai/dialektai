@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dialekt_integration
+      POSTGRES_USER: dialekt_test
+      POSTGRES_PASSWORD: dialekt_test
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dialekt_test -d dialekt_integration"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - ./seed/postgres_seed.sql:/docker-entrypoint-initdb.d/00_seed.sql
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: dialekt_integration
+      MYSQL_USER: dialekt_test
+      MYSQL_PASSWORD: dialekt_test
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "dialekt_test", "-pdialekt_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - ./seed/mysql_seed.sql:/docker-entrypoint-initdb.d/00_seed.sql
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    environment:
+      CLICKHOUSE_DB: dialekt_integration
+      CLICKHOUSE_USER: dialekt_test
+      CLICKHOUSE_PASSWORD: dialekt_test
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - ./seed/clickhouse_seed.sql:/docker-entrypoint-initdb.d/00_seed.sql

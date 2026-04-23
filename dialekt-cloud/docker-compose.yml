@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dialekt-db
+    environment:
+      POSTGRES_DB: dialekt_cloud
+      POSTGRES_USER: dialekt_cloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dialekt_cloud_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dialekt_cloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
+  api:
+    build: .
+    container_name: dialekt-api
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://dialekt_cloud:${POSTGRES_PASSWORD:-dialekt_cloud_pass}@db:5432/dialekt_cloud
+      DIALEKT_CLOUD_VERSION: ${DIALEKT_CLOUD_VERSION:-0.9.0}
+    # Exposed to host on 127.0.0.1 only; Cloudflare Tunnel reaches it
+    # locally (api.dias.now → http://127.0.0.1:8080).
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - invoices:/app/invoices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  landing:
+    image: nginx:1.27-alpine
+    container_name: dialekt-landing
+    volumes:
+      - ../landing:/usr/share/nginx/html:ro
+    # 127.0.0.1 only; Cloudflare Tunnel bridges to dialekt.dias.now.
+    ports:
+      - "127.0.0.1:8081:80"
+    restart: unless-stopped
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+  invoices:
+
+networks:
+  internal:
+    driver: bridge

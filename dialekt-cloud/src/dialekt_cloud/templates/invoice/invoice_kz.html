@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Счёт № {{ invoice_number }}</title>
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; margin: 0; }
+  h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
+  .subtitle { text-align: center; font-size: 10pt; color: #555; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #000; padding: 5px 8px; font-size: 10pt; }
+  th { background: #f0f0f0; font-weight: bold; text-align: left; }
+  .no-border td { border: none; padding: 2px 0; }
+  .section { margin: 16px 0; }
+  .section-title { font-weight: bold; font-size: 10pt; border-bottom: 2px solid #000; padding-bottom: 2px; margin-bottom: 8px; }
+  .total-row td { font-weight: bold; background: #f9f9f9; }
+  .footer-text { margin-top: 20px; font-size: 9pt; color: #555; text-align: center; }
+  .bank-table td { font-size: 9.5pt; border: 1px solid #ccc; padding: 4px 6px; }
+  .bank-table th { font-size: 9.5pt; background: #f5f5f5; border: 1px solid #ccc; padding: 4px 6px; }
+</style>
+</head>
+<body>
+
+<h1>СЧЁТ НА ОПЛАТУ № {{ invoice_number }}</h1>
+<div class="subtitle">от {{ issued_date }}</div>
+
+<div class="section">
+  <div class="section-title">Поставщик</div>
+  <table class="no-border">
+    <tr><td style="width:140px;font-weight:bold">Наименование:</td><td>{{ seller.name }}</td></tr>
+    <tr><td style="font-weight:bold">БИН/ИИН:</td><td>{{ seller.bin }}</td></tr>
+    <tr><td style="font-weight:bold">Адрес:</td><td>{{ seller.address }}</td></tr>
+    <tr><td style="font-weight:bold">IBAN:</td><td>{{ seller.iban }}</td></tr>
+    <tr><td style="font-weight:bold">Банк:</td><td>{{ seller.bank }}</td></tr>
+    <tr><td style="font-weight:bold">БИК:</td><td>{{ seller.bik }}</td></tr>
+    <tr><td style="font-weight:bold">Телефон:</td><td>{{ seller.phone }}</td></tr>
+    <tr><td style="font-weight:bold">Email:</td><td>{{ seller.email }}</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Покупатель</div>
+  <table class="no-border">
+    <tr><td style="width:140px;font-weight:bold">Наименование:</td><td>{{ buyer_company }}</td></tr>
+    {% if buyer_address %}<tr><td style="font-weight:bold">Адрес:</td><td>{{ buyer_address }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Товары / услуги</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">№</th>
+        <th>Наименование</th>
+        <th style="width:60px;text-align:center">Кол-во</th>
+        <th style="width:80px;text-align:center">Ед.</th>
+        <th style="width:110px;text-align:right">Цена, ₸</th>
+        <th style="width:120px;text-align:right">Сумма, ₸</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Подписка dialekt.ai ({{ plan }}), {{ seats }} мест{{ ', ' + period_months|string + ' мес.' if period_months > 1 else ', 1 мес.' }}</td>
+        <td style="text-align:center">1</td>
+        <td style="text-align:center">услуга</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }}</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      {% if has_nds %}
+      <tr>
+        <td colspan="5" style="text-align:right;font-weight:bold">НДС (12%):</td>
+        <td style="text-align:right">{{ "%.0f"|format(amount_kzt * 0.12) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" style="text-align:right">НДС:</td>
+        <td style="text-align:right;font-size:9pt;color:#555">Не облагается</td>
+      </tr>
+      {% endif %}
+      <tr class="total-row">
+        <td colspan="5" style="text-align:right">ИТОГО к оплате:</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }} ₸</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Реквизиты для оплаты</div>
+  <table class="bank-table">
+    <tr><th>IBAN</th><td>{{ seller.iban }}</td></tr>
+    <tr><th>Банк</th><td>{{ seller.bank }}</td></tr>
+    <tr><th>БИК</th><td>{{ seller.bik }}</td></tr>
+    <tr><th>Получатель</th><td>{{ seller.name }}</td></tr>
+    <tr><th>Назначение платежа</th><td>Оплата по счёту {{ invoice_number }} за подписку dialekt.ai</td></tr>
+  </table>
+</div>
+
+<div class="footer-text">
+  Оплата в течение 5 рабочих дней с даты выставления счёта.<br>
+  Настоящий счёт является основанием для оплаты в соответствии с условиями договора.<br>
+  При оплате укажите номер счёта в назначении платежа.
+</div>
+
+</body>
+</html>

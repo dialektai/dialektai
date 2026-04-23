@@ -54,3 +54,21 @@ dist/
 build/
 python/dist/
 python/build/
+
+# Stage 2 additions
+dialekt-cloud/venv/
+dialekt-cloud/.pytest_cache/
+dialekt-cloud/**/__pycache__/
+python/venv/
+python/**/__pycache__/
+python/tests/__pycache__/
+frontend/src-tauri/target/
+frontend/node_modules/
+frontend/dist/
+dist/
+*.pyc
+
+# Built PyInstaller sidecar binaries (produced by build_sidecar.sh / CI).
+# The committed stubs in binaries/ are shell scripts used for `tauri dev`;
+# real ELF binaries are always rebuilt and never committed.
+frontend/src-tauri/binaries/dialekt-server-x86_64-unknown-linux-gnu

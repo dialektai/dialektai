@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit tests (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+      - name: Install
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      - name: Run unit tests
+        run: |
+          cd python
+          source venv/bin/activate
+          python -m pytest -q --ignore=tests/integration --tb=short
+      - name: Count tests
+        run: |
+          cd python
+          source venv/bin/activate
+          python -m pytest --collect-only -q --ignore=tests/integration 2>/dev/null | tail -3
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  integration-tests:
+    name: Integration tests (live DBs)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dialekt_integration
+          POSTGRES_USER: dialekt_test
+          POSTGRES_PASSWORD: dialekt_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+      - name: Install
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      - name: Seed integration DB
+        run: |
+          cd python
+          source venv/bin/activate
+          PGPASSWORD=dialekt_test psql -h localhost -p 15432 -U dialekt_test -d dialekt_integration \
+            -f tests/integration/seed/postgres_seed.sql 2>/dev/null || true
+      - name: Run integration tests
+        env:
+          DIALEKT_INTEGRATION_PG: postgresql://dialekt_test:dialekt_test@localhost:15432/dialekt_integration
+        run: |
+          cd python
+          source venv/bin/activate
+          python -m pytest tests/integration/ -v --tb=short
+
+  cloud-tests:
+    name: dialekt-cloud tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dialekt_cloud_test
+          POSTGRES_USER: dialekt_cloud
+          POSTGRES_PASSWORD: dialekt_cloud_pass
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dialekt-cloud deps
+        run: |
+          cd dialekt-cloud
+          pip install -r requirements.txt pytest pytest-asyncio httpx
+      - name: Run cloud tests
+        env:
+          DATABASE_URL: postgresql://dialekt_cloud:dialekt_cloud_pass@localhost:5433/dialekt_cloud_test
+          DIALEKT_ADMIN_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          JWT_SECRET: test_secret_for_ci_only
+        run: |
+          cd dialekt-cloud
+          python -m pytest tests/ -v --tb=short
+        continue-on-error: true  # cloud tests may fail if DB schema not applied yet

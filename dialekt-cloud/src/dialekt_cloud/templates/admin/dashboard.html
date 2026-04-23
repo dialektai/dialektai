@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>dialekt.ai — Admin Panel</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14/dist/cdn.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Courier New', monospace; background: #0a0e14; color: #cdd6f4; font-size: 13px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: #13181f; border-bottom: 1px solid #2a3244; }
+.logo { color: #89dceb; font-size: 14px; letter-spacing: .1em; }
+.topbar a { color: #6c7086; font-size: 11px; text-decoration: none; }
+.topbar a:hover { color: #f38ba8; }
+.layout { display: flex; min-height: calc(100vh - 45px); }
+.sidebar { width: 200px; background: #0d1117; border-right: 1px solid #2a3244; padding: 20px 0; flex-shrink: 0; }
+.nav-item { display: block; padding: 10px 20px; color: #6c7086; cursor: pointer; font-size: 12px; letter-spacing: .06em; transition: all .2s; border-left: 2px solid transparent; text-decoration: none; }
+.nav-item:hover, .nav-item.active { color: #89dceb; background: #13181f; border-left-color: #89dceb; }
+.main { flex: 1; padding: 24px; overflow-y: auto; }
+.page { display: none; }
+.page.active { display: block; }
+h2 { font-size: 16px; color: #cdd6f4; margin-bottom: 20px; letter-spacing: .04em; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-card { background: #13181f; border: 1px solid #2a3244; padding: 20px; }
+.stat-label { font-size: 10px; color: #6c7086; letter-spacing: .08em; margin-bottom: 8px; }
+.stat-value { font-size: 28px; color: #89dceb; }
+.stat-sub { font-size: 11px; color: #6c7086; margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 10px; color: #6c7086; letter-spacing: .08em; padding: 8px 12px; border-bottom: 1px solid #2a3244; }
+td { padding: 10px 12px; border-bottom: 1px solid #1a2133; font-size: 12px; }
+tr:hover td { background: #13181f; }
+.badge { display: inline-block; padding: 2px 8px; font-size: 10px; letter-spacing: .06em; }
+.badge-active { background: #1e3a2a; color: #a6e3a1; }
+.badge-draft { background: #3a3218; color: #f9e2af; }
+.badge-suspended { background: #3a1525; color: #f38ba8; }
+.btn { display: inline-block; padding: 6px 14px; font-family: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer; border: 1px solid; transition: all .2s; }
+.btn-primary { background: #89dceb; color: #0a0e14; border-color: #89dceb; font-weight: bold; }
+.btn-primary:hover { background: #74c7ec; }
+.btn-ghost { background: transparent; color: #89dceb; border-color: #89dceb; }
+.btn-ghost:hover { background: #89dceb22; }
+.btn-warn { background: transparent; color: #f9e2af; border-color: #f9e2af; }
+.btn-warn:hover { background: #f9e2af22; }
+.btn-danger { background: transparent; color: #f38ba8; border-color: #f38ba8; }
+.btn-danger:hover { background: #f38ba822; }
+.btn-sm { padding: 3px 8px; font-size: 10px; }
+.form-row { margin-bottom: 14px; }
+label { display: block; font-size: 10px; color: #6c7086; letter-spacing: .08em; margin-bottom: 5px; }
+input, select, textarea { width: 100%; background: #0a0e14; border: 1px solid #2a3244; color: #cdd6f4; font-family: inherit; font-size: 13px; padding: 8px 10px; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: #89dceb; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.panel { background: #13181f; border: 1px solid #2a3244; padding: 20px; margin-bottom: 20px; }
+.panel h3 { font-size: 12px; color: #6c7086; letter-spacing: .08em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #2a3244; }
+.alert { padding: 10px 14px; font-size: 12px; margin-bottom: 16px; }
+.alert-ok { background: #1e3a2a; color: #a6e3a1; border: 1px solid #a6e3a144; }
+.alert-err { background: #3a1525; color: #f38ba8; border: 1px solid #f38ba844; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: flex-start; justify-content: center; padding-top: 60px; z-index: 100; }
+.modal { background: #13181f; border: 1px solid #2a3244; padding: 28px; width: 560px; max-height: 80vh; overflow-y: auto; }
+.modal h3 { font-size: 15px; margin-bottom: 20px; }
+.detail-row { display: flex; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.detail-label { color: #6c7086; width: 120px; flex-shrink: 0; }
+.key-box { background: #0a0e14; border: 1px solid #a6e3a1; padding: 12px; font-size: 14px; color: #a6e3a1; word-break: break-all; letter-spacing: .04em; margin: 8px 0; }
+.sep { border: none; border-top: 1px solid #2a3244; margin: 20px 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body x-data="adminApp()" x-init="init()">
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="logo">dialekt.ai / ADMIN</div>
+  <div style="display:flex;align-items:center;gap:20px">
+    <span style="font-size:11px;color:#6c7086" x-text="'Tenants: ' + (stats.tenants?.total ?? '...')"></span>
+    <a href="/admin/ui/logout">выйти</a>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+  <div class="sidebar">
+    <a class="nav-item" :class="{active: page==='dashboard'}" @click="page='dashboard'">ОБЗОР</a>
+    <a class="nav-item" :class="{active: page==='tenants'}" @click="page='tenants';loadTenants()">КЛИЕНТЫ</a>
+    <a class="nav-item" :class="{active: page==='create'}" @click="page='create'">+ НОВЫЙ КЛИЕНТ</a>
+    <a class="nav-item" :class="{active: page==='stats'}" @click="page='stats';loadStats()">СТАТИСТИКА</a>
+  </div>
+
+  <div class="main">
+
+    <!-- Dashboard -->
+    <div class="page" :class="{active: page==='dashboard'}">
+      <h2>Обзор</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">КЛИЕНТЫ ВСЕГО</div>
+          <div class="stat-value" x-text="stats.tenants?.total ?? '—'"></div>
+          <div class="stat-sub" x-text="(stats.tenants?.active ?? 0) + ' активных'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ЧЕРНОВИКИ</div>
+          <div class="stat-value" x-text="stats.tenants?.draft ?? '—'"></div>
+          <div class="stat-sub">ожидают активации</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ПОЛЬЗОВАТЕЛИ</div>
+          <div class="stat-value" x-text="stats.users?.total ?? '—'"></div>
+          <div class="stat-sub">всего аккаунтов</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">АГЕНТЫ</div>
+          <div class="stat-value" x-text="stats.agents?.total ?? '—'"></div>
+          <div class="stat-sub">опубликовано</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>НЕДАВНИЕ КЛИЕНТЫ</h3>
+        <table>
+          <thead><tr><th>КОМПАНИЯ</th><th>СТАТУС</th><th>ТАРИФ</th><th>МЕСТ</th><th></th></tr></thead>
+          <tbody>
+            <template x-for="t in tenants.slice(0,5)" :key="t.id">
+              <tr>
+                <td x-text="t.company_name"></td>
+                <td><span class="badge" :class="'badge-'+t.status" x-text="t.status.toUpperCase()"></span></td>
+                <td x-text="t.plan"></td>
+                <td x-text="t.seats_limit"></td>
+                <td><button class="btn btn-ghost btn-sm" @click="openTenant(t.id)">открыть</button></td>
+              </tr>
+            </template>
+            <tr x-show="tenants.length === 0"><td colspan="5" style="color:#6c7086;text-align:center;padding:20px">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tenants list -->
+    <div class="page" :class="{active: page==='tenants'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h2>Клиенты</h2>
+        <button class="btn btn-primary" @click="page='create'">+ Новый клиент</button>
+      </div>
+
+      <div class="panel" style="padding:12px 16px;margin-bottom:16px">
+        <input type="text" placeholder="Поиск по названию или email..." x-model="filter" style="border:none;background:transparent;width:100%">
+      </div>
+
+      <table>
+        <thead><tr><th>КОМПАНИЯ</th><th>EMAIL ADMIN</th><th>СТАТУС</th><th>ТАРИФ</th><th>МЕСТ</th><th>СОЗДАН</th><th></th></tr></thead>
+        <tbody>
+          <template x-for="t in filteredTenants" :key="t.id">
+            <tr>
+              <td x-text="t.company_name"></td>
+              <td x-text="t.admin_email"></td>
+              <td><span class="badge" :class="'badge-'+t.status" x-text="t.status.toUpperCase()"></span></td>
+              <td x-text="t.plan"></td>
+              <td x-text="t.seats_limit"></td>
+              <td x-text="formatDate(t.created_at)"></td>
+              <td>
+                <button class="btn btn-ghost btn-sm" @click="openTenant(t.id)">открыть</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filteredTenants.length === 0">
+            <td colspan="7" style="color:#6c7086;text-align:center;padding:24px">Клиенты не найдены</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Create tenant -->
+    <div class="page" :class="{active: page==='create'}">
+      <h2>Новый клиент</h2>
+      <div x-show="createMsg.text" class="alert" :class="createMsg.ok ? 'alert-ok' : 'alert-err'" x-text="createMsg.text"></div>
+
+      <div class="panel">
+        <h3>ДАННЫЕ КЛИЕНТА</h3>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>НАЗВАНИЕ КОМПАНИИ</label>
+            <input type="text" x-model="newTenant.company_name" placeholder="ТОО Рога и Копыта">
+          </div>
+          <div class="form-row">
+            <label>EMAIL АДМИНИСТРАТОРА</label>
+            <input type="email" x-model="newTenant.admin_email" placeholder="admin@company.kz">
+          </div>
+          <div class="form-row">
+            <label>ТАРИФ</label>
+            <select x-model="newTenant.plan">
+              <option value="team">Team</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>КОЛИЧЕСТВО МЕСТ</label>
+            <input type="number" x-model.number="newTenant.seats" min="1" max="200">
+          </div>
+          <div class="form-row">
+            <label>СРОК ПОДПИСКИ (МЕСЯЦЕВ)</label>
+            <input type="number" x-model.number="newTenant.expiration_months" min="1" max="36">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>ЗАМЕТКИ (внутренние)</label>
+          <textarea x-model="newTenant.notes" rows="2" placeholder="Контекст переговоров, дата follow-up..."></textarea>
+        </div>
+        <button class="btn btn-primary" @click="createTenant()" :disabled="creating">
+          <span x-show="!creating">СОЗДАТЬ ЧЕРНОВИК →</span>
+          <span x-show="creating">Создание...</span>
+        </button>
+      </div>
+
+      <div x-show="newTenantId" class="panel" style="border-color:#a6e3a1">
+        <h3 style="color:#a6e3a1">✓ КЛИЕНТ СОЗДАН</h3>
+        <p style="margin-bottom:16px;color:#6c7086">Теперь создайте счёт и отправьте клиенту. После оплаты — активируйте.</p>
+        <div class="actions">
+          <button class="btn btn-ghost" @click="openTenant(newTenantId)">Открыть карточку</button>
+          <button class="btn btn-warn" @click="page='tenants';loadTenants()">Все клиенты</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="page" :class="{active: page==='stats'}">
+      <h2>Статистика</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">КЛИЕНТОВ</div>
+          <div class="stat-value" x-text="stats.tenants?.total ?? '—'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">АКТИВНЫХ</div>
+          <div class="stat-value" x-text="stats.tenants?.active ?? '—'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ПОЛЬЗОВАТЕЛЕЙ</div>
+          <div class="stat-value" x-text="stats.users?.total ?? '—'"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">СЧЕТОВ / ОПЛАЧЕНО</div>
+          <div class="stat-value" x-text="(stats.invoices?.total ?? '—') + ' / ' + (stats.invoices?.paid ?? 0)"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- Tenant Detail Modal -->
+<div class="modal-overlay" x-show="showTenant" @click.self="showTenant=false" x-cloak>
+  <div class="modal" x-show="showTenant && tenantDetail">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">
+      <h3 x-text="tenantDetail?.company_name"></h3>
+      <button @click="showTenant=false" style="background:none;border:none;color:#6c7086;cursor:pointer;font-size:18px">×</button>
+    </div>
+
+    <!-- Status & Plan -->
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <span class="badge" :class="'badge-'+(tenantDetail?.status)" x-text="tenantDetail?.status?.toUpperCase()"></span>
+      <span style="color:#6c7086;font-size:11px" x-text="tenantDetail?.plan + ' · ' + tenantDetail?.seats_limit + ' мест'"></span>
+    </div>
+
+    <div class="detail-row"><span class="detail-label">Admin email</span><span x-text="tenantDetail?.admin_email"></span></div>
+    <div class="detail-row" x-show="tenantDetail?.expires_at"><span class="detail-label">Истекает</span><span x-text="formatDate(tenantDetail?.expires_at)"></span></div>
+    <div class="detail-row" x-show="tenantDetail?.notes"><span class="detail-label">Заметки</span><span x-text="tenantDetail?.notes"></span></div>
+
+    <!-- License key -->
+    <template x-if="tenantDetail?.license">
+      <div style="margin-top:16px">
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.08em;margin-bottom:6px">ЛИЦЕНЗИОННЫЙ КЛЮЧ</div>
+        <div class="key-box" x-text="tenantDetail?.license?.license_key"></div>
+      </div>
+    </template>
+
+    <hr class="sep">
+
+    <!-- Actions -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;color:#6c7086;letter-spacing:.08em;margin-bottom:10px">ДЕЙСТВИЯ</div>
+      <div class="actions">
+        <template x-if="tenantDetail?.status === 'draft'">
+          <button class="btn btn-primary" @click="activateTenant()">✓ АКТИВИРОВАТЬ</button>
+        </template>
+        <template x-if="tenantDetail?.status === 'active'">
+          <button class="btn btn-danger" @click="suspendTenant()">⊘ ПРИОСТАНОВИТЬ</button>
+        </template>
+        <template x-if="tenantDetail?.status === 'suspended'">
+          <button class="btn btn-ghost" @click="resumeTenant()">▶ ВОЗОБНОВИТЬ</button>
+        </template>
+        <button class="btn btn-warn" @click="showInvoiceForm=!showInvoiceForm">📄 СЧЁТ</button>
+      </div>
+    </div>
+
+    <!-- Invoice form -->
+    <div x-show="showInvoiceForm" style="background:#0a0e14;border:1px solid #2a3244;padding:16px;margin-bottom:16px">
+      <div style="font-size:10px;color:#6c7086;letter-spacing:.08em;margin-bottom:12px">ВЫСТАВИТЬ СЧЁТ</div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>СУММА (₸)</label>
+          <input type="number" x-model.number="invoiceForm.amount_kzt" placeholder="90000">
+        </div>
+        <div class="form-row">
+          <label>ПЕРИОД (МЕСЯЦЕВ)</label>
+          <input type="number" x-model.number="invoiceForm.period_months" placeholder="3">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>АДРЕС ПОКУПАТЕЛЯ</label>
+        <input type="text" x-model="invoiceForm.company_address" placeholder="г. Алматы, ул. Примерная, 1">
+      </div>
+      <button class="btn btn-primary btn-sm" @click="generateInvoice()">СГЕНЕРИРОВАТЬ PDF</button>
+      <span x-show="invoiceMsg" style="font-size:11px;color:#a6e3a1;margin-left:12px" x-text="invoiceMsg"></span>
+    </div>
+
+    <!-- Users -->
+    <template x-if="tenantDetail?.users?.length">
+      <div>
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.08em;margin-bottom:10px">ПОЛЬЗОВАТЕЛИ (<span x-text="tenantDetail?.users?.length"></span>)</div>
+        <table>
+          <thead><tr><th>EMAIL</th><th>РОЛЬ</th><th>ПРИНЯТ</th></tr></thead>
+          <tbody>
+            <template x-for="u in tenantDetail.users" :key="u.id">
+              <tr>
+                <td x-text="u.email"></td>
+                <td x-text="u.role"></td>
+                <td x-text="u.invite_accepted_at ? '✓' : '—'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <!-- Action messages -->
+    <div x-show="actionMsg.text" class="alert" :class="actionMsg.ok ? 'alert-ok' : 'alert-err'" style="margin-top:16px" x-text="actionMsg.text"></div>
+  </div>
+</div>
+
+<script>
+function adminApp() {
+  const ADMIN_KEY = {{ admin_key | tojson }};
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY };
+
+  const api = async (path, opts={}) => {
+    const r = await fetch(path, { headers, ...opts });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  };
+
+  return {
+    page: 'dashboard',
+    stats: {},
+    tenants: [],
+    filter: '',
+    showTenant: false,
+    tenantDetail: null,
+    showInvoiceForm: false,
+    invoiceForm: { amount_kzt: 0, period_months: 3, company_address: '' },
+    invoiceMsg: '',
+    actionMsg: { text: '', ok: true },
+    newTenant: { company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '' },
+    createMsg: { text: '', ok: true },
+    creating: false,
+    newTenantId: null,
+
+    get filteredTenants() {
+      if (!this.filter) return this.tenants;
+      const f = this.filter.toLowerCase();
+      return this.tenants.filter(t =>
+        t.company_name.toLowerCase().includes(f) || t.admin_email.toLowerCase().includes(f)
+      );
+    },
+
+    async init() {
+      await Promise.all([this.loadStats(), this.loadTenants()]);
+    },
+
+    async loadStats() {
+      try { this.stats = await api('/admin/stats'); } catch(e) {}
+    },
+
+    async loadTenants() {
+      try { this.tenants = await api('/admin/tenants'); } catch(e) {}
+    },
+
+    async openTenant(id) {
+      this.showTenant = true;
+      this.tenantDetail = null;
+      this.actionMsg = { text: '', ok: true };
+      this.showInvoiceForm = false;
+      this.invoiceMsg = '';
+      try {
+        this.tenantDetail = await api(`/admin/tenants/${id}`);
+      } catch(e) {
+        this.actionMsg = { text: 'Ошибка загрузки: ' + e.message, ok: false };
+      }
+    },
+
+    async activateTenant() {
+      try {
+        const data = await api(`/admin/tenants/${this.tenantDetail.id}/activate`, { method: 'POST' });
+        this.actionMsg = { text: `✓ Активирован. Ключ: ${data.license_key}`, ok: true };
+        await this.openTenant(this.tenantDetail.id);
+        await this.loadTenants();
+        await this.loadStats();
+      } catch(e) {
+        this.actionMsg = { text: 'Ошибка: ' + e.message, ok: false };
+      }
+    },
+
+    async suspendTenant() {
+      if (!confirm('Приостановить этого клиента?')) return;
+      try {
+        await api(`/admin/tenants/${this.tenantDetail.id}`, { method: 'PATCH', body: JSON.stringify({status:'suspended'}) });
+        this.actionMsg = { text: 'Клиент приостановлен', ok: true };
+        await this.openTenant(this.tenantDetail.id);
+        await this.loadTenants();
+      } catch(e) {
+        this.actionMsg = { text: 'Ошибка: ' + e.message, ok: false };
+      }
+    },
+
+    async resumeTenant() {
+      try {
+        await api(`/admin/tenants/${this.tenantDetail.id}`, { method: 'PATCH', body: JSON.stringify({status:'active'}) });
+        this.actionMsg = { text: 'Клиент возобновлён', ok: true };
+        await this.openTenant(this.tenantDetail.id);
+        await this.loadTenants();
+      } catch(e) {
+        this.actionMsg = { text: 'Ошибка: ' + e.message, ok: false };
+      }
+    },
+
+    async generateInvoice() {
+      try {
+        const data = await api(`/admin/tenants/${this.tenantDetail.id}/invoice`, {
+          method: 'POST',
+          body: JSON.stringify(this.invoiceForm)
+        });
+        this.invoiceMsg = `${data.invoice_number} создан`;
+        if (data.pdf_path) {
+          window.open(`/admin/invoices/${data.invoice_id}/download`, '_blank');
+        }
+        await this.openTenant(this.tenantDetail.id);
+      } catch(e) {
+        this.invoiceMsg = 'Ошибка: ' + e.message;
+      }
+    },
+
+    async createTenant() {
+      this.creating = true;
+      this.createMsg = { text: '', ok: true };
+      this.newTenantId = null;
+      try {
+        const data = await api('/admin/tenants', { method: 'POST', body: JSON.stringify(this.newTenant) });
+        this.newTenantId = data.tenant_id;
+        this.createMsg = { text: `Клиент создан: ${data.tenant_id}`, ok: true };
+        this.newTenant = { company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '' };
+        await this.loadTenants();
+        await this.loadStats();
+      } catch(e) {
+        this.createMsg = { text: 'Ошибка: ' + e.message, ok: false };
+      }
+      this.creating = false;
+    },
+
+    formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' });
+    },
+  };
+}
+</script>
+</body>
+</html>
