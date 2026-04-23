@@ -74,7 +74,7 @@ export default function App() {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       {screen === 'main'               && <MainScreen onNav={nav} {...screenProps} />}
-      {screen === 'settings'           && <SettingsScreen onNav={nav} />}
+      {screen === 'settings'           && <SettingsScreen onNav={nav} {...screenProps} />}
       {screen === 'onboarding'         && <OnboardingScreen onNav={nav} />}
       {screen === 'download'           && <DownloadScreen onNav={nav} {...screenProps} />}
       {screen === 'empty'              && <EmptyChatScreen onNav={nav} />}
