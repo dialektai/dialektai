@@ -28,6 +28,8 @@ export default function LeftPanel({
   onSessionSwitch,
   onNewSession,
   onModelSwitch,
+  selectedAgentId: selectedAgentIdProp,
+  onAgentSelect,
 }) {
   const [sessions, setSessions] = useState([]);
   const [search, setSearch] = useState('');
@@ -38,7 +40,10 @@ export default function LeftPanel({
   const [sysStats, setSysStats] = useState({ cpu: 0, ram: 0, gpu: null, disk: 0 });
   const [mode, setMode] = useState('builder');
   const [agents, setAgents] = useState([]);
-  const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [selectedAgentIdInner, setSelectedAgentIdInner] = useState(null);
+  // Controlled if parent supplies prop; otherwise fall back to local state.
+  const selectedAgentId = selectedAgentIdProp !== undefined ? selectedAgentIdProp : selectedAgentIdInner;
+  const selectAgent = onAgentSelect || setSelectedAgentIdInner;
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newAgentName, setNewAgentName] = useState('');
@@ -347,7 +352,7 @@ export default function LeftPanel({
                 return (
                   <div
                     key={a.id}
-                    onClick={() => setSelectedAgentId(id => id === a.id ? null : a.id)}
+                    onClick={() => selectAgent(selectedAgentId === a.id ? null : a.id)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8,
                       padding: '6px 8px',

@@ -14,7 +14,10 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
 
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [localTitle, setLocalTitle] = useState(null);
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
   const didInit = useRef(false);
+
+  const handleSend = (text) => send(text, selectedAgentId);
 
   const displayTitle = localTitle || sessionTitle;
 
@@ -54,6 +57,8 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
         onSessionSwitch={switchSession}
         onNewSession={handleNewSession}
         onModelSwitch={switchModel}
+        selectedAgentId={selectedAgentId}
+        onAgentSelect={setSelectedAgentId}
       />
       <ChatColumn
         messages={messages}
@@ -63,7 +68,7 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
         sessionId={sessionId}
         autonomy={autonomy}
         activeModel={activeModel}
-        onSend={send}
+        onSend={handleSend}
         onStop={stop}
         onNewSession={handleNewSession}
         onSessionTitleChange={handleTitleChange}

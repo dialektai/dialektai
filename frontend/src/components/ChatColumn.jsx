@@ -703,6 +703,7 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
   const submit = useCallback(() => {
     const t = text.trim();
     if (!t || streaming || !connected) return;
+    // onSend may be wrapped by parent to inject activeAgentId — pass text only here.
     onSend(t);
     setText('');
     if (taRef.current) taRef.current.style.height = 'auto';
