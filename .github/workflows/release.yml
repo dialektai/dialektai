@@ -34,7 +34,9 @@ jobs:
       - name: Run pytest
         run: |
           cd python && source venv/bin/activate
-          pytest -q --tb=short
+          # Integration tests require live PG/MySQL/CH DBs — run locally or
+          # in separate workflow with docker services. Unit tests gate CI here.
+          pytest -q --tb=short --ignore=tests/integration
 
   # ── 2. Linux build (.deb + .AppImage) ────────────────────────────────────
   # ubuntu-22.04 runner has GLIBC 2.35 — matching our support baseline.
