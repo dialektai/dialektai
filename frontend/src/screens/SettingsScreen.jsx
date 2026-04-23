@@ -1465,6 +1465,15 @@ function AboutSection() {
 
 // ── Section: Connections ──────────────────────────────────────────────────────
 
+// Driver metadata for the connection picker. Each entry maps to the
+// backend router for that database type. Default port is applied when
+// the user switches drivers in the Add form.
+const DRIVERS = {
+  postgres:   { label: 'PostgreSQL', prefix: '/connections',        defaultPort: '5432' },
+  mysql:      { label: 'MySQL',      prefix: '/mysql-connections',  defaultPort: '3306' },
+  clickhouse: { label: 'ClickHouse', prefix: '/ch-connections',     defaultPort: '8123' },
+};
+
 function ConnectionsSection() {
   const { addToast, showConfirm } = useContext(Ctx);
   const [conns, setConns] = useState([]);
@@ -1475,8 +1484,13 @@ function ConnectionsSection() {
   const [modelStatus, setModelStatus] = useState(null);
   const [pulling, setPulling] = useState(false);
   const [nomicPendingId, setNomicPendingId] = useState(null);
-  const EMPTY_FORM = { name: '', host: 'localhost', port: '5432', database: '', username: '', password: '', row_limit: '500', ssl: 'prefer' };
+  const EMPTY_FORM = { driver: 'postgres', name: '', host: 'localhost', port: '5432', database: '', username: '', password: '', row_limit: '500', ssl: 'prefer' };
   const [form, setForm] = useState(EMPTY_FORM);
+
+  // Route backend calls through the per-driver prefix. Each connection
+  // row we render carries `_driver` (added in load()) so tests / reindex /
+  // delete hit the correct router.
+  const prefixFor = (c) => (DRIVERS[c?._driver || 'postgres']?.prefix) || '/connections';
 
   useEffect(() => {
     fetch(`${API}/schema-rag/model-status`)
@@ -1501,37 +1515,59 @@ function ConnectionsSection() {
     setPulling(false);
   };
 
-  const load = () => {
-    fetch(`${API}/connections`)
-      .then(r => r.json())
-      .then(d => { setConns(d); setLoading(false); })
-      .catch(() => setLoading(false));
+  const load = async () => {
+    setLoading(true);
+    const all = [];
+    for (const [driver, meta] of Object.entries(DRIVERS)) {
+      try {
+        const r = await fetch(`${API}${meta.prefix}`);
+        if (r.ok) {
+          const rows = await r.json();
+          if (Array.isArray(rows)) rows.forEach(c => all.push({ ...c, _driver: driver }));
+        }
+      } catch {
+        // individual driver offline — skip, don't break the whole page
+      }
+    }
+    setConns(all);
+    setLoading(false);
   };
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const fset = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const create = async () => {
+    const driverMeta = DRIVERS[form.driver] || DRIVERS.postgres;
     const body = {
       name: form.name.trim(), host: form.host.trim(),
-      port: parseInt(form.port) || 5432, database: form.database.trim(),
+      port: parseInt(form.port) || parseInt(driverMeta.defaultPort), database: form.database.trim(),
       username: form.username.trim(), password: form.password,
-      row_limit: parseInt(form.row_limit) || 500, ssl: form.ssl,
+      row_limit: parseInt(form.row_limit) || 500,
+      // SSL is a PostgreSQL-specific concept (sslmode). MySQL/ClickHouse
+      // backends currently ignore it — sending anyway is harmless.
+      ssl: form.ssl,
     };
-    if (!body.name || !body.database || !body.username) {
-      addToast('Name, database, and username are required', 'error'); return;
+    // ClickHouse's POST handler doesn't require password; the other two do.
+    const required = ['name', 'database', 'username'];
+    for (const f of required) {
+      if (!body[f]) { addToast(`${f} is required`, 'error'); return; }
     }
     try {
-      const r = await fetch(`${API}/connections`, {
+      const r = await fetch(`${API}${driverMeta.prefix}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      if (!r.ok) { addToast('Failed to save connection', 'error'); return; }
-      addToast('Connection saved', 'ok');
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        addToast(`Failed to save connection${detail ? `: ${detail.slice(0, 140)}` : ''}`, 'error');
+        return;
+      }
+      addToast(`${driverMeta.label} connection saved`, 'ok');
       setAdding(false); setForm(EMPTY_FORM); load();
     } catch { addToast('Network error', 'error'); }
   };
 
-  const reindexConn = async (id) => {
+  const reindexConn = async (conn) => {
+    const id = conn.id;
     // Goal 1.5: intercept when embedding model not available
     if (modelStatus && !modelStatus.available) {
       setNomicPendingId(id);
@@ -1539,7 +1575,7 @@ function ConnectionsSection() {
     }
     setReindexStatus(s => ({ ...s, [id]: 'indexing' }));
     try {
-      const r = await fetch(`${API}/connections/${id}/reindex`, { method: 'POST' });
+      const r = await fetch(`${API}${prefixFor(conn)}/${id}/reindex`, { method: 'POST' });
       const data = await r.json();
       setReindexStatus(s => ({ ...s, [id]: 'done' }));
       const msg = data.error
@@ -1560,7 +1596,10 @@ function ConnectionsSection() {
       if (d.ok) {
         setModelStatus(m => ({ ...m, available: true }));
         addToast('Embedding model ready', 'ok');
-        if (pendingId) reindexConn(pendingId);
+        if (pendingId) {
+          const c = conns.find(x => x.id === pendingId);
+          if (c) reindexConn(c);
+        }
       } else {
         addToast('Pull failed — check Ollama is running', 'error');
       }
@@ -1568,10 +1607,11 @@ function ConnectionsSection() {
     setPulling(false);
   };
 
-  const testConn = async (id) => {
+  const testConn = async (conn) => {
+    const id = conn.id;
     setTestStatus(s => ({ ...s, [id]: 'testing' }));
     try {
-      const r = await fetch(`${API}/connections/${id}/test`, { method: 'POST' });
+      const r = await fetch(`${API}${prefixFor(conn)}/${id}/test`, { method: 'POST' });
       const data = await r.json();
       const ok = r.ok && data.ok !== false;
       setTestStatus(s => ({ ...s, [id]: ok ? 'ok' : 'error' }));
@@ -1579,14 +1619,14 @@ function ConnectionsSection() {
     } catch { setTestStatus(s => ({ ...s, [id]: 'error' })); addToast('Test failed', 'error'); }
   };
 
-  const remove = (id, name) => showConfirm({
-    title: `Remove "${name}"?`,
+  const remove = (conn) => showConfirm({
+    title: `Remove "${conn.name}"?`,
     body: 'The connection and its stored credentials will be deleted. This cannot be undone.',
     action: 'Remove connection', danger: true,
     onConfirm: async () => {
       try {
-        await fetch(`${API}/connections/${id}`, { method: 'DELETE' });
-        setConns(c => c.filter(x => x.id !== id));
+        await fetch(`${API}${prefixFor(conn)}/${conn.id}`, { method: 'DELETE' });
+        setConns(c => c.filter(x => x.id !== conn.id));
         addToast('Connection removed', 'ok');
       } catch { addToast('Delete failed', 'error'); }
     },
@@ -1607,23 +1647,28 @@ function ConnectionsSection() {
     const st = testStatus[c.id];
     const dot = st === 'ok' ? T.green : st === 'error' ? T.red : st === 'testing' ? T.amber : T.dim;
     const label = st === 'ok' ? 'connected' : st === 'error' ? 'failed' : st === 'testing' ? '…' : 'untested';
+    const driverLabel = DRIVERS[c._driver]?.label || c._driver || 'postgres';
     return (
       <Card key={c.id} title={c.name} n={String(i + 1).padStart(2, '0')} right={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="mono" style={{
+            fontSize: 9, color: T.cyan, border: `1px solid ${T.cyan}55`,
+            padding: '2px 6px', letterSpacing: '.08em', textTransform: 'uppercase',
+          }}>{driverLabel}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
             <span className="mono" style={{ fontSize: 10, color: dot }}>{label}</span>
           </div>
-          <button onClick={() => testConn(c.id)} style={{
+          <button onClick={() => testConn(c)} style={{
             background: T.bg2, border: `1px solid ${T.border}`, color: T.muted,
             padding: '4px 10px', fontSize: 11, cursor: 'pointer',
           }}>TEST</button>
-          <button onClick={() => reindexConn(c.id)} disabled={reindexStatus[c.id] === 'indexing'} style={{
+          <button onClick={() => reindexConn(c)} disabled={reindexStatus[c.id] === 'indexing'} style={{
             background: T.bg2, border: `1px solid ${T.border}`,
             color: reindexStatus[c.id] === 'indexing' ? T.dim : T.muted,
             padding: '4px 10px', fontSize: 11, cursor: reindexStatus[c.id] === 'indexing' ? 'default' : 'pointer',
           }}>{reindexStatus[c.id] === 'indexing' ? '…' : 'REINDEX'}</button>
-          <button onClick={() => remove(c.id, c.name)} style={{
+          <button onClick={() => remove(c)} style={{
             background: 'transparent', border: `1px solid ${T.border}`, color: T.red,
             padding: '4px 10px', fontSize: 11, cursor: 'pointer',
           }}>REMOVE</button>
@@ -1643,7 +1688,7 @@ function ConnectionsSection() {
 
   return (
     <BodyShell crumb="02 / CAPABILITIES → CONNECTIONS" title="Database Connections"
-      desc="Connect to PostgreSQL databases for SQL analytics. Credentials are stored in your OS keychain — never in config files or logs.">
+      desc="Connect to PostgreSQL, MySQL, and ClickHouse databases for SQL analytics. Credentials are stored in your OS keychain — never in config files or logs.">
 
       {modelStatus && !modelStatus.available && (
         <div style={{ border: `1px solid ${T.amber}44`, background: `${T.amber}0a`, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1694,23 +1739,49 @@ function ConnectionsSection() {
       {adding && (
         <Card title="New connection" n="NEW">
           <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, color: T.dim }}>Driver</label>
+              <select
+                value={form.driver}
+                onChange={e => {
+                  const newDriver = e.target.value;
+                  const meta = DRIVERS[newDriver];
+                  // Only overwrite port if the user hasn't customised it — compare
+                  // against the previous default; if it still matches, snap to the
+                  // new default. Keeps accidental driver toggles cheap.
+                  const prevDefault = DRIVERS[form.driver]?.defaultPort || '';
+                  const nextPort = (form.port === prevDefault || !form.port) ? meta.defaultPort : form.port;
+                  setForm(f => ({ ...f, driver: newDriver, port: nextPort }));
+                }}
+                style={{
+                  background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                  padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
+                }}
+              >
+                {Object.entries(DRIVERS).map(([k, meta]) => (
+                  <option key={k} value={k}>{meta.label}</option>
+                ))}
+              </select>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <FInput label="Name *" k="name" placeholder="My Analytics DB" style={{ gridColumn: '1 / -1' }} />
               <FInput label="Host *" k="host" placeholder="localhost" />
-              <FInput label="Port" k="port" placeholder="5432" />
-              <FInput label="Database *" k="database" placeholder="analytics" />
-              <FInput label="Username *" k="username" placeholder="readonly" />
+              <FInput label="Port" k="port" placeholder={DRIVERS[form.driver]?.defaultPort} />
+              <FInput label="Database *" k="database" placeholder={form.driver === 'clickhouse' ? 'default' : 'analytics'} />
+              <FInput label="Username *" k="username" placeholder={form.driver === 'mysql' ? 'root' : form.driver === 'clickhouse' ? 'default' : 'readonly'} />
               <FInput label="Password" k="password" type="password" placeholder="••••••••" style={{ gridColumn: '1 / -1' }} />
               <FInput label="Row limit" k="row_limit" placeholder="500" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: T.dim }}>SSL</label>
-                <select value={form.ssl} onChange={e => fset('ssl', e.target.value)} style={{
-                  background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
-                  padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
-                }}>
-                  {['prefer', 'require', 'disable', 'verify-full'].map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
+              {form.driver === 'postgres' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 11, color: T.dim }}>SSL</label>
+                  <select value={form.ssl} onChange={e => fset('ssl', e.target.value)} style={{
+                    background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                    padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
+                  }}>
+                    {['prefer', 'require', 'disable', 'verify-full'].map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 4 }}>
               <button onClick={() => { setAdding(false); setForm(EMPTY_FORM); }} style={{
