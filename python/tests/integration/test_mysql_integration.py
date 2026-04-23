@@ -59,7 +59,7 @@ def client():
 @pytest.fixture(scope="module")
 def conn_id(client):
     """Create a live MySQL connection and return its ID."""
-    r = client.post("/mysql/connections", json={
+    r = client.post("/mysql-connections", json={
         "name": "integration-mysql",
         "host": "localhost",
         "port": 13306,
@@ -70,17 +70,17 @@ def conn_id(client):
     assert r.status_code == 201, r.text
     cid = r.json()["id"]
     yield cid
-    client.delete(f"/mysql/connections/{cid}")
+    client.delete(f"/mysql-connections/{cid}")
 
 
 def test_connection_test_ok(client, conn_id):
-    r = client.post(f"/mysql/connections/{conn_id}/test")
+    r = client.post(f"/mysql-connections/{conn_id}/test")
     assert r.status_code == 200
     assert r.json()["ok"] is True
 
 
 def test_list_schemas(client, conn_id):
-    r = client.get(f"/mysql/connections/{conn_id}/schemas")
+    r = client.get(f"/mysql-connections/{conn_id}/schemas")
     assert r.status_code == 200
     schemas = r.json()
     schema_names = [s["schema_name"] for s in schemas]
@@ -88,7 +88,7 @@ def test_list_schemas(client, conn_id):
 
 
 def test_list_tables(client, conn_id):
-    r = client.get(f"/mysql/connections/{conn_id}/schemas/dialekt_integration/tables")
+    r = client.get(f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables")
     assert r.status_code == 200
     tables = [t["table_name"] for t in r.json()]
     assert "customers" in tables
@@ -99,7 +99,7 @@ def test_list_tables(client, conn_id):
 
 def test_describe_table(client, conn_id):
     r = client.get(
-        f"/mysql/connections/{conn_id}/schemas/dialekt_integration/tables/customers/describe"
+        f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables/customers/describe"
     )
     assert r.status_code == 200
     cols = {c["column_name"] for c in r.json()}
@@ -110,7 +110,7 @@ def test_describe_table(client, conn_id):
 
 def test_sample_rows(client, conn_id):
     r = client.get(
-        f"/mysql/connections/{conn_id}/schemas/dialekt_integration/tables/customers/sample",
+        f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables/customers/sample",
         params={"limit": 3},
     )
     assert r.status_code == 200
@@ -122,7 +122,7 @@ def test_sample_rows(client, conn_id):
 
 def test_foreign_keys_on_orders(client, conn_id):
     r = client.get(
-        f"/mysql/connections/{conn_id}/schemas/dialekt_integration/tables/orders/fkeys"
+        f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables/orders/fkeys"
     )
     assert r.status_code == 200
     fkeys = r.json()
@@ -133,7 +133,7 @@ def test_foreign_keys_on_orders(client, conn_id):
 
 def test_execute_count_query(client, conn_id):
     r = client.post(
-        f"/mysql/connections/{conn_id}/query",
+        f"/mysql-connections/{conn_id}/query",
         json={"sql": "SELECT COUNT(*) AS cnt FROM customers"},
     )
     assert r.status_code == 200
@@ -151,14 +151,14 @@ def test_execute_join_query(client, conn_id):
         ORDER BY order_count DESC
         LIMIT 5
     """
-    r = client.post(f"/mysql/connections/{conn_id}/query", json={"sql": sql})
+    r = client.post(f"/mysql-connections/{conn_id}/query", json={"sql": sql})
     assert r.status_code == 200
     assert len(r.json()["rows"]) > 0
 
 
 def test_ddl_rejected(client, conn_id):
     r = client.post(
-        f"/mysql/connections/{conn_id}/query",
+        f"/mysql-connections/{conn_id}/query",
         json={"sql": "DROP TABLE customers"},
     )
     assert r.status_code == 400
@@ -166,7 +166,7 @@ def test_ddl_rejected(client, conn_id):
 
 def test_dml_rejected(client, conn_id):
     r = client.post(
-        f"/mysql/connections/{conn_id}/query",
+        f"/mysql-connections/{conn_id}/query",
         json={"sql": "DELETE FROM customers"},
     )
     assert r.status_code == 400
@@ -174,7 +174,7 @@ def test_dml_rejected(client, conn_id):
 
 def test_insert_rejected(client, conn_id):
     r = client.post(
-        f"/mysql/connections/{conn_id}/query",
+        f"/mysql-connections/{conn_id}/query",
         json={"sql": "INSERT INTO customers (email, full_name) VALUES ('x@y.com', 'X')"},
     )
     assert r.status_code == 400
@@ -187,7 +187,7 @@ def test_product_category_grouping(client, conn_id):
         GROUP BY category
         ORDER BY cnt DESC
     """
-    r = client.post(f"/mysql/connections/{conn_id}/query", json={"sql": sql})
+    r = client.post(f"/mysql-connections/{conn_id}/query", json={"sql": sql})
     assert r.status_code == 200
     rows = r.json()["rows"]
     assert len(rows) >= 2
