@@ -281,6 +281,7 @@ function StepIdentity({ data, setData, errors }) {
           >
             <option value="en">English</option>
             <option value="ru">Russian</option>
+            <option value="kk">Kazakh</option>
             <option value="multi">Multilingual</option>
           </select>
         </Field>
