@@ -1553,6 +1553,19 @@ def make_interpreter(
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
 
+    # Register dialekt's SQL executor so agents with a bound DB connection
+    # can actually run the sql blocks they emit. The handler reads the
+    # connection id from the stashed attribute at execution time.
+    conn_id = (agent_context or {}).get("connection_id") if agent_context else None
+    interpreter._dialekt_sql_conn = conn_id
+    try:
+        from dialekt.llm.sql_language import DialektSQL
+        langs = interpreter.computer.terminal.languages
+        if not any(getattr(L, "name", "") == DialektSQL.name for L in langs):
+            langs.insert(0, DialektSQL)
+    except Exception as e:
+        log.warning(f"Could not register DialektSQL language: {e}")
+
     if agent and agent.get("system_prompt"):
         raw_prompt = agent["system_prompt"]
         ctx = agent_context or {}
