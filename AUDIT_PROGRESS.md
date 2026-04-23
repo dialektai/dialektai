@@ -21,6 +21,7 @@ until after the first investor pitch.
 
 | # | Item | Notes |
 |---|---|---|
+| P11 | **Full frontend E2E test** | 95-item checklist in `docs/frontend_e2e_prompt.md`. Requires Chrome MCP reconnected + display server (founder's local machine, not this headless server). 1-2h hands-on. Do tomorrow morning, fresh head. |
 | P5 | Deploy real SMTP | Gmail App Pwd works; migrate to Postmark / Mailgun for volume |
 | P6 | Tauri updater pubkey | Blocked on interactive TTY for signer generate |
 | P7 | macOS + Windows Tauri builds | Deferred per strategy — Linux-first |
