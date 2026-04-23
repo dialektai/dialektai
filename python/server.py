@@ -34,6 +34,10 @@ OLD_SETTINGS_FILE = _HOME / ".config" / "dialekt" / "settings.json"  # migration
 
 DEFAULT_SETTINGS: dict = {
     "model": "gemma3-12b",
+    "cloud_api_url": "https://api.dialekt.ai",
+    "cloud_bearer_token": None,
+    "tenant_info": None,
+    "user_info": None,
     "system_prompt": (
         f"You are dialekt — a powerful local AI agent with full access to this computer "
         f"(user: {_USERNAME}).\n"
@@ -102,6 +106,19 @@ db: aiosqlite.Connection = None
 _active_interpreters: dict = {}  # ws_id → interpreter instance
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS connections (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    type       TEXT NOT NULL DEFAULT 'postgresql',
+    host       TEXT NOT NULL,
+    port       INTEGER NOT NULL DEFAULT 5432,
+    database   TEXT NOT NULL,
+    username   TEXT NOT NULL,
+    row_limit  INTEGER NOT NULL DEFAULT 1000,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS agents (
     id            TEXT PRIMARY KEY,
     name          TEXT NOT NULL,
@@ -132,6 +149,13 @@ CREATE TABLE IF NOT EXISTS messages (
     format     TEXT,
     content    TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS agent_bindings (
+    agent_id        TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+    connection_id   TEXT,
+    connection_type TEXT NOT NULL DEFAULT 'postgres',
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -166,8 +190,39 @@ async def _migrate_agents():
         ga_id = row[0]
 
     await db.execute("UPDATE sessions SET agent_id = ? WHERE agent_id IS NULL", (ga_id,))
+
+    # Auto-import SQL Analyst if not yet present
+    cursor = await db.execute("SELECT id FROM agents WHERE name = 'SQL Analyst' LIMIT 1")
+    if await cursor.fetchone() is None:
+        await _maybe_import_bundled_agent(
+            Path(__file__).parent.parent / "agents" / "sql_analyst" / "manifest.yaml"
+        )
+
     await db.commit()
     log.info("Migration: agents ready")
+
+
+async def _maybe_import_bundled_agent(manifest_path: Path) -> None:
+    """Import a bundled agent manifest if the file exists. Errors are logged only."""
+    if not manifest_path.exists():
+        return
+    try:
+        from dialekt_manifest import ManifestValidator
+        yaml_str = manifest_path.read_text()
+        result = ManifestValidator().validate_string(yaml_str)
+        if not result.valid:
+            log.warning(f"Bundled manifest {manifest_path.name} failed validation: {result.errors}")
+            return
+        m = result.manifest
+        await db.execute(
+            "INSERT OR IGNORE INTO agents (id, name, description, system_prompt, manifest_yaml, version, status)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), m.metadata.name, m.metadata.description or "",
+             m.system_prompt or "", yaml_str, m.metadata.version, "published"),
+        )
+        log.info(f"Bundled agent '{m.metadata.name}' imported")
+    except Exception as e:
+        log.warning(f"Could not import bundled agent {manifest_path.name}: {e}")
 
 
 @asynccontextmanager
@@ -180,8 +235,21 @@ async def lifespan(app: FastAPI):
     await db.execute("PRAGMA foreign_keys=ON")
     await _init_db()
     await _migrate_agents()
+    from mcp_servers.postgres_mcp import init_db as pg_init_db
+    from mcp_servers.mysql_mcp import init_db as mysql_init_db
+    from mcp_servers.clickhouse_mcp import init_db as ch_init_db
+    pg_init_db(db)
+    mysql_init_db(db)
+    ch_init_db(db)
     log.info(f"SQLite ready at {DB_PATH}")
+    # Non-blocking: warn if embedding model isn't pulled yet
+    from mcp_servers import schema_rag as _rag
+    asyncio.create_task(_rag.check_model())
     yield
+    from mcp_servers.postgres_mcp import close_all_pools
+    from mcp_servers.mysql_mcp import close_all_pools_mysql
+    await close_all_pools()
+    await close_all_pools_mysql()
     await db.close()
 
 
@@ -192,6 +260,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from mcp_servers.postgres_mcp import router as pg_router  # noqa: E402
+from mcp_servers.mysql_mcp import router as mysql_router  # noqa: E402
+from mcp_servers.clickhouse_mcp import router as ch_router  # noqa: E402
+app.include_router(pg_router)
+app.include_router(mysql_router)
+app.include_router(ch_router)
 
 
 # ── Confirmation intercept ────────────────────────────────────────────────────
@@ -263,12 +338,13 @@ async def db_save_message(session_id: str, role: str, type_: str,
 
 async def db_create_agent(name: str, description: str, system_prompt: str,
                           manifest_yaml: str | None = None,
-                          version: str = "1.0.0") -> str:
+                          version: str = "1.0.0",
+                          status: str = "draft") -> str:
     agent_id = str(uuid.uuid4())
     await db.execute(
         "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status)"
         " VALUES (?,?,?,?,?,?,?)",
-        (agent_id, name, description, system_prompt, manifest_yaml, version, "draft"),
+        (agent_id, name, description, system_prompt, manifest_yaml, version, status),
     )
     await db.commit()
     return agent_id
@@ -341,6 +417,192 @@ async def about():
         "db": str(DB_PATH),
         "config": str(SETTINGS_FILE),
     }
+
+
+# ── Admin endpoints ──────────────────────────────────────────────────────────
+
+@app.get("/admin/stats")
+async def admin_stats():
+    """Aggregate stats for the admin panel."""
+    cur = await db.execute("SELECT COUNT(*) FROM sessions")
+    session_count = (await cur.fetchone())[0]
+    cur = await db.execute("SELECT COUNT(*) FROM agents")
+    agent_count = (await cur.fetchone())[0]
+    cur = await db.execute("SELECT COUNT(*) FROM connections")
+    connection_count = (await cur.fetchone())[0]
+    cur = await db.execute("SELECT COUNT(*) FROM messages")
+    message_count = (await cur.fetchone())[0]
+    cur = await db.execute(
+        "SELECT a.name, a.status, COUNT(s.id) AS session_count "
+        "FROM agents a LEFT JOIN sessions s ON s.agent_id = a.id "
+        "GROUP BY a.id ORDER BY session_count DESC"
+    )
+    agents = [dict(r) for r in await cur.fetchall()]
+    db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
+    return {
+        "sessions": session_count,
+        "agents": agent_count,
+        "connections": connection_count,
+        "messages": message_count,
+        "db_size_bytes": db_size,
+        "agents_detail": agents,
+    }
+
+
+# ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
+
+@app.get("/schema-rag/model-status")
+async def schema_rag_model_status():
+    """Check whether the embedding model is available in Ollama."""
+    from mcp_servers import schema_rag as _rag
+    available = await _rag.check_model()
+    return {
+        "model": _rag.EMBED_MODEL,
+        "available": available,
+        "pull_command": f"ollama pull {_rag.EMBED_MODEL}" if not available else None,
+    }
+
+
+@app.post("/schema-rag/pull-model")
+async def schema_rag_pull_model():
+    """Pull the embedding model from Ollama (may take several minutes)."""
+    from mcp_servers import schema_rag as _rag
+    ok = await _rag.pull_model()
+    return {"ok": ok, "model": _rag.EMBED_MODEL}
+
+
+@app.get("/sync/status")
+async def sync_status():
+    s = load_settings()
+    api_key = s.get("cloud_api_key", "")
+    if not api_key:
+        return {"enabled": False, "message": "Cloud sync not configured. Add your dialekt Cloud API key in Settings → Cloud Sync."}
+    return {"enabled": True, "api_key_prefix": api_key[:8] + "…", "last_sync": s.get("last_sync"), "pending": True}
+
+
+@app.post("/sync/configure")
+async def sync_configure(body: dict):
+    from fastapi import HTTPException
+    key = (body.get("api_key") or "").strip()
+    if not key:
+        raise HTTPException(400, "api_key is required")
+    s = load_settings()
+    s["cloud_api_key"] = key
+    save_settings(s)
+    return {"ok": True, "message": "Cloud API key saved."}
+
+
+@app.post("/sync/push")
+async def sync_push():
+    s = load_settings()
+    if not s.get("cloud_api_key"):
+        from fastapi import HTTPException
+        raise HTTPException(402, "Cloud sync not configured. Add API key via POST /sync/configure.")
+    return {"ok": True, "pushed": 0, "message": "Cloud sync push — not yet implemented in this build."}
+
+
+@app.post("/sync/pull")
+async def sync_pull():
+    import httpx
+    from fastapi import HTTPException
+    s = load_settings()
+    token = s.get("cloud_bearer_token")
+    if not token:
+        # Legacy: cloud_api_key configured but no bearer token yet
+        if s.get("cloud_api_key"):
+            return {"ok": True, "pulled": 0, "message": "Validate your license key to enable agent sync."}
+        raise HTTPException(402, "No cloud bearer token. Validate your license first.")
+    cloud_url = s.get("cloud_api_url", "https://api.dialekt.ai")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                f"{cloud_url}/agents/assigned-to-me",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        if r.status_code == 401:
+            raise HTTPException(401, "Cloud token expired. Re-validate your license key.")
+        r.raise_for_status()
+        remote_agents = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Cloud unreachable: {e}")
+
+    import yaml as _yaml
+    pulled = 0
+    for ra in remote_agents:
+        manifest_yaml = ra.get("manifest_yaml") or ""
+        parsed = {}
+        if manifest_yaml:
+            try:
+                parsed = _yaml.safe_load(manifest_yaml) or {}
+            except Exception:
+                parsed = {}
+        md = parsed.get("metadata") or {}
+        name = md.get("name") or ra.get("name") or "Unnamed Agent"
+        cursor = await db.execute("SELECT id FROM agents WHERE name = ?", (name,))
+        existing = await cursor.fetchone()
+        if existing:
+            continue
+        await db_create_agent(
+            name=name,
+            description=md.get("description") or ra.get("description") or "",
+            system_prompt=parsed.get("system_prompt") or "",
+            manifest_yaml=manifest_yaml or None,
+            version=md.get("version") or ra.get("version") or "1.0.0",
+            status="published",
+        )
+        pulled += 1
+
+    # Update last sync timestamp
+    s["last_sync"] = __import__("datetime").datetime.utcnow().isoformat()
+    save_settings(s)
+    return {"ok": True, "pulled": pulled, "total_remote": len(remote_agents)}
+
+
+# ── License endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/license/status")
+async def license_status():
+    import time
+    s = load_settings()
+    key = s.get("license_key")
+    trial_started = s.get("trial_started")
+    trial_valid = False
+    if trial_started:
+        trial_valid = (time.time() - trial_started) < 30 * 86400
+    return {
+        "valid": bool(key) or trial_valid,
+        "license_key": key,
+        "trial": bool(trial_started),
+        "trial_valid": trial_valid,
+        "tenant": s.get("tenant_info"),
+    }
+
+
+@app.post("/license/save")
+async def license_save(body: dict):
+    s = load_settings()
+    if body.get("license_key"):
+        s["license_key"] = body["license_key"]
+    if body.get("tenant"):
+        s["tenant_info"] = body["tenant"]
+    if body.get("user"):
+        s["user_info"] = body["user"]
+    if body.get("bearer_token"):
+        s["cloud_bearer_token"] = body["bearer_token"]
+    save_settings(s)
+    return {"ok": True}
+
+
+@app.post("/license/trial")
+async def license_trial():
+    import time
+    s = load_settings()
+    if not s.get("trial_started"):
+        s["trial_started"] = time.time()
+    save_settings(s)
+    return {"ok": True, "expires_in_days": 30}
 
 
 # ── Agent endpoints ───────────────────────────────────────────────────────────
@@ -419,6 +681,35 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
     return {"id": agent_id, "name": name, "warnings": warnings}
 
 
+@app.post("/agents/import-yaml", status_code=201)
+async def import_agent_yaml_endpoint(body: dict):
+    """Import agent from YAML string (used by the builder wizard)."""
+    from fastapi import HTTPException
+    from dialekt_manifest import ManifestValidator
+    yaml_str = (body.get("manifest_yaml") or "").strip()
+    if not yaml_str:
+        raise HTTPException(400, "manifest_yaml is required")
+    status = body.get("status", "draft")
+    if status not in ("draft", "published"):
+        status = "draft"
+    result = ManifestValidator().validate_string(yaml_str)
+    if not result.valid:
+        raise HTTPException(422, detail={
+            "errors": [{"code": e.code.value, "message": e.message} for e in result.errors]
+        })
+    m = result.manifest
+    agent_id = await db_create_agent(
+        name=m.metadata.name,
+        description=m.metadata.description or "",
+        system_prompt=m.system_prompt or "",
+        manifest_yaml=yaml_str,
+        version=m.metadata.version,
+        status=status,
+    )
+    warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    return {"id": agent_id, "name": m.metadata.name, "warnings": warnings}
+
+
 @app.get("/agents/{agent_id}/export")
 async def export_agent_endpoint(agent_id: str):
     from fastapi import HTTPException
@@ -433,6 +724,50 @@ async def export_agent_endpoint(agent_id: str):
         media_type="application/x-yaml",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.agent.yaml"'},
     )
+
+
+# ── Agent connection binding ──────────────────────────────────────────────────
+
+@app.get("/agents/{agent_id}/binding")
+async def get_agent_binding(agent_id: str):
+    from fastapi import HTTPException
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    cursor = await db.execute(
+        "SELECT connection_id, connection_type FROM agent_bindings WHERE agent_id = ?",
+        (agent_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return {"agent_id": agent_id, "connection_id": None, "connection_type": None}
+    return {"agent_id": agent_id, "connection_id": row[0], "connection_type": row[1]}
+
+
+@app.post("/agents/{agent_id}/binding")
+async def set_agent_binding(agent_id: str, body: dict):
+    from fastapi import HTTPException
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    conn_id = body.get("connection_id")
+    conn_type = body.get("connection_type", "postgres")
+    if conn_id is None:
+        await db.execute("DELETE FROM agent_bindings WHERE agent_id = ?", (agent_id,))
+    else:
+        await db.execute(
+            "INSERT OR REPLACE INTO agent_bindings(agent_id, connection_id, connection_type) VALUES (?,?,?)",
+            (agent_id, conn_id, conn_type),
+        )
+    await db.commit()
+    return {"ok": True, "agent_id": agent_id, "connection_id": conn_id}
+
+
+@app.delete("/agents/{agent_id}/binding")
+async def delete_agent_binding(agent_id: str):
+    await db.execute("DELETE FROM agent_bindings WHERE agent_id = ?", (agent_id,))
+    await db.commit()
+    return {"ok": True}
 
 
 # ── Mode config endpoints ─────────────────────────────────────────────────────
@@ -488,6 +823,36 @@ async def ollama_start():
         return {"status": "error", "error": "ollama binary not found"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/ollama/check")
+async def ollama_check():
+    import subprocess, shutil, httpx, platform
+    installed = shutil.which("ollama") is not None
+    version: str | None = None
+    running = False
+    if installed:
+        try:
+            result = subprocess.run(["ollama", "--version"], capture_output=True, text=True, timeout=3)
+            version = result.stdout.strip().split()[-1] if result.returncode == 0 else None
+        except Exception:
+            pass
+        try:
+            async with httpx.AsyncClient(timeout=3) as c:
+                r = await c.get("http://localhost:11434/api/tags")
+                running = r.status_code == 200
+        except Exception:
+            running = False
+    sys_platform = platform.system().lower()
+    platform_map = {"darwin": "Mac", "linux": "Linux", "windows": "Windows"}
+    install_url = "https://ollama.com/download/" + platform_map.get(sys_platform, "Mac")
+    return {
+        "installed": installed,
+        "running": running,
+        "version": version,
+        "install_url": install_url,
+        "platform": sys_platform,
+    }
 
 
 @app.get("/sessions")
@@ -973,8 +1338,45 @@ def _apply_autonomy(itp, level: str) -> None:
         itp.safe_mode = "off"
 
 
-def make_interpreter(agent: dict | None = None):
+async def resolve_agent_context(agent: dict) -> dict:
+    """
+    For agents that reference {{connection_id}}: look up the bound connection,
+    build substitution vars, and optionally run a Schema RAG search.
+    Returns a dict with keys: connection_id, connection_name, database_type, schema_summary.
+    """
+    result = {"connection_id": None, "connection_name": None, "database_type": None, "schema_summary": None}
+    agent_id = agent.get("id")
+    if not agent_id:
+        return result
+    cursor = await db.execute(
+        "SELECT connection_id, connection_type FROM agent_bindings WHERE agent_id = ?",
+        (agent_id,),
+    )
+    row = await cursor.fetchone()
+    if not row or not row[0]:
+        return result
+    conn_id, conn_type = row[0], row[1]
+    result["connection_id"] = conn_id
+    result["database_type"] = conn_type
+    # Look up connection name
+    cursor2 = await db.execute("SELECT name FROM connections WHERE id = ?", (conn_id,))
+    conn_row = await cursor2.fetchone()
+    if conn_row:
+        result["connection_name"] = conn_row[0]
+    return result
+
+
+def make_interpreter(
+    agent: dict | None = None,
+    agent_context: dict | None = None,
+    *,
+    history_summary: str | None = None,
+    few_shot_examples: list | None = None,
+):
     from interpreter import interpreter
+    from dialekt.llm.prompt_wrapper import (
+        build_system_prompt, substitute_template_vars, should_wrap,
+    )
     s = load_settings()
     interpreter.reset()
     model = s.get("model", "gemma3-12b")
@@ -985,10 +1387,46 @@ def make_interpreter(agent: dict | None = None):
     interpreter.llm.temperature = float(s.get("temperature", 0.7))
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
+
     if agent and agent.get("system_prompt"):
-        interpreter.system_message = agent["system_prompt"]
+        raw_prompt = agent["system_prompt"]
+        ctx = agent_context or {}
+        # Substitute {{connection_id}} and related placeholders
+        raw_prompt = substitute_template_vars(
+            raw_prompt,
+            connection_id=ctx.get("connection_id"),
+            connection_name=ctx.get("connection_name"),
+            database_type=ctx.get("database_type"),
+        )
+        manifest_yaml = agent.get("manifest_yaml", "")
+        if should_wrap(manifest_yaml):
+            # Extract language and output format from manifest if present
+            lang = None
+            out_fmt = None
+            if manifest_yaml:
+                import yaml as _yaml
+                try:
+                    m_data = _yaml.safe_load(manifest_yaml)
+                    lang = (m_data.get("metadata") or {}).get("language")
+                    out_fmt = (m_data.get("output") or {}).get("format")
+                except Exception:
+                    pass
+            system_message = build_system_prompt(
+                raw_prompt=raw_prompt,
+                agent_name=agent.get("name", "Assistant"),
+                language_hint=lang,
+                output_format=out_fmt,
+                schema_summary=ctx.get("schema_summary"),
+                history_summary=history_summary,
+                few_shot_examples=few_shot_examples,
+                max_tokens=interpreter.llm.context_window,
+            )
+        else:
+            system_message = raw_prompt
+        interpreter.system_message = system_message
     else:
         interpreter.system_message = s.get("system_prompt", DEFAULT_SETTINGS["system_prompt"])
+
     _apply_autonomy(interpreter, s.get("autonomy", "ask-write"))
     return interpreter
 
@@ -1005,6 +1443,7 @@ async def ws_chat(ws: WebSocket):
     ws_id = str(uuid.uuid4())
     _active_interpreters[ws_id] = itp
     session_id: str = None
+    current_agent_id: str | None = None
     first_message = True
     stop_flag = threading.Event()
     confirm_event = threading.Event()
@@ -1057,16 +1496,55 @@ async def ws_chat(ws: WebSocket):
                     "SELECT agent_id FROM sessions WHERE id = ?", (session_id,)
                 )
                 sess_row = await cursor.fetchone()
+                agent_for_join = None
+                agent_ctx_for_join = None
                 if sess_row and sess_row[0]:
-                    agent = await db_get_agent(sess_row[0])
-                    if agent and agent.get("system_prompt"):
-                        itp.system_message = agent["system_prompt"]
+                    agent_for_join = await db_get_agent(sess_row[0])
+                    if agent_for_join:
+                        agent_ctx_for_join = await resolve_agent_context(agent_for_join)
+
+                # Load message history — used for both summarization and few-shot query
                 cursor = await db.execute(
                     "SELECT role, content FROM messages WHERE session_id=? AND type='message' ORDER BY created_at",
                     (session_id,),
                 )
                 rows = await cursor.fetchall()
-                itp.messages = [{"role": r["role"], "type": "message", "content": r["content"]} for r in rows]
+                all_msgs = [{"role": r["role"], "type": "message", "content": r["content"]} for r in rows]
+
+                # Goal 8.4: history summarization when session exceeds token budget
+                from dialekt.llm.prompt_wrapper import summarize_history as _summarize_history
+                TOKEN_BUDGET = 6000
+                _token_est = lambda t: max(1, len(t) // 4)
+                total_tokens = sum(_token_est(m["content"]) for m in all_msgs)
+                history_sum_for_join = None
+                recent_msgs = all_msgs
+                if total_tokens > TOKEN_BUDGET:
+                    split = max(0, len(all_msgs) - 10)
+                    old_msgs = all_msgs[:split]
+                    recent_msgs = all_msgs[split:]
+                    if old_msgs:
+                        history_sum_for_join = _summarize_history(old_msgs, max_chars=1500)
+
+                # Goal 8.5: retrieve few-shot examples based on last user message
+                few_shots_for_join = None
+                if agent_for_join:
+                    try:
+                        from dialekt.llm.few_shot_memory import get_few_shots as _get_fs
+                        user_msgs = [m for m in all_msgs if m["role"] == "user"]
+                        query = user_msgs[-1]["content"] if user_msgs else agent_for_join.get("name", "")
+                        few_shots_for_join = await _get_fs(agent_for_join["id"], query)
+                    except Exception:
+                        pass
+
+                if agent_for_join:
+                    current_agent_id = agent_for_join["id"]
+                itp = make_interpreter(
+                    agent_for_join, agent_ctx_for_join,
+                    history_summary=history_sum_for_join,
+                    few_shot_examples=few_shots_for_join,
+                )
+                _active_interpreters[ws_id] = itp
+                itp.messages = recent_msgs
                 await send({"type": "joined", "session_id": session_id})
                 continue
 
@@ -1086,8 +1564,11 @@ async def ws_chat(ws: WebSocket):
                     session_id = await db_create_session(agent_id=agent_id_for_session)
                     if agent_id_for_session:
                         agent = await db_get_agent(agent_id_for_session)
-                        if agent and agent.get("system_prompt"):
-                            itp.system_message = agent["system_prompt"]
+                        if agent:
+                            current_agent_id = agent["id"]
+                            agent_ctx = await resolve_agent_context(agent)
+                            itp = make_interpreter(agent, agent_ctx)
+                            _active_interpreters[ws_id] = itp
                     first_message = True
 
             log.info(f"[{session_id[:8]}] User: {content[:80]}")
@@ -1165,11 +1646,22 @@ async def ws_chat(ws: WebSocket):
                     ).result(timeout=5)
                 finally:
                     _thread_confirm.pop(tid, None)
-                    if ai_text_buf:
+                    final_answer = "".join(ai_text_buf)
+                    if final_answer:
                         asyncio.run_coroutine_threadsafe(
-                            db_save_message(session_id, "assistant", "message", "".join(ai_text_buf)),
+                            db_save_message(session_id, "assistant", "message", final_answer),
                             loop
                         ).result(timeout=5)
+                        # Goal 8.5: persist successful interaction for future few-shot retrieval
+                        if current_agent_id and len(final_answer) > 20:
+                            try:
+                                from dialekt.llm.few_shot_memory import save_interaction as _save_fs
+                                asyncio.run_coroutine_threadsafe(
+                                    _save_fs(current_agent_id, content, final_answer),
+                                    loop
+                                ).result(timeout=10)
+                            except Exception:
+                                pass
                     asyncio.run_coroutine_threadsafe(
                         send({"type": "done"}), loop
                     ).result(timeout=5)
