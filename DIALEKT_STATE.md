@@ -174,11 +174,25 @@ code-level — see below).
 into postgres_mcp.py /query endpoint. 5 new integration tests added
 (5 passed, 0 regressions, full suite now 219 passing).
 
+**Update 2026-04-23 (evening):** P3b + P4 done. See resolved list below.
+
+### Resolved (later 2026-04-23)
+
+- **Integration tests URL drift** — fixed in commit 267157b.
+  `/mysql/connections` → `/mysql-connections` (14 replacements);
+  `/clickhouse/connections` → `/ch-connections` (13 replacements).
+  With seeded dialekt_integration DB on existing MySQL container, 4/12
+  MySQL tests pass; remaining 8 are separate contract drifts (list[dict]
+  vs list[str] response shape, 400 vs 422 for DML rejection) — not URL.
+- **CI pipeline performance fix** — commit 1870905 adds wheel cache
+  (actions/cache@v4 on ~/.cache/pip/wheels), `--prefer-binary
+  --only-binary=:all:` with sdist fallback, and `timeout-minutes: 15` on
+  the sidecar step. Root cause of the stuck v0.9.0 runs: pip compiling
+  C extensions from source when no manylinux wheel matched Python 3.12
+  × manylinux_2_35 for a heavy transitive (tokenizers / tiktoken via
+  open-interpreter → litellm).
+
 ### Known gaps
-- **Integration tests `test_mysql_integration.py` and `test_clickhouse_integration.py`**
-  post to `/mysql/connections` and `/clickhouse/connections`, but the real
-  routers live at `/mysql-connections` and `/ch-connections`. URL drift → 11
-  errors when a live CH container is present. Unit tests unaffected. Fix: ≈ 15 min.
 - **Goal 8.2 "JSON schema constraints"** — enforced at prompt-text level only;
   Ollama's native `format: {json_schema}` parameter is not wired. Adequate for
   v0.9, flagged for v1.0.
@@ -204,17 +218,22 @@ into postgres_mcp.py /query endpoint. 5 new integration tests added
 - Self-correcting SQL retry loop (Goal 8.3) intercepts bad SELECTs before
   execution and fixes them via local LLM; verified via 5 new integration tests.
 
-### CI status for v0.9.0 (as of 2026-04-23 08:38 UTC)
+### CI status for v0.9.0 (as of 2026-04-23 evening)
 
-- Workflow **Release (Linux)** run `24821806834` is **STUCK in_progress**
-  after 92 min. All steps before "Build Python sidecar" succeeded; the sidecar
-  step started at 07:07:26Z and has not progressed.
-- Likely cause: one of `open-interpreter` / `litellm` pip deps is compiling
-  C extensions on the runner and has hung. Local builds finish in 4–6 min.
-- Artifact status: no `.deb` / `.AppImage` published on the v0.9.0 Release yet.
-  Landing page download buttons resolve to `null` from the GitHub Releases API
-  until artifacts are uploaded.
-- Follow-up required (founder): cancel the hanging run, inspect the live step
-  logs if possible, re-queue. If the issue reproduces, pin problematic pip
-  packages or pre-build them in a cached base image.
-- Run URL: https://github.com/dialektai/dialektai/actions/runs/24821806834
+- Two runs stuck on "Build Python sidecar": `24821806834` (92+ min) and
+  `24825965114` (14+ min after re-push). Both cancelled.
+- Diagnosed cause: pip compiling C extensions from source because no
+  manylinux wheel matched CPython 3.12 × manylinux_2_35 for a heavy
+  transitive (tokenizers / tiktoken via open-interpreter → litellm).
+- Workflow fix committed in **1870905**:
+  - wheel cache via actions/cache@v4 on `~/.cache/pip/wheels`
+  - `--prefer-binary --only-binary=:all:` fast-fail first pass,
+    `--prefer-binary` sdist-allowed fallback
+  - `timeout-minutes: 15` on the sidecar step
+- Founder action required: re-push tag to trigger a new run.
+  ```
+  git tag -d v0.9.0 && git push origin :refs/tags/v0.9.0
+  git tag v0.9.0    && git push origin v0.9.0
+  ```
+- Artifact status: no `.deb` / `.AppImage` on the v0.9.0 Release until
+  the workflow-fix run completes.
