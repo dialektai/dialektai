@@ -427,8 +427,13 @@ function StepCapabilities({ data, setData }) {
 
   return (
     <div>
-      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 16 }}>
-        GRANT PERMISSIONS — select what this agent is allowed to do
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        DECLARE CAPABILITIES — tag what this agent uses
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        These tags describe what the agent needs access to. Currently used for documentation
+        and future policy enforcement — runtime gates live in Settings → Permissions (global)
+        and the Autonomy slider (per-agent).
       </div>
       {Object.entries(CAP_META).map(([key, meta]) => {
         const active = data.capabilities[key];
