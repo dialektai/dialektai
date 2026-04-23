@@ -796,14 +796,27 @@ function StepAutonomy({ data, setData }) {
 
 // ── Step 7: Trigger ───────────────────────────────────────────────────────────
 
+// `comingSoon` flags trigger types that the schema either doesn't accept
+// at all (webhook / event) or can't drive end-to-end yet (scheduled —
+// no scheduler process exists in the backend). They still render in
+// the list so the roadmap signal is visible, but Publish is gated.
 const TRIGGER_OPTS = [
   { value: 'interactive', label: 'Interactive',  desc: 'User types a message to start the agent. Standard chat mode.' },
-  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.' },
-  { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.' },
-  { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).' },
+  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.', comingSoon: true },
+  { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.', comingSoon: true },
+  { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).', comingSoon: true },
 ];
 
+// Helper consumed by the Publish step to disable the button when the
+// chosen trigger can't actually run yet.
+function triggerSupported(triggerType) {
+  const opt = TRIGGER_OPTS.find(o => o.value === triggerType);
+  return !!opt && !opt.comingSoon;
+}
+
 function StepTrigger({ data, setData }) {
+  const selectedOpt = TRIGGER_OPTS.find(o => o.value === data.trigger_type);
+  const selectedUnavailable = selectedOpt && selectedOpt.comingSoon;
   return (
     <div>
       <Field label="Trigger Type">
@@ -819,6 +832,7 @@ function StepTrigger({ data, setData }) {
                 background: active ? `${T.cyan}11` : T.bg1,
                 border: `1px solid ${active ? T.cyan : T.border}`,
                 cursor: 'pointer',
+                opacity: opt.comingSoon ? 0.75 : 1,
               }}
             >
               <div style={{
@@ -833,16 +847,40 @@ function StepTrigger({ data, setData }) {
                   }} />
                 )}
               </div>
-              <div>
-                <div style={{ fontFamily: T.mono, fontSize: 12, color: active ? T.cyan : T.text, marginBottom: 2 }}>
-                  {opt.label}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: T.mono, fontSize: 12, color: active ? T.cyan : T.text }}>
+                    {opt.label}
+                  </span>
+                  {opt.comingSoon && (
+                    <span className="mono" style={{
+                      fontSize: 9, color: T.amber,
+                      border: `1px solid ${T.amber}66`,
+                      padding: '1px 6px', letterSpacing: '.08em',
+                      textTransform: 'uppercase',
+                    }}>Soon</span>
+                  )}
                 </div>
-                <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim }}>{opt.desc}</div>
+                <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginTop: 2 }}>{opt.desc}</div>
               </div>
             </div>
           );
         })}
       </Field>
+
+      {selectedUnavailable && (
+        <div style={{
+          padding: '12px 14px', marginTop: -4, marginBottom: 12,
+          background: `${T.amber}0a`, border: `1px solid ${T.amber}44`,
+          fontFamily: T.mono, fontSize: 11, color: T.muted, lineHeight: 1.7,
+        }}>
+          <span style={{ color: T.amber }}>NOTE</span>{'  '}
+          The <span style={{ color: T.text }}>{selectedOpt.label}</span> trigger
+          is coming in a future release — contact{' '}
+          <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for early access.
+          Publish is disabled until you switch to Interactive.
+        </div>
+      )}
 
       <Field label="Input Placeholder">
         <TextInput
@@ -962,6 +1000,23 @@ function StepPublish({ data, saving, onSave }) {
         </div>
       </div>
 
+      {/* Trigger gate: Publish blocked when user picked a scheduled/webhook/event
+          trigger — those options are in the UI as a roadmap signal but the
+          backend has no runtime for them yet (no scheduler, no webhook listener). */}
+      {!triggerSupported(data.trigger_type) && (
+        <div style={{
+          padding: '12px 14px', marginBottom: 12,
+          background: `${T.amber}0a`, border: `1px solid ${T.amber}44`,
+          fontFamily: T.mono, fontSize: 11, color: T.muted, lineHeight: 1.7,
+        }}>
+          <span style={{ color: T.amber }}>⚠ PUBLISH BLOCKED</span>{'  '}
+          This agent is configured with a trigger that isn't available yet.
+          Go back to step 8 and pick <span style={{ color: T.text }}>Interactive</span>,
+          or contact <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for
+          early access to scheduled / webhook / event triggers.
+        </div>
+      )}
+
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: 12 }}>
         <button
@@ -978,13 +1033,14 @@ function StepPublish({ data, saving, onSave }) {
         </button>
         <button
           onClick={() => onSave('published')}
-          disabled={saving}
+          disabled={saving || !triggerSupported(data.trigger_type)}
           style={{
             flex: 2, padding: '12px', background: T.cyan,
             border: `1px solid ${T.cyan}`, color: T.bg0,
             fontFamily: T.mono, fontSize: 12, fontWeight: 700,
-            cursor: saving ? 'not-allowed' : 'pointer',
-            letterSpacing: '.1em', opacity: saving ? 0.7 : 1,
+            cursor: (saving || !triggerSupported(data.trigger_type)) ? 'not-allowed' : 'pointer',
+            letterSpacing: '.1em',
+            opacity: (saving || !triggerSupported(data.trigger_type)) ? 0.4 : 1,
           }}
         >
           {saving ? 'PUBLISHING...' : 'PUBLISH AGENT'}
