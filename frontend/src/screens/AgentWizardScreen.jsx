@@ -21,11 +21,16 @@ const STEPS = [
 
 // ── Autonomy level descriptions ───────────────────────────────────────────────
 
+// Values here must match dialekt_manifest.schema.AUTONOMY_LEVELS exactly.
+// Before 2026-04-23 the wizard emitted full-auto / ask-before-run / manual
+// which the validator rejected — breaking Publish whenever the user
+// picked anything except ask-before-write. Labels stay user-friendly;
+// only the string value is schema-bound.
 const AUTONOMY_OPTS = [
-  { value: 'full-auto',       label: 'Full Auto',        desc: 'Agent acts without asking. Reads, writes, executes, and publishes results autonomously. Use only for trusted, well-tested agents.' },
+  { value: 'autonomous',       label: 'Full Auto',        desc: 'Agent acts without asking. Reads, writes, executes, and publishes results autonomously. Use only for trusted, well-tested agents.' },
   { value: 'ask-before-write', label: 'Ask Before Write', desc: 'Agent reads and analyzes freely, but asks for approval before writing files, sending messages, or making persistent changes. Recommended default.' },
-  { value: 'ask-before-run',  label: 'Ask Before Run',   desc: 'Agent asks before executing any command or writing data. Safer for agents that interact with external systems or run shell commands.' },
-  { value: 'manual',          label: 'Manual',           desc: 'Every action requires user confirmation. Useful for learning, auditing, or sensitive production environments.' },
+  { value: 'review-only',      label: 'Ask Before Run',   desc: 'Agent asks before executing any command or writing data. Safer for agents that interact with external systems or run shell commands.' },
+  { value: 'manual',           label: 'Manual',           desc: 'Every action requires user confirmation — including reads. Useful for learning, auditing, or sensitive production environments.' },
 ];
 
 // ── YAML builder ──────────────────────────────────────────────────────────────
