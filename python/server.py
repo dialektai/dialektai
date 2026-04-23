@@ -1644,21 +1644,42 @@ async def ws_chat(ws: WebSocket):
             except Exception:
                 pass
 
+            # Determine which agent to bind on this turn.
+            # Priority: explicit agent_id in message → existing session's agent_id
+            # → current binding → no agent.
+            requested_agent_id = msg.get("agent_id")
+
             if session_id is None:
                 sid_from_client = msg.get("session_id")
-                agent_id_for_session = msg.get("agent_id")
                 if sid_from_client:
                     session_id = sid_from_client
+                    # Resume — pull agent_id from DB if client didn't send one.
+                    if not requested_agent_id:
+                        row = await (await db.execute(
+                            "SELECT agent_id FROM sessions WHERE id = ?",
+                            (session_id,),
+                        )).fetchone()
+                        if row and row[0]:
+                            requested_agent_id = row[0]
                 else:
-                    session_id = await db_create_session(agent_id=agent_id_for_session)
-                    if agent_id_for_session:
-                        agent = await db_get_agent(agent_id_for_session)
-                        if agent:
-                            current_agent_id = agent["id"]
-                            agent_ctx = await resolve_agent_context(agent)
-                            itp = make_interpreter(agent, agent_ctx)
-                            _active_interpreters[ws_id] = itp
+                    session_id = await db_create_session(agent_id=requested_agent_id)
                     first_message = True
+
+            # (Re)bind interpreter if the requested agent differs from current.
+            if requested_agent_id and requested_agent_id != current_agent_id:
+                agent = await db_get_agent(requested_agent_id)
+                if agent:
+                    current_agent_id = agent["id"]
+                    agent_ctx = await resolve_agent_context(agent)
+                    itp = make_interpreter(agent, agent_ctx)
+                    _active_interpreters[ws_id] = itp
+                    # Persist binding on the session row in case it wasn't set
+                    # (e.g. client sent agent_id without pre-creating session).
+                    await db.execute(
+                        "UPDATE sessions SET agent_id = ? WHERE id = ?",
+                        (current_agent_id, session_id),
+                    )
+                    await db.commit()
 
             log.info(f"[{session_id[:8]}] User: {content[:80]}")
 
