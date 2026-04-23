@@ -108,13 +108,21 @@ system_prompt: |
 ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
 `;
 
-  if (data.variables && data.variables.length > 0) {
+  // Schema expects a dict keyed by variable name (dialekt_manifest.schema.AgentManifest
+  // declares `variables: Optional[dict[str, Variable]]`), not a YAML list.
+  // Each Variable has type (string/number/boolean/list) + required + description.
+  // We filter out rows with an empty key so an abandoned "Add variable"
+  // click doesn't write `: {...}` into the manifest.
+  const namedVars = (data.variables || []).filter(v => v.key && v.key.trim());
+  if (namedVars.length > 0) {
     yaml += `\nvariables:\n`;
-    data.variables.forEach(v => {
-      if (!v.key) return;
-      yaml += `  - key: "${v.key}"\n`;
-      yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
+    namedVars.forEach(v => {
+      const key = v.key.trim();
+      const type = v.type || 'string';
+      yaml += `  ${key}:\n`;
+      yaml += `    type: "${type}"\n`;
       yaml += `    required: ${v.required ? 'true' : 'false'}\n`;
+      yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
     });
   }
 
@@ -604,7 +612,7 @@ function StepConnections({ data, setData }) {
 function StepVariables({ data, setData }) {
   const addVar = () => setData(d => ({
     ...d,
-    variables: [...d.variables, { key: '', description: '', required: true }],
+    variables: [...d.variables, { key: '', type: 'string', description: '', required: true }],
   }));
 
   const removeVar = idx => setData(d => ({
@@ -668,7 +676,7 @@ function StepVariables({ data, setData }) {
             <Icon name="x" size={13} color={T.dim} />
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 2fr auto', gap: 10, alignItems: 'end' }}>
             <div>
               <label style={LABEL}>Key</label>
               <input
@@ -677,6 +685,19 @@ function StepVariables({ data, setData }) {
                 placeholder="API_KEY"
                 style={{ ...INPUT, fontFamily: T.mono }}
               />
+            </div>
+            <div>
+              <label style={LABEL}>Type</label>
+              <select
+                value={v.type || 'string'}
+                onChange={e => updateVar(idx, 'type', e.target.value)}
+                style={{ ...INPUT, cursor: 'pointer' }}
+              >
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="list">list</option>
+              </select>
             </div>
             <div>
               <label style={LABEL}>Description</label>
