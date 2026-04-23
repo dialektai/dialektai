@@ -128,7 +128,14 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
   }
 
   if (data.connection_type && data.connection_type !== 'none') {
-    yaml += `\nconnections:\n  - type: "${data.connection_type}"\n    id: "${data.connection_id || ''}"\n`;
+    // Schema shape is {required: [Connection, …]}, not a flat list. Fields
+    // are type + role + purpose; the specific connection_id is NOT part
+    // of the manifest — binding lives in agent_bindings (POST /agents/{id}/binding,
+    // which the wizard does separately on publish). `role` and `purpose`
+    // are required strings per dialekt_manifest.schema.Connection.
+    const role = data.connection_role || 'readonly';
+    const purpose = escapeYaml(data.connection_purpose || 'Database access for this agent');
+    yaml += `\nconnections:\n  required:\n    - type: "${data.connection_type}"\n      role: "${role}"\n      purpose: "${purpose}"\n`;
   }
 
   yaml += `\nautonomy:\n  recommended: "${data.autonomy_recommended}"\n  max_allowed: "${data.autonomy_max}"\n`;
@@ -529,35 +536,55 @@ function StepConnections({ data, setData }) {
       </Field>
 
       {data.connection_type !== 'none' && (
-        <Field label="Connection">
-          {loading ? (
-            <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, padding: '8px 0' }}>
-              loading connections...
-            </div>
-          ) : connList.length === 0 ? (
-            <div style={{
-              padding: '12px 14px', background: T.bg1,
-              border: `1px solid ${T.border}`,
-              fontFamily: T.mono, fontSize: 11, color: T.dim,
-            }}>
-              No connections saved — add one in{' '}
-              <span style={{ color: T.cyan }}>Settings → Connections</span>
-            </div>
-          ) : (
+        <>
+          <Field label="Connection">
+            {loading ? (
+              <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, padding: '8px 0' }}>
+                loading connections...
+              </div>
+            ) : connList.length === 0 ? (
+              <div style={{
+                padding: '12px 14px', background: T.bg1,
+                border: `1px solid ${T.border}`,
+                fontFamily: T.mono, fontSize: 11, color: T.dim,
+              }}>
+                No connections saved — add one in{' '}
+                <span style={{ color: T.cyan }}>Settings → Connections</span>
+              </div>
+            ) : (
+              <select
+                value={data.connection_id}
+                onChange={e => setData(d => ({ ...d, connection_id: e.target.value }))}
+                style={{ ...INPUT, cursor: 'pointer' }}
+              >
+                <option value="">-- select connection --</option>
+                {connList.map(c => (
+                  <option key={c.id || c.name} value={c.id || c.name}>
+                    {c.name || c.id}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="Role">
             <select
-              value={data.connection_id}
-              onChange={e => setData(d => ({ ...d, connection_id: e.target.value }))}
+              value={data.connection_role}
+              onChange={e => setData(d => ({ ...d, connection_role: e.target.value }))}
               style={{ ...INPUT, cursor: 'pointer' }}
             >
-              <option value="">-- select connection --</option>
-              {connList.map(c => (
-                <option key={c.id || c.name} value={c.id || c.name}>
-                  {c.name || c.id}
-                </option>
-              ))}
+              <option value="readonly">Read only — SELECT queries</option>
+              <option value="readwrite">Read / write — SELECT + INSERT/UPDATE</option>
+              <option value="admin">Admin — DDL + all operations</option>
             </select>
-          )}
-        </Field>
+          </Field>
+          <Field label="Purpose">
+            <TextInput
+              value={data.connection_purpose}
+              onChange={v => setData(d => ({ ...d, connection_purpose: v }))}
+              placeholder="Database access for this agent"
+            />
+          </Field>
+        </>
       )}
 
       {data.connection_type === 'none' && (
@@ -1032,6 +1059,8 @@ export default function AgentWizardScreen({ onNav }) {
     },
     connection_type: 'none',
     connection_id: '',
+    connection_role: 'readonly',
+    connection_purpose: 'Database access for this agent',
     variables: [],
     autonomy_recommended: 'ask-before-write',
     autonomy_max: 'ask-before-write',
