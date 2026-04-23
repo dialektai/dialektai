@@ -47,7 +47,7 @@ Stage 2 COMPLETE — All goals 1–8 done, dialekt-cloud service + admin panel, 
 - Usage tab: StatCards + per-agent breakdown bars
 - Subscription tab: plan info, seat count, contact link
 
-## Goal 8 — LLM Performance Layer — COMPLETE ✓
+## Goal 8 — LLM Performance Layer — COMPLETE ✓ (5 of 5)
 
 ### 8.1: Structured prompt templating ✓
 - `python/dialekt/llm/prompt_wrapper.py`
@@ -62,24 +62,13 @@ Stage 2 COMPLETE — All goals 1–8 done, dialekt-cloud service + admin panel, 
 - Note: enforcement is text-level only. Ollama's native `format: {json_schema}` parameter
   is NOT set — this is acceptable for v0.9 but an obvious upgrade path.
 
-### 8.3: Self-correcting retry loop ✓ (wired 2026-04-23, commit 3c3a46e)
-- `python/dialekt/llm/retry_loop.py` — SQLRetryLoop class (12 unit tests)
-- Integration point: `python/mcp_servers/postgres_mcp.py` — `/connections/{id}/query`
-  endpoint calls `_retry_fix_sql()` before execution. Pre-flight EXPLAIN catches
-  bad SQL; on failure, `_ollama_fix_sql()` asks the local LLM (default
-  `gemma3-12b` via `DIALEKT_RETRY_MODEL`) to produce a corrected version using
-  the PG error message as feedback. Up to 3 retries.
-- Config:
-  - `DIALEKT_SQL_RETRY=1` (default on). Set to `0` to disable globally.
-  - Per-request `{"retry": false}` override in the /query body.
-  - `retry_context: {question, schema_hint}` in body for better fix-up quality.
-- Each retry emits `🔄 SQL retry attempt N/3 — previous error: ...` in the
-  desktop log. Response gains `retry_attempts: [...]` + `executed_sql` when
-  correction happened, so callers can observe what ran.
-- If all retries fail, the endpoint falls back to the original SQL so the
-  normal HTTP 400 error contract is preserved.
-- 5 new integration tests in `tests/test_retry_loop_integration.py`
-  (all pass; desktop suite: 214 → 219).
+### 8.3 Self-correcting retry loop ✓ COMPLETE
+- SQLRetryLoop class: `python/dialekt/llm/retry_loop.py` (12 unit tests)
+- Wire point: `python/mcp_servers/postgres_mcp.py` /query endpoint
+- Env flag: `DIALEKT_SQL_RETRY` (default: enabled)
+- Per-request override: `{"retry": false}` in POST body
+- Integration tests: `python/tests/test_retry_loop_integration.py` (5 tests)
+- Verification: `grep -c "SQLRetryLoop\|_retry_fix_sql" python/mcp_servers/postgres_mcp.py` → 8
 
 ### 8.4: History summarization
 - `summarize_history()` in prompt_wrapper.py (truncation-based, max_chars=1500)
@@ -180,6 +169,10 @@ code-level — see below).
 
 - **Goal 8.3 retry loop** — now wired into `POST /connections/{id}/query`
   (commit 3c3a46e). See Goal 8.3 section above for details.
+
+**Update 2026-04-23 (later same day):** Goal 8.3 closed. SQLRetryLoop wired
+into postgres_mcp.py /query endpoint. 5 new integration tests added
+(5 passed, 0 regressions, full suite now 219 passing).
 
 ### Known gaps
 - **Integration tests `test_mysql_integration.py` and `test_clickhouse_integration.py`**
