@@ -232,6 +232,43 @@ class PluginContext:
             "has_app": self.app is not None,
         }
 
+    # ── MCP integration (Этап 1) ───────────────────────────────────────────
+
+    def new_mcp_manager(self, agent_id: str, **manager_kwargs) -> Any:
+        """Build a fresh ``MCPClientManager`` bound to this context.
+
+        The caller owns the lifecycle — ``await manager.shutdown()``
+        when the chat session ends. PluginContext does not cache
+        managers because their lifetime is agent-session-scoped, not
+        context-scoped; caching them here would leak MCP subprocesses
+        and HTTP clients across sessions.
+
+        By default the manager's audit callback forwards events to
+        this context's ``POST /audit/log`` endpoint, so audit rows
+        land in the SQLite ``audit_log`` table through the normal
+        in-process ASGI dispatch. Callers may override
+        ``audit_callback`` by passing it in ``manager_kwargs``.
+        """
+        from dialekt.mcp.manager import MCPClientManager
+
+        audit_cb = manager_kwargs.pop(
+            "audit_callback", self._default_audit_callback
+        )
+        return MCPClientManager(
+            agent_id=agent_id,
+            audit_callback=audit_cb,
+            **manager_kwargs,
+        )
+
+    def _default_audit_callback(self, **payload) -> None:
+        """Forward an audit event to ``POST /audit/log``.
+
+        Called from ``MCPClientManager._emit_audit`` via
+        ``asyncio.to_thread`` so the sync HTTP round-trip does not
+        block the calling task's event loop.
+        """
+        self.post("/audit/log", json=payload)
+
 
 # ── Module-level default (lazy, thread-safe) ────────────────────────────────
 #

@@ -620,6 +620,49 @@ async def admin_stats():
     }
 
 
+# ── Audit log endpoint ────────────────────────────────────────────────────────
+
+@app.post("/audit/log")
+async def audit_log_endpoint(body: dict):
+    """Append a row to the universal ``audit_log`` table.
+
+    Introduced for MCPClientManager (M2 Month 1) to emit tool-call
+    audit rows through PluginContext. The endpoint is intentionally
+    generic — any future caller emitting ``kind="sql_query"`` /
+    ``"file_op"`` / etc. uses the same path. Keeps the log_event
+    helper as the single write authority.
+
+    Body fields mirror ``dialekt.audit.log_event`` keyword arguments.
+    ``kind``, ``action``, ``result`` are required; the rest are
+    nullable. Returns the inserted row id on success.
+    """
+    from dialekt.audit import log_event
+
+    kind = body.get("kind")
+    action = body.get("action")
+    result = body.get("result")
+    if not kind or not action or not result:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422,
+            detail="kind, action, result are required",
+        )
+    row_id = await log_event(
+        db,
+        kind=kind,
+        action=action,
+        result=result,
+        agent_id=body.get("agent_id"),
+        binding_id=body.get("binding_id"),
+        target=body.get("target"),
+        duration_ms=body.get("duration_ms"),
+        error_kind=body.get("error_kind"),
+        extra=body.get("extra"),
+    )
+    return {"id": row_id}
+
+
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
 
 @app.get("/schema-rag/model-status")
