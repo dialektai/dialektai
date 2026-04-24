@@ -167,7 +167,7 @@ jobs:
             pip-wheels-macos-py3.12-
 
       - name: Build Python sidecar (native, Apple Silicon)
-        timeout-minutes: 20
+        timeout-minutes: 25
         env:
           DIALEKT_BUILD_MODE: native
           DIALEKT_SKIP_SMOKE: '1'
@@ -176,9 +176,12 @@ jobs:
           cd python
           python -m venv venv
           source venv/bin/activate
-          pip install --upgrade pip wheel
-          pip install --prefer-binary --only-binary=:all: -r requirements.txt pyinstaller \
-              || pip install --prefer-binary -r requirements.txt pyinstaller
+          # Use python -m pip to avoid "can't replace running pip.exe" issues
+          # (macOS doesn't need this but stays consistent with Windows).
+          python -m pip install --upgrade pip wheel
+          # --prefer-binary without --only-binary=:all: — some deps (html2text)
+          # don't publish a matching binary wheel, so we allow source build.
+          python -m pip install --prefer-binary -r requirements.txt pyinstaller
           bash build_sidecar.sh
           test -f "../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin"
           file "../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin"
@@ -254,14 +257,18 @@ jobs:
       # can't call build_sidecar.sh directly — it hard-codes source venv/bin/
       # activate. Inline the PyInstaller call using the same flags.
       - name: Build Python sidecar (native, Windows x64)
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           cd python
           python -m venv venv
           source venv/Scripts/activate
-          pip install --upgrade pip wheel
-          pip install --prefer-binary --only-binary=:all: -r requirements.txt pyinstaller \
-              || pip install --prefer-binary -r requirements.txt pyinstaller
+          # On Windows, pip cannot replace its own pip.exe while running.
+          # Use `python -m pip` so the upgrade runs through the Python
+          # interpreter instead of pip.exe calling itself.
+          python -m pip install --upgrade pip wheel
+          # --prefer-binary without --only-binary=:all: — some deps don't
+          # have a matching wheel, so we allow source build as needed.
+          python -m pip install --prefer-binary -r requirements.txt pyinstaller
           pyinstaller --clean --log-level=WARN dialekt_server.spec
           test -f dist/dialekt-server.exe
           mkdir -p ../frontend/src-tauri/binaries
