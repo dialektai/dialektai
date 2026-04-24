@@ -57,13 +57,42 @@ honoring their decisions keeps the product at 100% completion bar
 When mentor gives a trade-off ("A better but costs Y, willing to pay Y"),
 pay Y. Don't silently take the cheaper path and hope no one notices.
 
+## When to invoke dias agent
+
+Use `Task` с `subagent_type="dias"` для quick style / convention
+decisions too small to interrupt Dias directly:
+
+- Variable naming preferences (snake_case, short > verbose)
+- Commit message wording
+- Test type choice (unit vs integration)
+- Import ordering / docstring format
+- Error message wording в logs / CLI output
+- File structure within established patterns
+
+Do NOT invoke dias для:
+
+- Architecture (invoke `mentor`)
+- Strategic priorities (invoke `mentor` or escalate to Dias)
+- Customer communication (escalate to Dias directly)
+- Anything that changes product behaviour (invoke `mentor`)
+
+Dias agent is a style proxy — if the question feels bigger than
+"how should this be named", escalate via the agent's own
+refusal-then-redirect pattern.
+
 ## Related agents
 
 - `code-reviewer.md` — line-level code review (use inline during
   commits, not for architectural questions)
 - `debugger.md` — targeted bug hunting when tests fail mysteriously
 
-Mentor is the strategic / architectural layer above these — invoke
-mentor when the question is "should we build this?" or "does this
-fit the architecture?", invoke the others when the question is
-"why doesn't this code work?"
+Layered decision surface:
+
+```
+dias         → style / conventions (small)
+mentor       → architecture / strategy / PR approval (medium-large)
+Dias himself → customer / financial / existential (largest)
+```
+
+Invoke the smallest one that can handle the question. Escalate
+upward when scope grows mid-decision.
