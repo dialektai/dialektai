@@ -164,9 +164,13 @@ async def test_validate_sql_disables_server_side_retry():
     triggers SQLRetryLoop when retry is enabled, which would call
     validate_sql again — infinite loop. Guard: retry must be False in the
     body so the server does one-shot validation and returns.
+
+    After the PluginContext refactor (2026-04-24) dispatch goes through
+    get_context(); we inject a recording fake context instead of
+    patching httpx.
     """
     from dialekt.llm.retry_loop import validate_sql
-    import httpx as _httpx
+    from dialekt.llm import _plugin_context as pc
 
     captured = {}
 
@@ -175,24 +179,24 @@ async def test_validate_sql_disables_server_side_retry():
         def json(self):
             return {"ok": True}
 
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *a):
-            return False
-        async def post(self, url, json=None, **kwargs):
-            captured["url"] = url
+    class _FakeContext:
+        def post(self, path, json=None, **kwargs):
+            captured["path"] = path
             captured["json"] = json
             return _FakeResponse()
+        def close(self):
+            pass
 
-    with patch.object(_httpx, "AsyncClient", _FakeClient):
+    original = pc.get_context()
+    pc.set_context(_FakeContext())
+    try:
         ok, err = await validate_sql("conn-x", "SELECT 1")
+    finally:
+        pc.set_context(original)
 
     assert ok is True
     assert err == ""
-    assert captured["url"].endswith("/connections/conn-x/query")
+    assert captured["path"] == "/connections/conn-x/query"
     assert captured["json"].get("retry") is False, (
         "validate_sql must pass retry:false to avoid recursive SQLRetryLoop "
         "on the server side — see postgres_mcp._retry_fix_sql."

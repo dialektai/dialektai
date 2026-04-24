@@ -36,11 +36,16 @@ def test_env_change_picked_up_at_call_time(monkeypatch):
 
 
 def test_validate_sql_uses_current_backend(monkeypatch):
-    """validate_sql() posts to {_get_backend()}/connections/{id}/query.
-    We stub httpx to capture the URL and assert it reflects the env.
+    """validate_sql() dispatches through PluginContext. After the
+    2026-04-24 consolidation the call goes via `ctx.post(path, ...)`
+    (PluginContext prepends the base_url for http mode, or pumps the
+    ASGI app for in-process mode). We assert the PATH alone here —
+    the base URL is a PluginContext concern covered in
+    test_plugin_context.py.
     """
     import asyncio
-    import dialekt.llm.retry_loop as rl
+    from dialekt.llm import _plugin_context as pc
+    from dialekt.llm import retry_loop as rl
 
     captured: dict = {}
 
@@ -49,18 +54,21 @@ def test_validate_sql_uses_current_backend(monkeypatch):
         def json(self):
             return {"ok": True}
 
-    class _FakeClient:
-        def __init__(self, *a, **kw): ...
-        async def __aenter__(self):
-            return self
-        async def __aexit__(self, *a):
-            return False
-        async def post(self, url, json=None):
-            captured["url"] = url
+    class _FakeContext:
+        base_url = "http://example.test:4242"
+        def post(self, path, json=None, **kw):
+            captured["path"] = path
+            captured["base_url"] = self.base_url
             return _FakeResp()
+        def close(self):
+            pass
 
-    monkeypatch.setattr(rl.httpx, "AsyncClient", _FakeClient)
-    monkeypatch.setenv("DIALEKT_BACKEND_URL", "http://example.test:4242")
+    original = pc.get_context()
+    pc.set_context(_FakeContext())
+    try:
+        asyncio.run(rl.validate_sql("conn-abc", "SELECT 1"))
+    finally:
+        pc.set_context(original)
 
-    asyncio.run(rl.validate_sql("conn-abc", "SELECT 1"))
-    assert captured["url"] == "http://example.test:4242/connections/conn-abc/query"
+    assert captured["path"] == "/connections/conn-abc/query"
+    assert captured["base_url"] == "http://example.test:4242"

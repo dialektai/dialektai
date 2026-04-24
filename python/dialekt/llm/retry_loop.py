@@ -10,22 +10,23 @@ Retries are opaque to the user (invisible in chat). They are logged for debuggin
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 from typing import Any, Callable, Awaitable, Optional
 
-import httpx
-
 log = logging.getLogger("dialekt.retry_loop")
 
 
-def _get_backend() -> str:
-    """Return the dialekt-server base URL.
+# ── Back-compat shim for the R1 API ─────────────────────────────────────────
+# Prior to PluginContext (2026-04-24), tests imported `_get_backend` directly
+# to verify env-var plumbing. Keep the symbol so those tests — and any third-
+# party integrator that copied the pattern — don't break.
 
-    Read at call time so that in-process changes (e.g. server.py setting
-    the env var after binding to a custom --port) are picked up, and so
-    tests can override via monkeypatch/env without re-importing.
+def _get_backend() -> str:
+    """DEPRECATED: prefer `get_context().base_url`. Kept for backward
+    compatibility with test_retry_loop_config.py.
     """
     return os.environ.get("DIALEKT_BACKEND_URL", "http://localhost:8765")
 
@@ -51,13 +52,28 @@ async def validate_sql(conn_id: str, sql: str) -> tuple[bool, str]:
     spamming the logs with '🔄 SQL retry attempt N/3' forever until the
     client times out. The validator does its own retry here; the server
     must not try to double-retry.
+
+    Dispatch goes through the shared PluginContext: in-process when the
+    server has wired its own FastAPI app (fast, works on any port), HTTP
+    fallback when running detached (DIALEKT_BACKEND_URL).
     """
+    # Lazy import + call-time resolution so tests that monkeypatch
+    # set_context() after module import still take effect.
+    from dialekt.llm._plugin_context import get_context
+    ctx = get_context()
+
+    def _do_call():
+        return ctx.post(
+            f"/connections/{conn_id}/query",
+            json={"sql": f"EXPLAIN {sql}", "retry": False},
+            timeout=10.0,
+        )
+
     try:
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.post(
-                f"{_get_backend()}/connections/{conn_id}/query",
-                json={"sql": f"EXPLAIN {sql}", "retry": False},
-            )
+        # PluginContext exposes a sync surface (both TestClient and the
+        # httpx.Client fallback are sync). Run in a thread so we don't
+        # block the event loop in live-server contexts.
+        r = await asyncio.to_thread(_do_call)
         data = r.json()
         if not data.get("ok", True) or r.status_code >= 400:
             return False, data.get("detail") or data.get("error") or "SQL validation failed"
