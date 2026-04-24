@@ -135,6 +135,100 @@ DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
 _active_interpreters: dict = {}  # ws_id → interpreter instance
 
+# ── MCP consent bridge (Phase 1.2 commit A) ──────────────────────────────────
+# Module-global pending-consents map. Keyed on f"{ws_id}:{request_id}".
+# Desktop dialekt is single-process; do not move to multi-worker
+# (e.g. uvicorn --workers 2+) without a Redis-backed future registry.
+_pending_consents: dict[str, asyncio.Future] = {}
+
+# Timeout before a consent prompt auto-denies. Overridable from tests.
+_CONSENT_TIMEOUT_SECONDS = 30.0
+
+
+def _build_consent_prompt_fn(ws, ws_id: str, loop):
+    """Return a PromptFn (dialekt.mcp.consent.PromptFn) that talks over this ws.
+
+    The returned async callable is intended to be passed into
+    ``provider_for_autonomy(level, prompt_fn)`` so the resulting
+    ConsentProvider chain (SessionCaching → PromptConsent) resolves
+    destructive MCP tool calls against the user through the WS.
+    """
+    from dialekt.mcp import ConsentDecision, ConsentRequest
+
+    async def _prompt(request: ConsentRequest) -> ConsentDecision:
+        request_id = uuid.uuid4().hex
+        key = f"{ws_id}:{request_id}"
+        fut = loop.create_future()
+        _pending_consents[key] = fut
+        try:
+            await ws.send_text(json.dumps({
+                "type": "mcp_consent_request",
+                "request_id": request_id,
+                "server_name": request.server_name,
+                "tool_name": request.tool_name,
+                "arguments": request.arguments,
+                "destructive": request.destructive,
+                "destructive_source": request.destructive_source,
+            }))
+            try:
+                return await asyncio.wait_for(
+                    fut, timeout=_CONSENT_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                try:
+                    await ws.send_text(json.dumps({
+                        "type": "mcp_consent_timeout",
+                        "request_id": request_id,
+                    }))
+                except Exception:
+                    pass
+                return ConsentDecision.DENIED
+            except asyncio.CancelledError:
+                # ws_chat finally-block cancels pending futures on
+                # disconnect; the prompt caller sees DENIED.
+                return ConsentDecision.DENIED
+        finally:
+            _pending_consents.pop(key, None)
+
+    return _prompt
+
+
+def _handle_consent_response(ws_id: str, msg: dict) -> bool:
+    """Resolve the pending future for msg['request_id']. Return True on dispatch.
+
+    Drops silently on:
+      - unknown request_id (orphan response — frontend bug or replay)
+      - future already done (response raced a timeout)
+    Unknown ``decision`` values are coerced to DENIED (defensive default).
+    """
+    from dialekt.mcp import ConsentDecision
+
+    request_id = msg.get("request_id") or ""
+    key = f"{ws_id}:{request_id}"
+    fut = _pending_consents.get(key)
+    if fut is None or fut.done():
+        log.debug("consent response dropped (unknown/stale): %s", key)
+        return False
+    raw = msg.get("decision", "denied")
+    try:
+        decision = ConsentDecision(raw)
+    except ValueError:
+        decision = ConsentDecision.DENIED
+    fut.set_result(decision)
+    return True
+
+
+def _cancel_pending_consents(ws_id: str) -> None:
+    """Cancel any pending consent futures belonging to this ws_id.
+
+    Called from ws_chat's disconnect cleanup so prompt_fn consumers
+    still awaiting a response unblock with DENIED via CancelledError.
+    """
+    for key in [k for k in _pending_consents if k.startswith(f"{ws_id}:")]:
+        fut = _pending_consents.pop(key, None)
+        if fut is not None and not fut.done():
+            fut.cancel()
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS connections (
     id         TEXT PRIMARY KEY,
@@ -1803,6 +1897,10 @@ async def ws_chat(ws: WebSocket):
                 await send({"type": "done"})
                 continue
 
+            if msg.get("type") == "mcp_consent_response":
+                _handle_consent_response(ws_id, msg)
+                continue
+
             if msg.get("type") == "confirm":
                 confirm_approved[0] = msg.get("approved", False)
                 confirm_event.set()
@@ -2043,6 +2141,7 @@ async def ws_chat(ws: WebSocket):
         log.error(f"WS error: {e}")
     finally:
         _active_interpreters.pop(ws_id, None)
+        _cancel_pending_consents(ws_id)
 
 
 if __name__ == "__main__":
