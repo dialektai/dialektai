@@ -166,25 +166,30 @@ jobs:
           restore-keys: |
             pip-wheels-macos-py3.12-
 
+      # Inline PyInstaller invocation (same shape as build-windows). Previous
+      # rc2 attempt called `bash build_sidecar.sh` which silently exited 1
+      # on macOS runners right after pip's "Successfully installed" message
+      # — cause was the script's inner `pip install --quiet --upgrade pip`
+      # interacting poorly with the runner's cached venv. Inlining bypasses
+      # it entirely and matches what build-windows already does successfully.
       - name: Build Python sidecar (native, Apple Silicon)
         timeout-minutes: 25
-        env:
-          DIALEKT_BUILD_MODE: native
-          DIALEKT_SKIP_SMOKE: '1'
-          DIALEKT_SIDECAR_TARGET: aarch64-apple-darwin
         run: |
+          set -x
           cd python
           python -m venv venv
           source venv/bin/activate
-          # Use python -m pip to avoid "can't replace running pip.exe" issues
-          # (macOS doesn't need this but stays consistent with Windows).
           python -m pip install --upgrade pip wheel
-          # --prefer-binary without --only-binary=:all: — some deps (html2text)
-          # don't publish a matching binary wheel, so we allow source build.
           python -m pip install --prefer-binary -r requirements.txt pyinstaller
-          bash build_sidecar.sh
-          test -f "../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin"
-          file "../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin"
+          echo "::group::pyinstaller"
+          pyinstaller --clean --log-level=WARN dialekt_server.spec
+          echo "::endgroup::"
+          test -f dist/dialekt-server
+          mkdir -p ../frontend/src-tauri/binaries
+          cp dist/dialekt-server \
+            ../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin
+          chmod +x ../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin
+          file ../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin
 
       - name: Build Tauri bundles (.dmg + .app)
         run: |
