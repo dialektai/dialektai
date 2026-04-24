@@ -122,8 +122,20 @@ class MCPServer:
         self._registered_tools.extend(names)
 
     def _register_agent_tools(self) -> None:
-        """Commit 5 plugs list_agents + get_agent in here."""
-        log.debug("agent tools registration is a no-op until Commit 5")
+        """Attach list_agents + get_agent. dialekt_invoke_agent is
+        deliberately omitted in v0.20.0 — see M2_MCP_SERVER_DESIGN.md
+        Decision 3. Lands in M3 as a real end-to-end tool, not a stub.
+        """
+        if self._plugin_context is None:
+            log.warning(
+                "agent tools skipped — no plugin_context supplied; "
+                "pass one to MCPServer to enable backend-proxying tools"
+            )
+            return
+        from dialekt.mcp.server.tools.agent import register_agent_tools
+
+        names = register_agent_tools(self, self._plugin_context)
+        self._registered_tools.extend(names)
 
     # ── Accessors used by tools / tests ─────────────────────────────────
 
