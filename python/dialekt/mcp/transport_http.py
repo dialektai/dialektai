@@ -9,6 +9,7 @@ and 6 (errors).
 """
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
@@ -17,7 +18,13 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from dialekt.mcp.auth import BearerAuth, Credentials
+from dialekt.mcp.errors import MCPTimeoutError
 from dialekt.mcp.transport import HttpTransportSpec
+
+
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+"""Handshake ceiling — see transport_stdio for rationale. Symmetric
+across transports so both surfaces behave the same."""
 
 if TYPE_CHECKING:
     pass
@@ -43,6 +50,7 @@ async def open_http_session(
     credentials: Credentials,
     *,
     http_client: httpx.AsyncClient | None = None,
+    connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS,
 ) -> AsyncIterator[ClientSession]:
     """Open an initialized ``ClientSession`` over Streamable HTTP.
 
@@ -81,7 +89,15 @@ async def open_http_session(
             transport.url, http_client=http_client
         ) as (read, write, _get_session_id):
             async with ClientSession(read, write) as session:
-                await session.initialize()
+                try:
+                    async with asyncio.timeout(connect_timeout_seconds):
+                        await session.initialize()
+                except asyncio.TimeoutError as exc:
+                    raise MCPTimeoutError(
+                        f"HTTP MCP server handshake (initialize) at "
+                        f"{transport.url} timed out after "
+                        f"{connect_timeout_seconds}s"
+                    ) from exc
                 yield session
     finally:
         if owns_client:

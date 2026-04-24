@@ -100,6 +100,49 @@ def test_stdio_spawn_failure_surfaces():
     asyncio.run(run())
 
 
+def test_stdio_handshake_timeout_raises_mcp_timeout_error():
+    """A server that accepts stdin but never answers initialize must
+    be surfaced as MCPTimeoutError within connect_timeout_seconds —
+    not wedged forever.
+
+    The SDK's stdio_client runs inside an anyio TaskGroup so the
+    raised MCPTimeoutError comes out wrapped in BaseExceptionGroup.
+    Callers via MCPClientManager get this unwrapped by
+    ``error_classify.classify_sdk_error``; this test bypasses the
+    manager and so unwraps manually.
+    """
+    from dialekt.mcp import MCPTimeoutError, NoAuth
+    from dialekt.mcp.error_classify import classify_sdk_error
+    from dialekt.mcp.transport import StdioTransportSpec
+    from dialekt.mcp.transport_stdio import open_stdio_session
+
+    hang_script = Path(__file__).parent / "fixtures" / "stdio_hang.py"
+    transport = StdioTransportSpec(
+        command=[sys.executable, "-u", str(hang_script)]
+    )
+
+    async def run():
+        loop = asyncio.get_event_loop()
+        start = loop.time()
+        try:
+            async with open_stdio_session(
+                transport, NoAuth(), connect_timeout_seconds=0.5
+            ):
+                pytest.fail("open_stdio_session should have timed out")
+        except BaseException as raised:
+            classified = classify_sdk_error(raised)
+            assert isinstance(classified, MCPTimeoutError), (
+                f"expected MCPTimeoutError after classification, got "
+                f"{type(classified).__name__}: {classified}"
+            )
+        elapsed = loop.time() - start
+        # Generous upper bound so the test isn't flaky on loaded CI
+        # but still fails loudly if we disable the timeout path.
+        assert elapsed < 5.0, f"took {elapsed}s — timeout not enforced"
+
+    asyncio.run(run())
+
+
 def test_subprocess_env_merges_safelist_then_manifest_then_creds():
     """Unit test for the env assembly logic — pure function, no subprocess."""
     from dialekt.mcp.auth import EnvVarsAuth, NoAuth

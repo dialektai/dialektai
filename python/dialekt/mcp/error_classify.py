@@ -14,6 +14,8 @@ don't absorb behaviour here.
 """
 from __future__ import annotations
 
+import builtins
+
 from dialekt.mcp.errors import (
     MCPError,
     MCPProtocolError,
@@ -21,6 +23,12 @@ from dialekt.mcp.errors import (
     MCPTimeoutError,
     MCPToolNotFoundError,
 )
+
+
+# BaseExceptionGroup landed in Python 3.11. Dialekt ships on 3.12 but
+# the SDK supports 3.10 — use getattr so importing this module on 3.10
+# remains safe even if the unwrap branch is inert there.
+_BaseExceptionGroup = getattr(builtins, "BaseExceptionGroup", None)
 
 
 def classify_sdk_error(exc: BaseException) -> MCPError:
@@ -36,8 +44,7 @@ def classify_sdk_error(exc: BaseException) -> MCPError:
     # ExceptionGroup — anyio task groups surface cancellations as
     # a group. Unwrap the single interesting exception if we can; a
     # group with a mix of shapes is a protocol anomaly.
-    group_base = getattr(__builtins__, "BaseExceptionGroup", None)
-    if group_base is not None and isinstance(exc, group_base):
+    if _BaseExceptionGroup is not None and isinstance(exc, _BaseExceptionGroup):
         inner = getattr(exc, "exceptions", None)
         if inner and len(inner) == 1:
             return classify_sdk_error(inner[0])

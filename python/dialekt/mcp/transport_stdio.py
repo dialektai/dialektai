@@ -10,6 +10,7 @@ isolation), and 6 (errors).
 """
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, AsyncIterator
@@ -18,6 +19,7 @@ from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from dialekt.mcp.auth import Credentials, EnvVarsAuth
+from dialekt.mcp.errors import MCPTimeoutError
 from dialekt.mcp.transport import StdioTransportSpec
 
 if TYPE_CHECKING:
@@ -71,10 +73,22 @@ def _build_subprocess_env(
     return env
 
 
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+"""How long ``session.initialize()`` may take before we give up.
+
+A server that completes TCP / fd setup but never responds to the
+initialize JSON-RPC request would otherwise wedge the client forever.
+Connect timeout is separate from the per-call ``timeout_seconds``
+on the transport spec because handshake latency and per-tool
+latency are different order-of-magnitude concerns."""
+
+
 @asynccontextmanager
 async def open_stdio_session(
     transport: StdioTransportSpec,
     credentials: Credentials,
+    *,
+    connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS,
 ) -> AsyncIterator[ClientSession]:
     """Open an initialized ``ClientSession`` over a stdio subprocess.
 
@@ -88,12 +102,16 @@ async def open_stdio_session(
     wants the binary and the args separately, so we split at
     index 0.
 
-    Error surfacing is intentionally thin in this commit — SDK
-    exceptions (ExecutableNotFound, transport cancellations,
-    initialize timeouts) bubble unwrapped. Commit 7 adds the
-    ``PluginContext`` wrapper that classifies them into the
-    ``MCPServerUnavailableError`` / ``MCPTimeoutError`` /
-    ``MCPProtocolError`` taxonomy with audit emission.
+    ``initialize()`` is wrapped in ``asyncio.timeout`` so an MCP
+    server that hangs mid-handshake surfaces as
+    :class:`MCPTimeoutError` rather than hanging the chat turn.
+    Default 10s; callers can tighten or loosen via
+    ``connect_timeout_seconds``.
+
+    Non-handshake errors bubble unwrapped at this layer — the
+    ``MCPClientManager`` (Commit 7) classifies them into the
+    ``MCPServerUnavailableError`` / ``MCPProtocolError`` taxonomy
+    with audit emission on behalf of the caller.
     """
     params = StdioServerParameters(
         command=transport.command[0],
@@ -103,5 +121,13 @@ async def open_stdio_session(
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
-            await session.initialize()
+            try:
+                async with asyncio.timeout(connect_timeout_seconds):
+                    await session.initialize()
+            except asyncio.TimeoutError as exc:
+                raise MCPTimeoutError(
+                    f"stdio MCP server handshake (initialize) timed out "
+                    f"after {connect_timeout_seconds}s — server accepted "
+                    f"the subprocess pipes but never responded"
+                ) from exc
             yield session
