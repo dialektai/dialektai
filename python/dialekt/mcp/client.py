@@ -10,10 +10,11 @@ Transport wiring is layered:
     - ``_build_session_opener`` dispatches on the transport kind and
       returns the async-context-manager factory that will open a
       ``mcp.ClientSession`` when entered.
-    - For stdio → the dispatcher currently raises ``NotImplementedError``;
-      Commit 4 plugs in ``mcp.client.stdio.stdio_client``.
-    - For HTTP → same story, Commit 5 plugs in
-      ``mcp.client.streamable_http.streamablehttp_client``.
+    - For stdio → dispatches into
+      ``dialekt.mcp.transport_stdio.open_stdio_session``.
+    - For HTTP → dispatches into the symmetric
+      ``transport_http.open_http_session`` (landing in Commit 5; the
+      dispatcher raises ``NotImplementedError`` until then).
 
 Tests bypass transport entirely by assigning a custom
 ``_session_opener`` before entering the client — for example, a
@@ -156,13 +157,15 @@ class MCPClient:
         """Return a factory that opens a ``ClientSession`` for this transport.
 
         Overridden by test setup (``client._session_opener = ...``)
-        and by the transport commits (4-5) which plug in the real
-        stdio and HTTP session openers from the MCP SDK.
+        for in-memory testing; otherwise dispatches on the transport
+        kind to ``transport_stdio`` / ``transport_http``.
         """
         if isinstance(self.transport, StdioTransportSpec):
-            raise NotImplementedError(
-                "stdio transport wiring lands in Commit 4"
-            )
+            from dialekt.mcp.transport_stdio import open_stdio_session
+
+            transport = self.transport
+            credentials = self.credentials
+            return lambda: open_stdio_session(transport, credentials)
         if isinstance(self.transport, HttpTransportSpec):
             raise NotImplementedError(
                 "Streamable HTTP transport wiring lands in Commit 5"

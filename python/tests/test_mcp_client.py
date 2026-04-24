@@ -106,18 +106,6 @@ def test_aexit_cleans_up_session_reference():
     asyncio.run(run())
 
 
-def test_stdio_transport_not_yet_wired():
-    """Commit 3 deliberately leaves stdio wiring for Commit 4 —
-    verify that path still raises until then."""
-    async def run():
-        client = MCPClient.from_stdio_command(["nonexistent-binary-xyz"])
-        with pytest.raises(NotImplementedError, match="Commit 4"):
-            async with client:
-                pass
-
-    asyncio.run(run())
-
-
 def test_http_transport_not_yet_wired():
     async def run():
         client = MCPClient.from_http_url("https://example.invalid/mcp")

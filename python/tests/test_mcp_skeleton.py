@@ -112,12 +112,10 @@ def test_from_http_url_without_token_uses_noauth():
     assert isinstance(client.credentials, NoAuth)
 
 
-def test_real_transports_not_yet_wired():
-    """stdio + HTTP transport wiring is deferred to Commits 4 and 5 —
-    both paths must surface NotImplementedError, not silently succeed.
-    In-memory session injection (used by test_mcp_client.py) bypasses
-    this dispatcher entirely.
-    """
+def test_http_transport_still_deferred():
+    """HTTP transport wiring lands in Commit 5. Until then the
+    dispatcher must raise NotImplementedError rather than silently
+    succeed. (stdio is now real — see tests/test_mcp_stdio.py.)"""
     import asyncio
 
     from dialekt.mcp import MCPClient
@@ -128,13 +126,6 @@ def test_real_transports_not_yet_wired():
 
     with pytest.raises(NotImplementedError, match="Commit 5"):
         asyncio.run(_enter_http())
-
-    async def _enter_stdio():
-        async with MCPClient.from_stdio_command(["nonexistent"]):
-            pass
-
-    with pytest.raises(NotImplementedError, match="Commit 4"):
-        asyncio.run(_enter_stdio())
 
 
 def test_connection_session_access_before_open_raises():
