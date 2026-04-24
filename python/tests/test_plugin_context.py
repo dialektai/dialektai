@@ -1,12 +1,16 @@
 """Tests for dialekt.llm._plugin_context.
 
-Covers the three axes of PluginContext:
+Covers the axes of PluginContext:
   • env-based default (DIALEKT_BACKEND_URL)
   • explicit http mode via base_url
   • in-process mode via a FastAPI app
   • module-level set_context / get_context lifecycle
+  • thread-safety of the lazy-init singleton (P1 — 100-thread race test)
+  • shutdown-race: _call() after close() raises a clean RuntimeError
 """
 from __future__ import annotations
+
+import threading
 
 import pytest
 
@@ -150,3 +154,120 @@ def test_post_get_delete_patch_all_route_through_client():
     ctx.delete("/c")
     ctx.patch("/d")
     assert calls == [("POST", "/a"), ("GET", "/b"), ("DELETE", "/c"), ("PATCH", "/d")]
+
+
+# ── Thread-safety (P1 regression) ────────────────────────────────────────────
+
+
+def test_concurrent_get_context_returns_same_instance(monkeypatch):
+    """100 threads concurrently call get_context() from a cold start —
+    they must all observe the same PluginContext instance. Without the
+    lock added in the P1 fix, two winners of the `is None` check both
+    build a context and the loser's httpx.Client + portal thread leak.
+    """
+    monkeypatch.delenv("DIALEKT_BACKEND_URL", raising=False)
+    pc = _fresh_module()
+    pc._reset_context_for_testing()
+
+    observed: list[int] = []
+    N = 100
+    barrier = threading.Barrier(N)
+
+    def worker():
+        barrier.wait()           # release all threads at exactly the same moment
+        ctx = pc.get_context()
+        observed.append(id(ctx))
+
+    threads = [threading.Thread(target=worker) for _ in range(N)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(observed) == N, "one or more workers never reported an id"
+    assert len(set(observed)) == 1, (
+        f"race: threads observed {len(set(observed))} distinct "
+        f"PluginContext instances — expected 1"
+    )
+
+    pc._reset_context_for_testing()
+
+
+def test_set_context_closes_previous_on_replace():
+    """set_context must close() the old context before swapping, so
+    overrides in tests (and runtime lifecycle transitions) don't leak
+    httpx.Client / portal threads.
+    """
+    pc = _fresh_module()
+
+    closed_flags = []
+
+    class _FakeContext:
+        def close(self):
+            closed_flags.append(True)
+
+    first = _FakeContext()
+    pc.set_context(first)
+    second = _FakeContext()
+    pc.set_context(second)
+
+    assert closed_flags == [True], (
+        f"expected exactly 1 close() on the first context, got {len(closed_flags)}"
+    )
+    # Swapping to the SAME instance must not re-close.
+    pc.set_context(second)
+    assert closed_flags == [True], "set_context(same) should be a no-op"
+
+    pc._reset_context_for_testing()
+
+
+def test_reset_for_testing_closes_live_context():
+    """The test-only reset helper must also close whatever was live
+    before clearing, so test-to-test bleed is impossible.
+    """
+    pc = _fresh_module()
+    closed = []
+
+    class _FakeContext:
+        def close(self):
+            closed.append(True)
+
+    pc.set_context(_FakeContext())
+    pc._reset_context_for_testing()
+
+    assert closed == [True]
+    # And a fresh get_context after reset must build a brand-new default.
+    pc._reset_context_for_testing()
+    ctx = pc.get_context()
+    assert ctx is not None
+    pc._reset_context_for_testing()
+
+
+# ── Shutdown-race (P1.5 regression) ──────────────────────────────────────────
+
+
+def test_persistent_asgi_client_raises_cleanly_after_close():
+    """If an OI worker calls ctx.post() *after* lifespan shutdown has
+    close()'d the PluginContext, we must raise a cohesive RuntimeError
+    rather than bubbling an anyio "portal is closed" stacktrace up
+    into the WS handler.
+    """
+    from fastapi import FastAPI
+    pc = _fresh_module()
+
+    app = FastAPI()
+
+    @app.get("/probe")
+    def _probe():
+        return {"ok": True}
+
+    ctx = pc.PluginContext(app=app)
+    # Round-trip once so the portal is definitely running.
+    r = ctx.get("/probe")
+    assert r.status_code == 200
+
+    # Now close and confirm a subsequent call raises cleanly.
+    ctx.close()
+    with pytest.raises(RuntimeError) as excinfo:
+        ctx.get("/probe")
+    assert "closed" in str(excinfo.value).lower()

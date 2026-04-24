@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any, Optional
 
 log = logging.getLogger("dialekt.plugin_context")
@@ -78,6 +79,11 @@ class _PersistentASGIClient:
         self._portal_cm = anyio.from_thread.start_blocking_portal()
         self._portal = self._portal_cm.__enter__()
         self._async_client = self._portal.call(self._build_async_client)
+        # Single flag flipped by close(); race-safe enough for the
+        # "worker calls _call while lifespan shutdown runs close()"
+        # scenario we actually care about. Threads observing it half-
+        # set just fall into the existing RuntimeError path below.
+        self._closed = False
 
     def _build_async_client(self):
         import httpx
@@ -90,9 +96,25 @@ class _PersistentASGIClient:
 
     def _call(self, method: str, path: str, **kwargs):
         # Route the async call onto the persistent portal loop.
+        # During lifespan shutdown the portal can be torn down while an
+        # OI worker thread is mid-dispatch; anyio raises RuntimeError
+        # ("portal is closed" or "no running event loop") from
+        # portal.call(). Surface that as a transport failure that the
+        # plugin layer already knows how to render, instead of letting
+        # it bubble up as an unhandled exception and crash the turn.
+        if self._closed:
+            raise RuntimeError("PluginContext client is closed")
         async def _run():
             return await getattr(self._async_client, method)(path, **kwargs)
-        return self._portal.call(_run)
+        try:
+            return self._portal.call(_run)
+        except RuntimeError as e:
+            # Re-raise with clearer diagnostic so sql_language.py /
+            # retry_loop.py format it as a "SQL transport error".
+            raise RuntimeError(
+                f"PluginContext portal unavailable ({e}) — "
+                "server likely shutting down"
+            ) from e
 
     def post(self, path, **kwargs):   return self._call("post",   path, **kwargs)
     def get(self, path, **kwargs):    return self._call("get",    path, **kwargs)
@@ -100,6 +122,9 @@ class _PersistentASGIClient:
     def patch(self, path, **kwargs):  return self._call("patch",  path, **kwargs)
 
     def close(self) -> None:
+        # Flip the flag first — any concurrent _call() checks it before
+        # touching the portal and raises a clean RuntimeError.
+        self._closed = True
         try:
             async def _close():
                 await self._async_client.aclose()
@@ -132,6 +157,12 @@ class PluginContext:
             "DIALEKT_BACKEND_URL", _DEFAULT_BASE_URL
         )
         self._client = None  # TestClient OR httpx.Client; built on first use
+        # close() is terminal — once called, any subsequent HTTP-verb method
+        # raises instead of lazily rebuilding a fresh client. This prevents
+        # a race where set_context(new) close()'s the old context while a
+        # worker thread still holds a reference and would otherwise spin up
+        # a new portal thread on next .post().
+        self._closed = False
 
     # ── Client factory ──────────────────────────────────────────────────────
 
@@ -142,6 +173,8 @@ class PluginContext:
         return httpx.Client(base_url=self.base_url, timeout=30.0)
 
     def _client_ref(self):
+        if self._closed:
+            raise RuntimeError("PluginContext is closed")
         if self._client is None:
             self._client = self._build_client()
         return self._client
@@ -163,11 +196,23 @@ class PluginContext:
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
     def close(self) -> None:
-        """Close the underlying httpx.Client if we own one.
+        """Terminally close the context.
+
+        Once closed, any subsequent `.post()` / `.get()` / etc. raises
+        ``RuntimeError("PluginContext is closed")`` instead of lazily
+        rebuilding a fresh client. This matters during runtime context
+        swaps (lifespan shutdown, test teardown, set_context(new)) —
+        without this guard a worker thread that outlives the swap would
+        get a brand-new portal thread on the next call, leaking
+        resources and operating against a stale context.
 
         TestClient doesn't require explicit close when never entered as
-        a context manager — the ASGITransport is stateless.
+        a context manager — the ASGITransport is stateless — but the
+        persistent-portal variant does.
         """
+        if self._closed:
+            return  # idempotent
+        self._closed = True
         if self._client is not None:
             close = getattr(self._client, "close", None)
             if callable(close):
@@ -188,9 +233,21 @@ class PluginContext:
         }
 
 
-# ── Module-level default (lazy) ─────────────────────────────────────────────
+# ── Module-level default (lazy, thread-safe) ────────────────────────────────
+#
+# Dialekt's WebSocket chat spawns one threading.Thread per active chat turn
+# (server.py's run_oi). Each thread's Open Interpreter may call DialektSQL,
+# which calls get_context(). Without a lock, two simultaneous first turns
+# could both enter the `is None` branch and each build a PluginContext —
+# the loser is orphaned (httpx.Client + background portal thread leak).
+#
+# Fix: double-checked locking. Fast path (already-initialised) takes no
+# lock. Slow path (first init OR explicit override via set_context) holds
+# _context_lock. Both paths share the lock so set_context can observe a
+# consistent global.
 
 _default_context: Optional[PluginContext] = None
+_context_lock = threading.Lock()
 
 
 def get_context() -> PluginContext:
@@ -198,11 +255,21 @@ def get_context() -> PluginContext:
 
     The default is built lazily from the env so that plugin imports at
     interpreter startup don't fail when DIALEKT_BACKEND_URL isn't set.
+
+    Thread-safe via double-checked locking: the common (already-built)
+    path avoids the lock entirely; the first-init path synchronises so
+    concurrent callers all observe the same singleton.
     """
     global _default_context
-    if _default_context is None:
-        _default_context = PluginContext()
-    return _default_context
+    # Fast path — already initialised, no lock needed.
+    ctx = _default_context
+    if ctx is not None:
+        return ctx
+    # Slow path — hold the lock to build exactly one context.
+    with _context_lock:
+        if _default_context is None:
+            _default_context = PluginContext()
+        return _default_context
 
 
 def set_context(ctx: Optional[PluginContext]) -> None:
@@ -212,13 +279,37 @@ def set_context(ctx: Optional[PluginContext]) -> None:
     `PluginContext(app=app)`. Tests use it to inject a `TestClient`-
     backed context and to restore the default between suites.
 
-    Pass `None` to reset to a freshly-built default on next `get_context()`.
+    Pass `None` to reset to a freshly-built default on next
+    `get_context()`. The previous context, if any, is close()'d before
+    the swap so its httpx.Client and background portal thread don't leak.
     """
     global _default_context
-    if _default_context is not None and _default_context is not ctx:
-        # Old context might own an httpx.Client — close before replacing.
-        try:
-            _default_context.close()
-        except Exception:
-            pass
-    _default_context = ctx
+    with _context_lock:
+        old = _default_context
+        if old is not None and old is not ctx:
+            try:
+                old.close()
+            except Exception:
+                # Best-effort cleanup — a slow/failing close must not
+                # block a runtime context swap or shutdown.
+                log.debug("old PluginContext close failed", exc_info=True)
+        _default_context = ctx
+
+
+def _reset_context_for_testing() -> None:
+    """Reset the module-level singleton to ``None``, closing any live
+    context first. **Test-only helper** — production code must go through
+    ``set_context``.
+
+    Exposed because the thread-safety tests below deliberately stress
+    the first-init race, and they need a reliable way to put the
+    singleton back into its pristine state between cases.
+    """
+    global _default_context
+    with _context_lock:
+        if _default_context is not None:
+            try:
+                _default_context.close()
+            except Exception:
+                log.debug("reset: old context close failed", exc_info=True)
+        _default_context = None
