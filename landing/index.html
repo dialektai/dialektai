@@ -240,10 +240,11 @@ function useReleases() {
   const [state, setState] = React.useState({
     version: null,
     publishedAt: null,
-    debUrl: null,
-    debSize: null,
-    appimageUrl: null,
-    appimageSize: null,
+    debUrl: null, debSize: null,
+    appimageUrl: null, appimageSize: null,
+    dmgUrl: null, dmgSize: null,
+    exeUrl: null, exeSize: null,
+    msiUrl: null, msiSize: null,
     loading: true,
     error: null,
   });
@@ -257,13 +258,24 @@ function useReleases() {
         const assets = release.assets || [];
         const deb = assets.find(a => /\.deb$/i.test(a.name));
         const app = assets.find(a => /\.AppImage$/i.test(a.name));
+        const dmg = assets.find(a => /\.dmg$/i.test(a.name));
+        // Prefer NSIS *-setup.exe installer over generic .exe; MSI as fallback
+        const exe = assets.find(a => /-setup\.exe$/i.test(a.name))
+                 || assets.find(a => /\.exe$/i.test(a.name));
+        const msi = assets.find(a => /\.msi$/i.test(a.name));
         setState({
-          version: (release.tag_name || '').replace(/^v/, '') || '0.9.0',
+          version: (release.tag_name || '').replace(/^v/, '') || '0.10.0',
           publishedAt: release.published_at ? release.published_at.substring(0, 10) : null,
           debUrl: deb ? deb.browser_download_url : null,
           debSize: deb ? fmtBytes(deb.size) : null,
           appimageUrl: app ? app.browser_download_url : null,
           appimageSize: app ? fmtBytes(app.size) : null,
+          dmgUrl: dmg ? dmg.browser_download_url : null,
+          dmgSize: dmg ? fmtBytes(dmg.size) : null,
+          exeUrl: exe ? exe.browser_download_url : null,
+          exeSize: exe ? fmtBytes(exe.size) : null,
+          msiUrl: msi ? msi.browser_download_url : null,
+          msiSize: msi ? fmtBytes(msi.size) : null,
           loading: false,
           error: null,
         });
@@ -276,16 +288,27 @@ function useReleases() {
 }
 
 const DownloadsContext = React.createContext({
-  releases: { version: null, debUrl: null, appimageUrl: null, loading: true },
+  releases: { version: null, debUrl: null, appimageUrl: null, dmgUrl: null, exeUrl: null, msiUrl: null, loading: true },
   detectedPlatform: 'linux-deb',
 });
 
 function HeroCTA() {
   const { releases, detectedPlatform } = React.useContext(DownloadsContext);
-  const primary = detectedPlatform === 'linux-appimage'
-    ? { label: 'AppImage', url: releases.appimageUrl, size: releases.appimageSize || '~130 MB' }
-    : { label: '.deb for Ubuntu / Debian', url: releases.debUrl, size: releases.debSize || '~130 MB' };
-  const macWinLabel = detectedPlatform === 'macos' || detectedPlatform === 'windows' ? 'Linux only for now' : 'macOS / Windows soon';
+  let primary;
+  if (detectedPlatform === 'macos') {
+    primary = { label: '.dmg for macOS', url: releases.dmgUrl, size: releases.dmgSize || '~140 MB', arch: 'apple silicon' };
+  } else if (detectedPlatform === 'windows') {
+    primary = { label: 'Installer for Windows', url: releases.exeUrl, size: releases.exeSize || '~140 MB', arch: 'x64' };
+  } else if (detectedPlatform === 'linux-appimage') {
+    primary = { label: 'AppImage', url: releases.appimageUrl, size: releases.appimageSize || '~130 MB', arch: 'x64' };
+  } else {
+    primary = { label: '.deb for Ubuntu / Debian', url: releases.debUrl, size: releases.debSize || '~130 MB', arch: 'x64' };
+  }
+  const macWinLabel = detectedPlatform === 'macos'
+    ? 'Also: .deb / AppImage / .msi'
+    : detectedPlatform === 'windows'
+      ? 'Also: .deb / AppImage / .dmg'
+      : 'Also: macOS / Windows';
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
       <a
@@ -297,14 +320,11 @@ function HeroCTA() {
       >
         <LIcon name="down" size={14} color={LT.bg0} />
         {primary.url ? `Download ${primary.label}` : 'Loading latest release…'}
-        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· x64 · {primary.size}</span>
+        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· {primary.arch} · {primary.size}</span>
       </a>
       <a className="btn" href="#install" style={{ padding: '12px 16px', fontSize: 12 }}>
         other platforms
         <span className="mono" style={{ color: LT.dim, marginLeft: 4, fontSize: 10 }}>({macWinLabel})</span>
-      </a>
-      <a className="btn" href="https://github.com/dialektai/dialektai" target="_blank" rel="noopener" style={{ padding: '12px 16px', fontSize: 12 }}>
-        <LIcon name="github" size={13} color={LT.text} />View source
       </a>
       {releases.version && (
         <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>
@@ -348,11 +368,6 @@ function Nav() {
           <a href="#about">About</a>
           <a href="#install">Install</a>
         </div>
-        <a className="btn hide-sm" href="#install" style={{ padding: '6px 10px' }}>
-          <LIcon name="github" size={13} color={LT.text} />
-          <span>github</span>
-          <span className="mono" style={{ color: LT.dim, fontSize: 10 }}>★ 4.2k</span>
-        </a>
         <a className="btn primary" href="#install" style={{ padding: '7px 12px' }}>
           <LIcon name="down" size={13} color={LT.bg0} />
           <span>Download</span>
@@ -996,7 +1011,7 @@ function SectionLocal() {
               Inference runs on Ollama, on your machine. Filesystem access is sandboxed to paths you allow-list. No telemetry. No cloud sync. No account. You can pull the plug on your wifi and everything still works.
             </p>
             <div style={{ marginTop: 28, display: 'grid', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-              {[['inference','ollama · localhost:11434',LT.green],['filesystem','allow-listed paths only',LT.green],['network','ask per call · off by default',LT.amber],['telemetry','none · verifiable in source',LT.green],['account','not required · no login',LT.green],['cloud sync','disabled · no endpoint exists',LT.green]].map(([k,v,col],i) => (
+              {[['inference','ollama · localhost:11434',LT.green],['filesystem','allow-listed paths only',LT.green],['network','ask per call · off by default',LT.amber],['telemetry','none · verifiable in network logs',LT.green],['account','not required · no login',LT.green],['cloud sync','disabled · no endpoint exists',LT.green]].map(([k,v,col],i) => (
                 <div key={i} style={{ background: LT.bg1, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12 }} className="mono">
                   <span className="dot" style={{ background: col, width: 6, height: 6 }} />
                   <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.14em', textTransform: 'uppercase', width: 100 }}>{k}</span>
@@ -1245,46 +1260,43 @@ function SectionInstall() {
     },
     {
       platform: 'macOS',
-      arch: 'coming soon',
-      size: '—',
-      cmd: 'brew install --cask dialekt',
-      url: null,
-      disabled: true,
+      arch: 'Apple Silicon (M1/M2/M3) · macOS 12+',
+      size: releases.dmgSize || '~140 MB',
+      cmd: releases.dmgUrl ? `open ${releases.dmgUrl}` : 'curl -fsSLO <download> && open dialekt_*.dmg',
+      url: releases.dmgUrl,
+      primary: detectedPlatform === 'macos',
+      disabled: !releases.dmgUrl,
     },
     {
       platform: 'Windows',
-      arch: 'coming soon',
-      size: '—',
-      cmd: 'winget install dialekt',
-      url: null,
-      disabled: true,
-    },
-    {
-      platform: 'Source',
-      arch: 'rust + tauri + python',
-      size: 'git',
-      cmd: 'git clone github.com/dialektai/dialektai',
-      code: true,
+      arch: 'Windows 10 / 11 · x64',
+      size: releases.exeSize || '~140 MB',
+      cmd: releases.exeUrl ? `Start-Process ${releases.exeUrl}` : 'curl -fsSLO <download> && run dialekt_*-setup.exe',
+      url: releases.exeUrl,
+      primary: detectedPlatform === 'windows',
+      disabled: !releases.exeUrl,
     },
   ];
   return (
     <section id="install" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
       <div className="wrap-wide">
-        <SecTag n="07" label="Install" meta="linux first · macos/windows coming" />
+        <SecTag n="08" label="Install" meta="linux · macos · windows" />
         <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
           <div>
             <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
               Download it.<br />
-              <span style={{ color: LT.muted }}>Or build it.</span>
+              <span style={{ color: LT.muted }}>Install it.</span>
             </h2>
             <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 460 }}>
-              Open-source core. No account. No license key for local use. No telemetry on first launch. Linux binaries available today; macOS and Windows land next.
+              No account. No license key for local use. No telemetry on first launch. Native builds for Linux, macOS, and Windows.
             </p>
             <div className="mono" style={{ marginTop: 24, fontSize: 11, color: LT.dim, lineHeight: 1.8 }}>
-              → requires ollama 0.4+<br />
-              → requires glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 38)<br />
-              → requires 16 GB ram (48 GB recommended)<br />
-              → version {releases.version || '0.9.0'} · {releases.publishedAt || 'apr 2026'} · <a href="https://github.com/dialektai/dialektai/releases" style={{ color: LT.muted }}>changelog</a>
+              → requires ollama 0.4+ (https://ollama.com)<br />
+              → linux: glibc 2.35+ (Ubuntu 22.04+, Debian 12+, Fedora 38+)<br />
+              → macos: 12.0+ · apple silicon<br />
+              → windows: 10 / 11 · x64<br />
+              → 16 GB ram minimum (48 GB recommended for 32B models)<br />
+              → version {releases.version || '0.10.0'} · {releases.publishedAt || 'apr 2026'}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
@@ -1298,9 +1310,7 @@ function SectionInstall() {
                   <span style={{ color: LT.cyan }}>$</span> {r.cmd}
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{r.size}</div>
-                {r.code ? (
-                  <a className="btn" href="https://github.com/dialektai/dialektai" target="_blank" rel="noopener" style={{ justifyContent: 'center' }}><LIcon name="github" size={12} color={LT.text} />View source</a>
-                ) : r.disabled ? (
+                {r.disabled ? (
                   <span className="mono" style={{ fontSize: 10, color: LT.dim, textAlign: 'center', letterSpacing: '.08em' }}>soon</span>
                 ) : (
                   <a
@@ -1319,13 +1329,13 @@ function SectionInstall() {
           </div>
         </div>
         <div style={{ marginTop: 40, padding: '16px 18px', border: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }} className="mono">
-          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● OPEN SOURCE CORE</span>
+          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● LOCAL-FIRST</span>
           <span style={{ color: LT.border }}>/</span>
           <span style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>● PRO FEATURES COMING</span>
           <span style={{ color: LT.border }}>/</span>
           <span style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.1em' }}>NO ACCOUNT REQUIRED</span>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>apache-2.0 · sha256 4f8c…e1a2</span>
+          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>signed builds · sha256 verified</span>
         </div>
       </div>
     </section>
@@ -1346,10 +1356,10 @@ function Footer() {
             <p style={{ color: LT.muted, fontSize: 13, lineHeight: 1.55, marginTop: 14, maxWidth: 380 }}>A local-first AI agent for developers. Built in a cabin with the wifi off.</p>
             <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 18, letterSpacing: '0.06em', lineHeight: 1.8 }}>
               made by <a href="#" style={{ color: LT.cyan }}>@weloveclaude</a><br />
-              apache-2.0 · no telemetry · no account · no pricing page
+              local-first · no telemetry · no account
             </div>
           </div>
-          {[['PRODUCT',[['download','#install'],['changelog','#'],['roadmap','#'],['source','#']]],['RESOURCES',[['docs','#'],['mcp servers','#'],['model guide','#'],['privacy','#']]],['COMMUNITY',[['github','#'],['twitter / x','#'],['youtube · weloveclaude','#'],['telegram','#']]]].map(([title,links],i) => (
+          {[['PRODUCT',[['download','#install'],['release notes','#'],['roadmap','#']]],['RESOURCES',[['docs','#'],['mcp servers','#'],['model guide','#'],['privacy','#']]],['COMMUNITY',[['twitter / x','#'],['youtube','#'],['telegram','#']]]].map(([title,links],i) => (
             <div key={i}>
               <div className="mono" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.16em', marginBottom: 14 }}>{title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
