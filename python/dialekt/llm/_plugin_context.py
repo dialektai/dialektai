@@ -50,6 +50,68 @@ log = logging.getLogger("dialekt.plugin_context")
 _DEFAULT_BASE_URL = "http://127.0.0.1:8765"
 
 
+class _PersistentASGIClient:
+    """A sync httpx-shaped client whose ASGI transport uses ONE long-lived
+    anyio portal (and therefore one event loop) across all requests.
+
+    Why this exists:
+    ``httpx.Client(transport=ASGITransport(app))`` and
+    ``fastapi.testclient.TestClient`` both spin a *fresh* anyio portal per
+    request (each call goes through ``anyio.from_thread.start_blocking_portal``).
+    Each portal creates a new event loop. ``asyncpg`` connection pools are
+    tied to the loop they were instantiated on, so the *second* in-process
+    query reliably fails with ``another operation is in progress`` because
+    it's dispatched on a different loop than the pool.
+
+    Solution: open a single ``BlockingPortal`` up-front and reuse it for
+    every request via ``httpx.AsyncClient + ASGITransport`` scheduled on
+    that portal. Pool built on portal-loop → all subsequent queries run
+    on portal-loop → asyncpg stays happy.
+    """
+
+    def __init__(self, app: Any) -> None:
+        import anyio.from_thread
+        self._app = app
+        # start_blocking_portal() returns a context manager; .__enter__()
+        # spins up a dedicated thread + loop. We own its lifecycle and
+        # tear it down in close().
+        self._portal_cm = anyio.from_thread.start_blocking_portal()
+        self._portal = self._portal_cm.__enter__()
+        self._async_client = self._portal.call(self._build_async_client)
+
+    def _build_async_client(self):
+        import httpx
+        transport = httpx.ASGITransport(app=self._app)
+        return httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            timeout=30.0,
+        )
+
+    def _call(self, method: str, path: str, **kwargs):
+        # Route the async call onto the persistent portal loop.
+        async def _run():
+            return await getattr(self._async_client, method)(path, **kwargs)
+        return self._portal.call(_run)
+
+    def post(self, path, **kwargs):   return self._call("post",   path, **kwargs)
+    def get(self, path, **kwargs):    return self._call("get",    path, **kwargs)
+    def delete(self, path, **kwargs): return self._call("delete", path, **kwargs)
+    def patch(self, path, **kwargs):  return self._call("patch",  path, **kwargs)
+
+    def close(self) -> None:
+        try:
+            async def _close():
+                await self._async_client.aclose()
+            self._portal.call(_close)
+        except Exception:
+            log.debug("_PersistentASGIClient async close failed", exc_info=True)
+        try:
+            self._portal_cm.__exit__(None, None, None)
+        except Exception:
+            log.debug("_PersistentASGIClient portal teardown failed", exc_info=True)
+
+
 class PluginContext:
     """Unified backend access for dialekt plugins.
 
@@ -75,13 +137,7 @@ class PluginContext:
 
     def _build_client(self):
         if self.app is not None:
-            from fastapi.testclient import TestClient
-            # NOTE: we deliberately do NOT enter a `with` block on the
-            # TestClient. Entering it runs lifespan startup/shutdown on
-            # the app, which would re-init the DB and break the running
-            # server. Direct method calls on TestClient bypass lifespan
-            # and just pump the ASGI app via a per-request portal.
-            return TestClient(self.app)
+            return _PersistentASGIClient(self.app)
         import httpx
         return httpx.Client(base_url=self.base_url, timeout=30.0)
 
