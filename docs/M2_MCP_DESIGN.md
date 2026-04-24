@@ -13,7 +13,8 @@ References:
 - [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md)
 - [AGENT_MANIFEST_SPEC.md](../AGENT_MANIFEST_SPEC.md)
 
-Spec revision targeted: **2025-11-25**. SDK: **`mcp>=1.27,<2`**.
+Spec revision targeted: **2025-11-25**. SDK: **`mcp>=1.25,<1.27`**
+(see Decision 1 addendum below for why 1.27 is held back).
 
 ---
 
@@ -51,6 +52,27 @@ Spec revision targeted: **2025-11-25**. SDK: **`mcp>=1.27,<2`**.
 `streamablehttp_client`, and `sse_client` helpers on the client side
 and `FastMCP` with `transport="stdio" | "streamable-http"` on the
 server side. We don't hand-roll any wire code.
+
+**Addendum (2026-04-24, during Этап 1 setup):** the initial plan
+pinned `mcp>=1.27,<2`. Installing 1.27.0 into the existing venv
+failed — the 1.27 line requires `sse-starlette>=3.x`, which itself
+requires `starlette>=1.0`. Dialekt's current `fastapi==0.115.2` and
+`open-interpreter==0.4.3` both cap `starlette<0.38`; the conflict
+broke `Router.__init__()` (13 existing tests failed with
+`unexpected keyword argument 'on_startup'`).
+
+`mcp 1.26.0` accepts `starlette>=0.27` (loose), and pairing it with
+`sse-starlette<3` holds starlette at 0.37.2. All imports we actually
+consume (`stdio_client`, `streamablehttp_client`, `ClientSession`,
+`types`) are present and stable in 1.26. The 1.27-only additions —
+RFC 8707 OAuth resource validation, Streamable HTTP idle timeout,
+and stdio non-UTF-8 byte handling — are not required by v0.20.0.
+
+**Effective pin therefore:** `mcp>=1.25,<1.27` with explicit
+`sse-starlette<3` to defend against a transitive drift. Upgrade to
+1.27+ is scheduled for when we concurrently bump `fastapi` and
+`open-interpreter` to versions that accept `starlette>=1.0` — that
+is its own task, not part of M2 Month 1.
 
 ---
 
@@ -428,7 +450,7 @@ not a default.
 | Area | Decision |
 |---|---|
 | Protocol spec | MCP 2025-11-25 |
-| Python SDK | `mcp>=1.27,<2` |
+| Python SDK | `mcp>=1.25,<1.27` + `sse-starlette<3` (1.27 held back pending fastapi/open-interpreter bump — see Decision 1 addendum) |
 | Transports (client) | stdio, Streamable HTTP |
 | Transports (server) | stdio only (HTTP deferred to v0.25.0) |
 | Manifest | new `mcp_servers:` block, spec `1.1.0`, validator `0.3.0` |
