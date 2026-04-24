@@ -267,6 +267,43 @@ def test_response_after_timeout_dropped_silently():
     asyncio.run(run())
 
 
+def test_non_string_request_id_rejected():
+    """Malformed frames with numeric/dict request_id are dropped, not crashy."""
+    _reset_pending()
+    for bad in (123, {"x": 1}, None, ""):
+        assert srv._handle_consent_response("ws-9", {
+            "request_id": bad,
+            "decision": "approved",
+        }) is False
+
+
+def test_non_string_decision_coerced_to_denied():
+    """A list/dict decision value must coerce to DENIED, not raise TypeError."""
+    async def run():
+        _reset_pending()
+        ws = FakeWS()
+        prompt = srv._build_consent_prompt_fn(ws, "ws-10", asyncio.get_event_loop())
+
+        async def responder():
+            for _ in range(100):
+                if srv._pending_consents:
+                    break
+                await asyncio.sleep(0.001)
+            key = next(iter(srv._pending_consents))
+            _, req_id = key.split(":", 1)
+            srv._handle_consent_response("ws-10", {
+                "request_id": req_id,
+                "decision": ["approved"],   # non-string, previously crashy
+            })
+
+        task = asyncio.create_task(responder())
+        decision = await prompt(_make_request())
+        await task
+        assert decision == ConsentDecision.DENIED
+
+    asyncio.run(run())
+
+
 def test_unknown_decision_coerced_to_denied():
     """Defensive default — garbage decision values get treated as denied."""
     async def run():

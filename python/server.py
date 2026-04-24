@@ -203,7 +203,9 @@ def _handle_consent_response(ws_id: str, msg: dict) -> bool:
     """
     from dialekt.mcp import ConsentDecision
 
-    request_id = msg.get("request_id") or ""
+    request_id = msg.get("request_id")
+    if not isinstance(request_id, str) or not request_id:
+        return False
     key = f"{ws_id}:{request_id}"
     fut = _pending_consents.get(key)
     if fut is None or fut.done():
@@ -212,7 +214,7 @@ def _handle_consent_response(ws_id: str, msg: dict) -> bool:
     raw = msg.get("decision", "denied")
     try:
         decision = ConsentDecision(raw)
-    except ValueError:
+    except (ValueError, TypeError):
         decision = ConsentDecision.DENIED
     fut.set_result(decision)
     return True
