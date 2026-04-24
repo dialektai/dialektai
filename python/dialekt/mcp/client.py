@@ -13,8 +13,7 @@ Transport wiring is layered:
     - For stdio → dispatches into
       ``dialekt.mcp.transport_stdio.open_stdio_session``.
     - For HTTP → dispatches into the symmetric
-      ``transport_http.open_http_session`` (landing in Commit 5; the
-      dispatcher raises ``NotImplementedError`` until then).
+      ``transport_http.open_http_session``.
 
 Tests bypass transport entirely by assigning a custom
 ``_session_opener`` before entering the client — for example, a
@@ -167,9 +166,11 @@ class MCPClient:
             credentials = self.credentials
             return lambda: open_stdio_session(transport, credentials)
         if isinstance(self.transport, HttpTransportSpec):
-            raise NotImplementedError(
-                "Streamable HTTP transport wiring lands in Commit 5"
-            )
+            from dialekt.mcp.transport_http import open_http_session
+
+            transport = self.transport
+            credentials = self.credentials
+            return lambda: open_http_session(transport, credentials)
         raise MCPConfigError(
             f"unknown transport kind: {type(self.transport).__name__}"
         )

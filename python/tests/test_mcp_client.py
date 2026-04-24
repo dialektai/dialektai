@@ -106,11 +106,3 @@ def test_aexit_cleans_up_session_reference():
     asyncio.run(run())
 
 
-def test_http_transport_not_yet_wired():
-    async def run():
-        client = MCPClient.from_http_url("https://example.invalid/mcp")
-        with pytest.raises(NotImplementedError, match="Commit 5"):
-            async with client:
-                pass
-
-    asyncio.run(run())
