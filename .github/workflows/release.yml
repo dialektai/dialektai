@@ -386,8 +386,12 @@ jobs:
 
             **macOS — Apple Silicon (M1/M2/M3)**:
             Download `dialekt_*_aarch64.dmg`, open, drag to Applications.
-            First open: right-click → Open (Gatekeeper shows "unidentified developer"
-            warning; the build is not yet code-signed).
+            First open: **right-click the app in Applications → Open → Open** in
+            the Gatekeeper prompt (build is ad-hoc signed, not notarized — an
+            "unidentified developer" warning is expected on first launch only).
+            If macOS still says the app is damaged, run once in Terminal:
+            `xattr -cr /Applications/dialekt.app` — this removes the download
+            quarantine flag. Developer ID signing + notarization is on the roadmap.
 
             **Windows — x64**:
             Download `dialekt_*_x64-setup.exe` (NSIS installer) or `dialekt_*_x64.msi`.
