@@ -187,6 +187,24 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
     connection_type TEXT NOT NULL DEFAULT 'postgres',
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    agent_id    TEXT,
+    binding_id  TEXT,
+    kind        TEXT NOT NULL,
+    target      TEXT,
+    action      TEXT NOT NULL,
+    result      TEXT NOT NULL,
+    duration_ms INTEGER,
+    error_kind  TEXT,
+    extra_json  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_ts       ON audit_log(ts);
+CREATE INDEX IF NOT EXISTS idx_audit_log_agent_id ON audit_log(agent_id, ts);
+CREATE INDEX IF NOT EXISTS idx_audit_log_kind     ON audit_log(kind, ts);
 """
 
 
