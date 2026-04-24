@@ -479,6 +479,86 @@ async def about():
 
 # ── Admin endpoints ──────────────────────────────────────────────────────────
 
+@app.post("/admin/reload-schema")
+async def admin_reload_schema():
+    """Re-import `dialekt_manifest` so a pip-upgrade of the validator
+    takes effect without restarting the server.
+
+    Background: Python caches imports in `sys.modules` for the life of
+    the interpreter. A pip install --upgrade replaces files on disk
+    but the running server keeps using the constants it loaded at
+    boot — the classic symptom being "autonomy.recommended: manual"
+    rejected with a 422 quoting the *previous* allowed list (see
+    docs/OVERNIGHT_E2E_REPORT_2026-04-23.md §N1 + docs/UPGRADE.md).
+
+    We reload both the schema module and the validator (plus the
+    package itself) so every name in `dialekt_manifest` re-binds to
+    the on-disk version. Returns the new constants + package version
+    so the caller can confirm the reload actually landed.
+
+    Admin-only (same scope as /admin/stats). Safe to call any time —
+    worst case it's a no-op.
+    """
+    import importlib
+    import sys
+
+    reloaded = []
+    errors: list[str] = []
+    # Order matters: reload the leaf modules before the package re-export
+    # so the names on `dialekt_manifest.*` pick up the new objects.
+    for modname in (
+        "dialekt_manifest.schema",
+        "dialekt_manifest.validator",
+        "dialekt_manifest.errors",
+        "dialekt_manifest",
+    ):
+        mod = sys.modules.get(modname)
+        if mod is None:
+            # Module wasn't imported yet — fresh import will pick up
+            # the on-disk version anyway; nothing to reload.
+            continue
+        try:
+            importlib.reload(mod)
+            reloaded.append(modname)
+        except Exception as e:
+            errors.append(f"{modname}: {type(e).__name__}: {e}")
+
+    # Surface the new constants so the UI can show them in a toast and
+    # the user knows the reload actually took effect.
+    try:
+        from dialekt_manifest.schema import (
+            AUTONOMY_LEVELS,
+            CAPABILITY_GROUPS,
+            CONNECTION_TYPES,
+            SUPPORTED_SPEC_VERSIONS,
+        )
+        constants = {
+            "autonomy_levels": list(AUTONOMY_LEVELS),
+            "capability_groups": sorted(CAPABILITY_GROUPS),
+            "connection_types": sorted(CONNECTION_TYPES),
+            "supported_spec_versions": sorted(SUPPORTED_SPEC_VERSIONS),
+        }
+    except Exception as e:
+        constants = {}
+        errors.append(f"schema constants import: {type(e).__name__}: {e}")
+
+    # Package version, best-effort
+    try:
+        from importlib.metadata import version as _pkg_version
+        pkg_version = _pkg_version("dialekt-manifest-validator")
+    except Exception:
+        pkg_version = None
+
+    log.info(f"admin_reload_schema: reloaded={reloaded} errors={errors} version={pkg_version}")
+    return {
+        "ok": not errors,
+        "reloaded": reloaded,
+        "errors": errors,
+        "package_version": pkg_version,
+        "constants": constants,
+    }
+
+
 @app.get("/admin/stats")
 async def admin_stats():
     """Aggregate stats for the admin panel."""

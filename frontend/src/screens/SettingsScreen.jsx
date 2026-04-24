@@ -2103,6 +2103,8 @@ function AdminSection() {
   const { addToast, showConfirm } = useContext(Ctx);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reloadingSchema, setReloadingSchema] = useState(false);
+  const [schemaInfo, setSchemaInfo] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -2112,6 +2114,26 @@ function AdminSection() {
       .catch(() => setLoading(false));
   };
   useEffect(load, []);
+
+  const reloadSchema = async () => {
+    setReloadingSchema(true);
+    try {
+      const r = await fetch(`${API}/admin/reload-schema`, { method: 'POST' });
+      const body = await r.json();
+      if (r.ok && body.ok) {
+        setSchemaInfo(body);
+        const v = body.package_version ? `v${body.package_version}` : 'installed';
+        const n = body.constants?.autonomy_levels?.length ?? '?';
+        addToast(`Schema reloaded (${v}, ${n} autonomy levels)`, 'ok');
+      } else {
+        addToast(`Reload failed: ${(body.errors || []).join('; ') || 'unknown error'}`, 'error');
+      }
+    } catch (e) {
+      addToast(`Reload failed: ${e.message || 'network error'}`, 'error');
+    } finally {
+      setReloadingSchema(false);
+    }
+  };
 
   const wipeAll = () => showConfirm({
     title: 'Wipe all conversations?',
@@ -2169,6 +2191,20 @@ function AdminSection() {
             )}
           </Card>
           <Card title="Maintenance" n="C">
+            <Row
+              label="Reload validation schema"
+              sub={
+                schemaInfo
+                  ? `dialekt-manifest-validator${schemaInfo.package_version ? ` v${schemaInfo.package_version}` : ''} · ${schemaInfo.constants?.autonomy_levels?.length ?? '?'} autonomy levels, ${schemaInfo.constants?.connection_types?.length ?? '?'} connection types`
+                  : 'Re-import the manifest validator so a pip-upgrade takes effect without restarting.'
+              }
+            >
+              <button onClick={reloadSchema} disabled={reloadingSchema} style={{
+                background: 'transparent', border: `1px solid ${T.cyan}`, color: T.cyan,
+                padding: '6px 14px', fontSize: 11, cursor: reloadingSchema ? 'wait' : 'pointer',
+                letterSpacing: '.04em', opacity: reloadingSchema ? 0.5 : 1,
+              }}>{reloadingSchema ? 'RELOADING…' : 'RELOAD'}</button>
+            </Row>
             <Row label="Wipe conversations" sub="Delete all sessions and messages. Models and agents are kept." last>
               <button onClick={wipeAll} style={{
                 background: 'transparent', border: `1px solid ${T.red}`, color: T.red,

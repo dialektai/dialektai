@@ -14,7 +14,22 @@ time it gains a new value the running dialekt-server process needs to
 re-import it — pip only replaces files on disk, the interpreter still
 holds the old constants in memory.
 
-### Steps
+### Steps (recommended, no restart)
+
+1. Upgrade the package while dialekt keeps running:
+   ```bash
+   pip install --upgrade dialekt-manifest-validator
+   ```
+2. Open **Settings → Admin → Maintenance** and click **Reload validation schema**.
+   A toast confirms the new version + autonomy-level count.
+
+That's it — the running server re-imports the schema in place via
+`POST /admin/reload-schema`. No process restart required.
+
+### Steps (fallback, if the endpoint is unavailable)
+
+For older builds (<0.2.x) that don't have the reload endpoint, or if
+the button is unreachable, restart manually:
 
 1. Quit the dialekt desktop app.
 2. Stop the background server:
@@ -29,23 +44,25 @@ holds the old constants in memory.
 4. Relaunch dialekt desktop. The server starts fresh and picks up the
    new schema.
 
-### Why
+### Why this is needed at all
 
 Python caches imported modules in `sys.modules` for the life of the
 interpreter process. `dialekt_manifest.schema` is imported once when
 `server.py` boots; after that, updating the file on disk has no
-effect until you restart.
+effect until the module is re-imported (either via the reload
+endpoint, or by restarting the process).
 
 ### How to verify the upgrade took
 
 ```bash
-# after restart
-curl -s http://localhost:8765/about   # no direct schema version endpoint yet
+# confirm the new version is live in-process
+curl -s -X POST http://localhost:8765/admin/reload-schema | jq '.package_version, .constants.autonomy_levels'
 pip show dialekt-manifest-validator | grep Version
 ```
 
-Then Publish an agent that uses a value only the new schema accepts
-(e.g. autonomy `"manual"` in 0.2.0). A 201 confirms the new schema is live.
+The values must match. Then Publish an agent that uses a value only
+the new schema accepts (e.g. autonomy `"manual"` in 0.2.0). A 201
+confirms the new schema is live.
 
 ### Symptoms if you forget to restart
 
@@ -81,16 +98,31 @@ handles this without manual steps.
 
 ---
 
-## Future: `POST /admin/reload-schema` (planned, not shipped)
+## `POST /admin/reload-schema` (shipped)
 
-Nice-to-have: a button in Settings → Admin that reloads
-`dialekt_manifest` in place, so pip-upgrading the validator no longer
-requires a server restart. Deferred to Milestone 2 — the manual
-restart takes 5 seconds and restarts are rare.
+Reloads `dialekt_manifest` in place via `importlib.reload` on the
+server process, so pip-upgrading the validator no longer requires a
+restart. The Settings → Admin → Maintenance → **Reload validation
+schema** button calls this endpoint and surfaces the new constants
+in a toast.
 
-When this ships, the steps above collapse to:
+Response shape:
 
-```bash
-pip install --upgrade dialekt-manifest-validator
-# click "Reload validation schema" in Settings → Admin
+```json
+{
+  "ok": true,
+  "reloaded": ["dialekt_manifest.schema", "dialekt_manifest.validator", ...],
+  "errors": [],
+  "package_version": "0.2.1",
+  "constants": {
+    "autonomy_levels": [...],
+    "capability_groups": [...],
+    "connection_types": [...],
+    "supported_spec_versions": [...]
+  }
+}
 ```
+
+The endpoint only reloads the schema module and its dependents —
+it does **not** touch the Open Interpreter runtime, active agents,
+or running chat sessions.
