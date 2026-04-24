@@ -16,6 +16,12 @@ being renamed to ``python/db_connectors/`` in a later commit. See
 from dialekt.mcp.auth import BearerAuth, Credentials, EnvVarsAuth, NoAuth
 from dialekt.mcp.client import MCPClient
 from dialekt.mcp.connection import MCPConnection
+from dialekt.mcp.secrets_resolver import (
+    has_unresolved_refs,
+    keyring_key,
+    resolve_env,
+    resolve_secret_refs,
+)
 from dialekt.mcp.errors import (
     MCPConfigError,
     MCPError,
@@ -45,6 +51,11 @@ __all__ = [
     "NoAuth",
     "EnvVarsAuth",
     "BearerAuth",
+    # secrets (Decision 2)
+    "resolve_secret_refs",
+    "resolve_env",
+    "keyring_key",
+    "has_unresolved_refs",
     # errors (Decision 6)
     "MCPError",
     "MCPConfigError",
