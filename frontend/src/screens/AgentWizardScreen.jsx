@@ -12,6 +12,7 @@ const STEPS = [
   { label: 'Model',         icon: 'sparkle'  },
   { label: 'System Prompt', icon: 'chat'     },
   { label: 'Capabilities',  icon: 'shield'   },
+  { label: 'MCP Tools',     icon: 'plug'     },
   { label: 'Connections',   icon: 'folder'   },
   { label: 'Variables',     icon: 'terminal' },
   { label: 'Autonomy',      icon: 'cog'      },
@@ -44,7 +45,7 @@ function isoWithOffset(d = new Date()) {
     + sign + pad(tz / 60) + ':' + pad(tz % 60);
 }
 
-function buildManifestYaml(data) {
+function buildManifestYaml(data, mcpServers = []) {
   const now = isoWithOffset();
   const id = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -54,9 +55,17 @@ function buildManifestYaml(data) {
     ? data.tags.split(',').map(t => t.trim()).filter(Boolean)
     : [];
 
+  const hasMcp = Array.isArray(data.mcp_server_names) && data.mcp_server_names.length > 0;
+
+  // Silent capability injection (product design §3.3 ruling 3). We clone
+  // into a local set so the React `data.capabilities` state stays
+  // user-authored — only the YAML gets the `mcp_tools` shim.
   const enabledCaps = Object.entries(data.capabilities)
     .filter(([, v]) => v)
     .map(([k]) => k);
+  if (hasMcp && !enabledCaps.includes('mcp_tools')) {
+    enabledCaps.push('mcp_tools');
+  }
 
   const acceptableModels = data.model_acceptable
     ? data.model_acceptable.split('\n').map(m => m.trim()).filter(Boolean)
@@ -73,8 +82,13 @@ function buildManifestYaml(data) {
   const authorName = escapeYaml(data.author_name) || 'dialekt user';
   const authorEmail = escapeYaml(data.author_email) || 'unknown@local';
 
-  let yaml = `spec_version: "1.0.1"
-minimum_dialekt_version: "1.0.0"
+  // MCP-bearing manifests require the MCP runtime shipped in v0.20.0.
+  // Non-MCP manifests stay back-compat with v0.11.x installs.
+  const specVersion = hasMcp ? "1.1.0" : "1.0.1";
+  const minVersion  = hasMcp ? "0.20.0" : "1.0.0";
+
+  let yaml = `spec_version: "${specVersion}"
+minimum_dialekt_version: "${minVersion}"
 
 metadata:
   id: "${id}"
@@ -124,6 +138,57 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
       yaml += `    required: ${v.required ? 'true' : 'false'}\n`;
       yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
     });
+  }
+
+  // Emit mcp_servers block when the user selected any on step 4 AND
+  // the caller supplied the fresh server specs (save() does; preview
+  // skips the block — the capability + spec_version bump is enough
+  // signal in the read-only preview).
+  if (hasMcp && mcpServers.length > 0) {
+    const selectedSpecs = mcpServers.filter(
+      s => data.mcp_server_names.includes(s.name)
+    );
+    if (selectedSpecs.length > 0) {
+      yaml += `\nmcp_servers:\n`;
+      selectedSpecs.forEach(s => {
+        yaml += `  - name: "${s.name}"\n`;
+        yaml += `    transport: "${s.transport}"\n`;
+        if (s.transport === 'stdio') {
+          const cmd = Array.isArray(s.command) ? s.command : [];
+          yaml += `    command:\n`;
+          cmd.forEach(arg => {
+            yaml += `      - "${String(arg).replace(/"/g, '\\"')}"\n`;
+          });
+          const envRefs = s.env_refs || {};
+          const envKeys = Object.keys(envRefs);
+          if (envKeys.length > 0) {
+            yaml += `    env:\n`;
+            envKeys.forEach(envName => {
+              yaml += `      ${envName}: "\${secrets.${envRefs[envName]}}"\n`;
+            });
+          }
+          if (s.cwd) {
+            yaml += `    cwd: "${String(s.cwd).replace(/"/g, '\\"')}"\n`;
+          }
+        } else {
+          yaml += `    url: "${String(s.url || '').replace(/"/g, '\\"')}"\n`;
+          if (s.auth_type && s.has_auth_token) {
+            // auth_ref isn't exposed in the list response; default matches
+            // backend (keyring_key(<name>, "auth_token")) unless the user
+            // set a custom one during create. We cannot know the ref from
+            // the list response — document this limitation in design §10
+            // and assume "auth_token" for now; users who customise auth_ref
+            // via direct API call own the manifest hand-edit.
+            yaml += `    auth:\n`;
+            yaml += `      type: "${s.auth_type}"\n`;
+            yaml += `      token: "\${secrets.auth_token}"\n`;
+          }
+        }
+        if (s.timeout_seconds && s.timeout_seconds !== 30) {
+          yaml += `    timeout_seconds: ${s.timeout_seconds}\n`;
+        }
+      });
+    }
   }
 
   yaml += `\ncapabilities:\n  groups:\n`;
@@ -502,7 +567,135 @@ function StepCapabilities({ data, setData }) {
   );
 }
 
-// ── Step 4: Connections ───────────────────────────────────────────────────────
+// ── Step 4: MCP Tools ─────────────────────────────────────────────────────────
+
+function StepMcpServers({ data, setData }) {
+  const [servers, setServers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [testingId, setTestingId] = useState(null);
+
+  const refresh = useCallback(async () => {
+    setError('');
+    try {
+      const r = await fetch(`${API}/mcp-servers`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const list = await r.json();
+      setServers(Array.isArray(list) ? list : []);
+      // Drop selections for servers that no longer exist.
+      const existing = new Set((list || []).map(s => s.name));
+      const cleaned = (data.mcp_server_names || []).filter(n => existing.has(n));
+      if (cleaned.length !== (data.mcp_server_names || []).length) {
+        setData(d => ({ ...d, mcp_server_names: cleaned }));
+      }
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const toggle = (name, on) => {
+    setData(d => {
+      const set = new Set(d.mcp_server_names || []);
+      if (on) set.add(name); else set.delete(name);
+      return { ...d, mcp_server_names: Array.from(set) };
+    });
+  };
+
+  const runTest = async (s) => {
+    setTestingId(s.id);
+    try {
+      await fetch(`${API}/mcp-servers/${s.id}/test`, { method: 'POST' });
+    } catch (_) { /* refresh will reflect */ }
+    await refresh();
+    setTestingId(null);
+  };
+
+  const selectedCount = (data.mcp_server_names || []).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{
+        border: `1px solid ${T.cyan}33`, background: `${T.cyan}08`,
+        padding: '10px 14px', fontSize: 12, color: T.muted,
+      }}>
+        <span className="mono" style={{ color: T.cyan }}>[i]</span>{' '}
+        Selecting any server here adds the <span className="mono" style={{ color: T.text }}>mcp_tools</span> capability automatically.
+      </div>
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>
+      ) : error ? (
+        <div style={{ fontSize: 12, color: T.red, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span>Failed to load MCP servers: {error}</span>
+          <button onClick={refresh} style={{
+            background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+            padding: '4px 12px', fontSize: 11, cursor: 'pointer',
+          }}>RETRY</button>
+        </div>
+      ) : servers.length === 0 ? (
+        <div style={{ padding: '24px 0', fontSize: 13, color: T.dim, textAlign: 'center' }}>
+          No MCP servers configured. Open <span className="mono" style={{ color: T.muted }}>Settings → MCP Servers</span> to add one, then come back.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {servers.map(s => {
+            const ready = s.last_test_ok === true;
+            const untested = s.last_test_ok == null;
+            const failed = s.last_test_ok === false;
+            const checked = (data.mcp_server_names || []).includes(s.name);
+            const dotColor = ready ? T.green : untested ? T.amber : T.red;
+            const statusLabel = ready ? `${s.tool_count || 0} tools`
+              : untested ? 'untested'
+              : 'error';
+            return (
+              <div key={s.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                border: `1px solid ${T.border}`, padding: '10px 14px', background: T.bg1,
+              }}>
+                <input type="checkbox" checked={checked} disabled={!ready}
+                  onChange={e => toggle(s.name, e.target.checked)}
+                  style={{ cursor: ready ? 'pointer' : 'not-allowed' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: T.text }}>{s.name}</div>
+                  <div className="mono" style={{ fontSize: 10, color: T.dim }}>
+                    {s.transport === 'stdio'
+                      ? `stdio · ${(s.command || []).slice(0, 2).join(' ')}${(s.command || []).length > 2 ? ' …' : ''}`
+                      : `http · ${s.url}`}
+                  </div>
+                  {failed && s.last_test_error && (
+                    <div style={{ fontSize: 10, color: T.red, marginTop: 4 }}>{s.last_test_error}</div>
+                  )}
+                </div>
+                <span className="mono" style={{ fontSize: 11, color: dotColor }} title={s.last_test_error || ''}>
+                  ● {statusLabel}
+                </span>
+                {!ready && (
+                  <button onClick={() => runTest(s)} disabled={testingId === s.id} style={{
+                    background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                    padding: '4px 10px', fontSize: 10, cursor: testingId === s.id ? 'default' : 'pointer',
+                  }}>{testingId === s.id ? 'TESTING…' : (untested ? 'TEST FIRST' : 'RETEST')}</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedCount > 0 && (
+        <div style={{ fontSize: 11, color: T.muted }}>
+          {selectedCount} server{selectedCount === 1 ? '' : 's'} selected. The agent will be able to call tools from {selectedCount === 1 ? 'this server' : 'these servers'}; destructive calls will prompt for consent at runtime.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step 5: Connections ───────────────────────────────────────────────────────
 
 const CONN_ENDPOINTS = {
   postgres:   '/connections',
@@ -1135,6 +1328,7 @@ export default function AgentWizardScreen({ onNav }) {
       shell_execute: false,
       screen_capture: false,
     },
+    mcp_server_names: [],
     connection_type: 'none',
     connection_id: '',
     connection_role: 'readonly',
@@ -1179,7 +1373,17 @@ export default function AgentWizardScreen({ onNav }) {
   const save = async (status) => {
     setSaving(true);
     try {
-      const yaml = buildManifestYaml(data);
+      // Fetch fresh MCP server specs so the manifest inlines the current
+      // transport + env config, not a stale wizard-step snapshot. Design
+      // doc §3.3 item 1 + impl plan §3 option B.
+      let mcpServers = [];
+      if (Array.isArray(data.mcp_server_names) && data.mcp_server_names.length > 0) {
+        try {
+          const mr = await fetch(`${API}/mcp-servers`);
+          if (mr.ok) mcpServers = await mr.json();
+        } catch (_) { /* leave empty; manifest emission skips the block */ }
+      }
+      const yaml = buildManifestYaml(data, mcpServers);
       const res = await fetch(`${API}/agents/import-yaml`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1239,11 +1443,12 @@ export default function AgentWizardScreen({ onNav }) {
       case 1: return <StepModel data={data} setData={setData} />;
       case 2: return <StepSystemPrompt data={data} setData={setData} errors={errors} />;
       case 3: return <StepCapabilities data={data} setData={setData} />;
-      case 4: return <StepConnections data={data} setData={setData} />;
-      case 5: return <StepVariables data={data} setData={setData} />;
-      case 6: return <StepAutonomy data={data} setData={setData} />;
-      case 7: return <StepTrigger data={data} setData={setData} />;
-      case 8: return <StepPublish data={data} saving={saving} onSave={save} />;
+      case 4: return <StepMcpServers data={data} setData={setData} />;
+      case 5: return <StepConnections data={data} setData={setData} />;
+      case 6: return <StepVariables data={data} setData={setData} />;
+      case 7: return <StepAutonomy data={data} setData={setData} />;
+      case 8: return <StepTrigger data={data} setData={setData} />;
+      case 9: return <StepPublish data={data} saving={saving} onSave={save} />;
       default: return null;
     }
   };
