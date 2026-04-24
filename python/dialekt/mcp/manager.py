@@ -137,10 +137,17 @@ class MCPClientManager:
         credentials: Credentials | None = None,
         timeout_seconds: float = 30.0,
         binding_id: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> Any:
         """Invoke an MCP tool with rate limit, timeout, audit, and
         classified errors. Returns the raw ``CallToolResult`` from
         the SDK so callers can inspect ``.content`` / ``.isError``.
+
+        ``extra`` is an opaque JSON-serializable dict merged into the
+        audit row. The runtime layer uses it to inject
+        ``consent_id`` — the audit row id of the consent decision
+        that authorized this call — so audit rows can be joined back
+        to their consent event in SQL queries.
         """
         self._check_rate_limit()
 
@@ -188,6 +195,7 @@ class MCPClientManager:
             binding_id=binding_id,
             duration_ms=duration_ms,
             error_kind=error_kind,
+            extra=extra,
         )
 
         if exception_to_raise is not None:

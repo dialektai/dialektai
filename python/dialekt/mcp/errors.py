@@ -86,3 +86,15 @@ class MCPProtocolError(MCPError):
     or the other) and never retried — the connection is marked
     unhealthy and torn down at the next natural lifecycle boundary.
     """
+
+
+class MCPConsentDenied(MCPError):
+    """User explicitly denied an MCP tool invocation.
+
+    Not a failure — a legitimate agent-control outcome. The LLM
+    receives this as a tool error and may propose an alternative,
+    ask for clarification, or give up gracefully. Audit log records
+    the decision under ``kind='mcp_consent_decision'`` with
+    ``result='denied'``; there is NO ``error_kind`` attached to
+    such audit rows because denial is the system working as designed.
+    """

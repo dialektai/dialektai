@@ -16,6 +16,18 @@ being renamed to ``python/db_connectors/`` in a later commit. See
 from dialekt.mcp.auth import BearerAuth, Credentials, EnvVarsAuth, NoAuth
 from dialekt.mcp.client import MCPClient
 from dialekt.mcp.connection import MCPConnection
+from dialekt.mcp.consent import (
+    AutoApproveProvider,
+    AutoDenyProvider,
+    ConsentDecision,
+    ConsentProvider,
+    ConsentRequest,
+    PromptConsentProvider,
+    SessionCachingProvider,
+    is_destructive_tool,
+    provider_for_autonomy,
+)
+from dialekt.mcp.runtime import MCPNamespace, MCPRuntime, MCPServerProxy
 from dialekt.mcp.secrets_resolver import (
     has_unresolved_refs,
     keyring_key,
@@ -23,6 +35,7 @@ from dialekt.mcp.secrets_resolver import (
     resolve_secret_refs,
 )
 from dialekt.mcp.errors import (
+    MCPConsentDenied,
     MCPConfigError,
     MCPError,
     MCPProtocolError,
@@ -65,4 +78,18 @@ __all__ = [
     "MCPTimeoutError",
     "MCPRateLimitError",
     "MCPProtocolError",
+    "MCPConsentDenied",
+    # runtime + consent (Decision 5)
+    "MCPRuntime",
+    "MCPNamespace",
+    "MCPServerProxy",
+    "ConsentDecision",
+    "ConsentProvider",
+    "ConsentRequest",
+    "AutoApproveProvider",
+    "AutoDenyProvider",
+    "PromptConsentProvider",
+    "SessionCachingProvider",
+    "is_destructive_tool",
+    "provider_for_autonomy",
 ]
