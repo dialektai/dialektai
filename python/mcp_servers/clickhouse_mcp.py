@@ -128,9 +128,12 @@ async def _require_connection(conn_id: str) -> dict:
 
 @router.get("")
 async def list_connections():
+    # Filter by type — the `connections` table is shared across all three
+    # MCP routers (pg/mysql/clickhouse). See postgres_mcp.list_connections
+    # for the full context. 2026-04-23 overnight E2E §N2.
     cursor = await _db.execute(
         "SELECT id, name, type, host, port, database, username, row_limit, created_at, updated_at "
-        "FROM connections ORDER BY name"
+        "FROM connections WHERE type = 'clickhouse' ORDER BY name"
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
