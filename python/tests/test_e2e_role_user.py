@@ -497,18 +497,26 @@ def test_08_sql_retry_loop_graceful_on_missing_table(client):
         "Please run: SELECT * FROM ecom.nonexistent_zzz LIMIT 1",
         agent_id=agent_id, timeout=180,
     )
-    # The turn must complete (done arrived) — even if errors surfaced
-    # mid-stream, the pipeline must not crash.
-    # Either an error bubbled to the `error` channel OR the reply
-    # mentions the missing relation — both are acceptable graceful paths.
+    # The turn must complete without crashing the pipeline (pytest would
+    # have raised on `done` never arriving — the timeout path surfaces
+    # through turn["errors"]).
+    #
+    # Tight contract: PG's actual error text MUST surface somewhere the
+    # user sees (the table name or the PG-specific "does not exist"
+    # phrase). A bland "I encountered an error" reply would have passed
+    # the looser original assertion — it would NOT have proved the retry
+    # loop actually dispatched the SQL and received the PG error.
+    # Refined per PR #2 review, P2 finding.
     combined = (
         (turn["full_reply"] or "")
         + " ".join(turn["console_output"])
         + " ".join(turn["errors"])
     ).lower()
-    assert any(
-        kw in combined for kw in ("does not exist", "nonexistent_zzz", "error")
-    ), f"no graceful error signal — got: {combined[:300]!r}"
+    assert "does not exist" in combined or "nonexistent_zzz" in combined, (
+        "retry loop / DialektSQL must surface PG's actual error text "
+        "(either 'does not exist' or the offending relation name) — "
+        f"got only generic output: {combined[:400]!r}"
+    )
 
 
 # ── 9 · Agent switching mid-session ─────────────────────────────────────────
