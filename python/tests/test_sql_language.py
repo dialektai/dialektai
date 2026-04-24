@@ -1,9 +1,16 @@
-"""Tests for the DialektSQL Open Interpreter language handler."""
-from unittest.mock import MagicMock, patch
+"""Tests for the DialektSQL Open Interpreter language handler.
+
+After the PluginContext refactor (2026-04-24) DialektSQL dispatches
+through `get_context()` rather than calling httpx directly. These tests
+inject a `_FakePluginContext` via `set_context()` to capture the request
+and shape the response.
+"""
+from unittest.mock import MagicMock
 
 import pytest
 
 from dialekt.llm.sql_language import DialektSQL, _format_result, _prefix_for
+from dialekt.llm import _plugin_context as _pc
 
 
 class _FakeInterpreter:
@@ -15,6 +22,38 @@ class _FakeInterpreter:
 class _FakeComputer:
     def __init__(self, conn_id=None, driver=None):
         self.interpreter = _FakeInterpreter(conn_id, driver)
+
+
+class _FakePluginContext:
+    """Stand-in that records post() calls and returns a preset response."""
+
+    def __init__(self, response=None, raise_on_post=None):
+        self.response = response
+        self.raise_on_post = raise_on_post
+        self.calls: list[dict] = []
+
+    def post(self, path, **kwargs):
+        self.calls.append({"path": path, **kwargs})
+        if self.raise_on_post is not None:
+            raise self.raise_on_post
+        return self.response
+
+    def close(self):
+        pass
+
+    @property
+    def last_path(self) -> str:
+        return self.calls[-1]["path"] if self.calls else ""
+
+
+@pytest.fixture
+def restore_context():
+    """Restore the default PluginContext after each test so injections
+    don't leak between cases.
+    """
+    original = _pc.get_context()
+    yield
+    _pc.set_context(original)
 
 
 def test_format_result_renders_markdown_table():
@@ -73,62 +112,53 @@ def test_run_without_binding_reports_error():
     assert chunks[0]["type"] == "console"
 
 
-def test_run_with_binding_calls_backend_and_formats_output():
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {
+def test_run_with_binding_calls_backend_and_formats_output(restore_context):
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {
         "columns": ["count"],
         "rows": [[42]],
         "row_count": 1,
     }
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post = MagicMock(return_value=mock_resp)
+    ctx = _FakePluginContext(response=resp)
+    _pc.set_context(ctx)
 
-    with patch("httpx.Client", return_value=mock_client):
-        handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
-        chunks = list(handler.run("SELECT COUNT(*) FROM orders"))
+    handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
+    chunks = list(handler.run("SELECT COUNT(*) FROM orders"))
 
-    mock_client.post.assert_called_once()
-    call_url = mock_client.post.call_args[0][0]
-    call_body = mock_client.post.call_args[1]["json"]
-    assert "connections/conn-123/query" in call_url
+    assert len(ctx.calls) == 1, "plugin must hit the backend exactly once"
+    assert ctx.last_path == "/connections/conn-123/query"
     # retry:false avoids triggering the server-side recursive validate loop.
-    assert call_body == {"sql": "SELECT COUNT(*) FROM orders", "retry": False}
+    assert ctx.calls[0]["json"] == {"sql": "SELECT COUNT(*) FROM orders", "retry": False}
     assert len(chunks) == 1
     content = chunks[0]["content"]
     assert "42" in content
     assert "count" in content
 
 
-def test_run_with_backend_4xx_surfaces_error():
-    mock_resp = MagicMock()
-    mock_resp.status_code = 400
-    mock_resp.text = "syntax error at or near FROMM"
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post = MagicMock(return_value=mock_resp)
+def test_run_with_backend_4xx_surfaces_error(restore_context):
+    resp = MagicMock()
+    resp.status_code = 400
+    resp.text = "syntax error at or near FROMM"
+    _pc.set_context(_FakePluginContext(response=resp))
 
-    with patch("httpx.Client", return_value=mock_client):
-        handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
-        chunks = list(handler.run("SELECT * FROMM orders"))
+    handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
+    chunks = list(handler.run("SELECT * FROMM orders"))
 
     assert len(chunks) == 1
     assert "SQL error (400)" in chunks[0]["content"]
     assert "syntax error" in chunks[0]["content"]
 
 
-def test_run_with_transport_error_surfaces_it():
+def test_run_with_transport_error_surfaces_it(restore_context):
     import httpx
 
-    def boom(*a, **kw):
-        raise httpx.ConnectError("could not reach backend")
+    _pc.set_context(_FakePluginContext(
+        raise_on_post=httpx.ConnectError("could not reach backend"),
+    ))
 
-    with patch("httpx.Client", side_effect=boom):
-        handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
-        chunks = list(handler.run("SELECT 1"))
+    handler = DialektSQL(_FakeComputer(conn_id="conn-123"))
+    chunks = list(handler.run("SELECT 1"))
 
     assert len(chunks) == 1
     assert "SQL transport error" in chunks[0]["content"]
@@ -154,60 +184,47 @@ def test_prefix_for_driver_routes_to_correct_backend(driver, expected):
     assert _prefix_for(driver) == expected
 
 
-def test_run_with_mysql_driver_hits_mysql_connections_prefix():
+def test_run_with_mysql_driver_hits_mysql_connections_prefix(restore_context):
     """Regression: before this fix DialektSQL always POSTed to
     /connections/{id}/query, so mysql conn_ids got a 400 from the
     postgres router. Now it must route via /mysql-connections.
     """
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"columns": ["n"], "rows": [[4]], "row_count": 1}
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post = MagicMock(return_value=mock_resp)
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"columns": ["n"], "rows": [[4]], "row_count": 1}
+    ctx = _FakePluginContext(response=resp)
+    _pc.set_context(ctx)
 
-    with patch("httpx.Client", return_value=mock_client):
-        handler = DialektSQL(_FakeComputer(conn_id="mysql-xyz", driver="mysql"))
-        list(handler.run("SELECT COUNT(*) FROM orders"))
+    handler = DialektSQL(_FakeComputer(conn_id="mysql-xyz", driver="mysql"))
+    list(handler.run("SELECT COUNT(*) FROM orders"))
 
-    call_url = mock_client.post.call_args[0][0]
-    assert "/mysql-connections/mysql-xyz/query" in call_url
-    assert "/connections/mysql-xyz/query" not in call_url.replace("/mysql-connections", "")
+    assert ctx.last_path == "/mysql-connections/mysql-xyz/query"
 
 
-def test_run_with_clickhouse_driver_hits_ch_connections_prefix():
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"columns": ["n"], "rows": [[1]], "row_count": 1}
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post = MagicMock(return_value=mock_resp)
+def test_run_with_clickhouse_driver_hits_ch_connections_prefix(restore_context):
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"columns": ["n"], "rows": [[1]], "row_count": 1}
+    ctx = _FakePluginContext(response=resp)
+    _pc.set_context(ctx)
 
-    with patch("httpx.Client", return_value=mock_client):
-        handler = DialektSQL(_FakeComputer(conn_id="ch-abc", driver="clickhouse"))
-        list(handler.run("SELECT 1"))
+    handler = DialektSQL(_FakeComputer(conn_id="ch-abc", driver="clickhouse"))
+    list(handler.run("SELECT 1"))
 
-    call_url = mock_client.post.call_args[0][0]
-    assert "/ch-connections/ch-abc/query" in call_url
+    assert ctx.last_path == "/ch-connections/ch-abc/query"
 
 
-def test_run_without_driver_defaults_to_postgres_prefix():
+def test_run_without_driver_defaults_to_postgres_prefix(restore_context):
     """Backward compatibility — agents bound before the driver field existed
     have no _dialekt_sql_driver attribute; we must not break them.
     """
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"columns": [], "rows": [], "row_count": 0}
-    mock_client = MagicMock()
-    mock_client.__enter__ = MagicMock(return_value=mock_client)
-    mock_client.__exit__ = MagicMock(return_value=False)
-    mock_client.post = MagicMock(return_value=mock_resp)
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"columns": [], "rows": [], "row_count": 0}
+    ctx = _FakePluginContext(response=resp)
+    _pc.set_context(ctx)
 
-    with patch("httpx.Client", return_value=mock_client):
-        handler = DialektSQL(_FakeComputer(conn_id="legacy-pg"))  # driver=None
-        list(handler.run("SELECT 1"))
+    handler = DialektSQL(_FakeComputer(conn_id="legacy-pg"))  # driver=None
+    list(handler.run("SELECT 1"))
 
-    call_url = mock_client.post.call_args[0][0]
-    assert "/connections/legacy-pg/query" in call_url
+    assert ctx.last_path == "/connections/legacy-pg/query"

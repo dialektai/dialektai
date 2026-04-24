@@ -298,6 +298,14 @@ async def lifespan(app: FastAPI):
     from dialekt.license_refresh import start_refresher, stop_refresher
     app.state.license_refresher = asyncio.create_task(start_refresher(load_settings, save_settings))
 
+    # UF-1 (2026-04-24): give the LLM plugins a context that dispatches
+    # back into this very app instead of a network hop to localhost:8765.
+    # Plugins (DialektSQL, retry_loop) read the context via get_context(),
+    # so they pick up the in-process routing without any direct call.
+    from dialekt.llm._plugin_context import PluginContext, set_context
+    set_context(PluginContext(app=app))
+    log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
+
     yield
     from mcp_servers.postgres_mcp import close_all_pools
     from mcp_servers.mysql_mcp import close_all_pools_mysql
@@ -305,6 +313,13 @@ async def lifespan(app: FastAPI):
     await close_all_pools_mysql()
     try:
         await stop_refresher(app.state.license_refresher)
+    except Exception:
+        pass
+    # Drop the plugin context so a subsequent lifespan (e.g. tests that
+    # re-enter the app) starts from a clean default.
+    try:
+        from dialekt.llm._plugin_context import set_context
+        set_context(None)
     except Exception:
         pass
     await db.close()
