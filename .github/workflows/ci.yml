@@ -124,7 +124,7 @@ jobs:
       - name: Install dialekt-cloud deps
         run: |
           cd dialekt-cloud
-          pip install -r requirements.txt pytest pytest-asyncio httpx
+          pip install -e ".[test]"
       - name: Run cloud tests
         env:
           DATABASE_URL: postgresql://dialekt_cloud:dialekt_cloud_pass@localhost:5433/dialekt_cloud_test
@@ -133,4 +133,3 @@ jobs:
         run: |
           cd dialekt-cloud
           python -m pytest tests/ -v --tb=short
-        continue-on-error: true  # cloud tests may fail if DB schema not applied yet
