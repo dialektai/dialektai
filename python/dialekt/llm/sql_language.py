@@ -15,12 +15,12 @@ Usage (from make_interpreter):
 from __future__ import annotations
 
 import logging
-import os
 from typing import Iterable
+
+from dialekt.llm._plugin_context import get_context
 
 log = logging.getLogger("dialekt")
 
-DIALEKT_API = os.environ.get("DIALEKT_API", "http://127.0.0.1:8765")
 MAX_DISPLAY_ROWS = 50
 QUERY_TIMEOUT_SECONDS = 30.0
 
@@ -92,15 +92,20 @@ def _execute(conn_id: str, sql: str, driver: str | None = None) -> Iterable[dict
 
     `driver` selects the backend router. Missing / unknown → postgres
     for backward compatibility.
+
+    Dispatch goes through `PluginContext` so that in-process callers
+    (server, TestClient) talk to the ASGI app directly, while detached
+    callers still fall back to the legacy HTTP path via
+    DIALEKT_BACKEND_URL.
     """
-    import httpx
     prefix = _prefix_for(driver)
+    ctx = get_context()
     try:
-        with httpx.Client(timeout=QUERY_TIMEOUT_SECONDS) as c:
-            r = c.post(
-                f"{DIALEKT_API}{prefix}/{conn_id}/query",
-                json={"sql": sql.strip(), "retry": False},
-            )
+        r = ctx.post(
+            f"{prefix}/{conn_id}/query",
+            json={"sql": sql.strip(), "retry": False},
+            timeout=QUERY_TIMEOUT_SECONDS,
+        )
     except Exception as e:
         yield {
             "type": "console",
