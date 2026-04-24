@@ -187,6 +187,24 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
     connection_type TEXT NOT NULL DEFAULT 'postgres',
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    agent_id    TEXT,
+    binding_id  TEXT,
+    kind        TEXT NOT NULL,
+    target      TEXT,
+    action      TEXT NOT NULL,
+    result      TEXT NOT NULL,
+    duration_ms INTEGER,
+    error_kind  TEXT,
+    extra_json  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_ts       ON audit_log(ts);
+CREATE INDEX IF NOT EXISTS idx_audit_log_agent_id ON audit_log(agent_id, ts);
+CREATE INDEX IF NOT EXISTS idx_audit_log_kind     ON audit_log(kind, ts);
 """
 
 
@@ -600,6 +618,49 @@ async def admin_stats():
         "db_size_bytes": db_size,
         "agents_detail": agents,
     }
+
+
+# ── Audit log endpoint ────────────────────────────────────────────────────────
+
+@app.post("/audit/log")
+async def audit_log_endpoint(body: dict):
+    """Append a row to the universal ``audit_log`` table.
+
+    Introduced for MCPClientManager (M2 Month 1) to emit tool-call
+    audit rows through PluginContext. The endpoint is intentionally
+    generic — any future caller emitting ``kind="sql_query"`` /
+    ``"file_op"`` / etc. uses the same path. Keeps the log_event
+    helper as the single write authority.
+
+    Body fields mirror ``dialekt.audit.log_event`` keyword arguments.
+    ``kind``, ``action``, ``result`` are required; the rest are
+    nullable. Returns the inserted row id on success.
+    """
+    from dialekt.audit import log_event
+
+    kind = body.get("kind")
+    action = body.get("action")
+    result = body.get("result")
+    if not kind or not action or not result:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=422,
+            detail="kind, action, result are required",
+        )
+    row_id = await log_event(
+        db,
+        kind=kind,
+        action=action,
+        result=result,
+        agent_id=body.get("agent_id"),
+        binding_id=body.get("binding_id"),
+        target=body.get("target"),
+        duration_ms=body.get("duration_ms"),
+        error_kind=body.get("error_kind"),
+        extra=body.get("extra"),
+    )
+    return {"id": row_id}
 
 
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────

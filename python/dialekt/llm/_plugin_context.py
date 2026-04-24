@@ -44,7 +44,17 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from contextvars import ContextVar
 from typing import Any, Optional
+
+# Per-session MCP runtime binding — set by ws_chat handlers at turn
+# start, read via ``ctx.mcp`` from inside the agent's Python block.
+# ContextVar is inherited into asyncio tasks and copied into threads
+# started via ``asyncio.to_thread`` (the path OI uses under anyio),
+# so agent code sees the runtime that was active when the turn began.
+_current_mcp_runtime: ContextVar[Any] = ContextVar(
+    "dialekt_mcp_runtime", default=None
+)
 
 log = logging.getLogger("dialekt.plugin_context")
 
@@ -231,6 +241,89 @@ class PluginContext:
             "base_url": self.base_url,
             "has_app": self.app is not None,
         }
+
+    # ── MCP integration (Этап 1) ───────────────────────────────────────────
+
+    def new_mcp_manager(self, agent_id: str, **manager_kwargs) -> Any:
+        """Build a fresh ``MCPClientManager`` bound to this context.
+
+        The caller owns the lifecycle — ``await manager.shutdown()``
+        when the chat session ends. PluginContext does not cache
+        managers because their lifetime is agent-session-scoped, not
+        context-scoped; caching them here would leak MCP subprocesses
+        and HTTP clients across sessions.
+
+        By default the manager's audit callback forwards events to
+        this context's ``POST /audit/log`` endpoint, so audit rows
+        land in the SQLite ``audit_log`` table through the normal
+        in-process ASGI dispatch. Callers may override
+        ``audit_callback`` by passing it in ``manager_kwargs``.
+        """
+        from dialekt.mcp.manager import MCPClientManager
+
+        audit_cb = manager_kwargs.pop(
+            "audit_callback", self._default_audit_callback
+        )
+        return MCPClientManager(
+            agent_id=agent_id,
+            audit_callback=audit_cb,
+            **manager_kwargs,
+        )
+
+    def _default_audit_callback(self, **payload) -> Any:
+        """Forward an audit event to ``POST /audit/log``.
+
+        Called from ``MCPClientManager._emit_audit`` and
+        ``MCPRuntime._emit_audit`` via ``asyncio.to_thread`` so the
+        sync HTTP round-trip does not block the calling task's event
+        loop. Returns the ``httpx.Response``; callers that need the
+        assigned audit row id pluck it from ``.json()["id"]``.
+        """
+        return self.post("/audit/log", json=payload)
+
+    @property
+    def mcp(self) -> Any:
+        """Agent-facing MCP namespace.
+
+        Resolves to the :class:`MCPNamespace` of the ``MCPRuntime``
+        bound to the current session via
+        :func:`bind_mcp_runtime`. Agents write::
+
+            result = await ctx.mcp.github.create_issue(
+                repo="dialektai/dialektai", title="…",
+            )
+
+        Raises ``RuntimeError`` if no runtime is bound — that means
+        either the manifest did not declare any ``mcp_servers``, or
+        the ws_chat session forgot to call ``bind_mcp_runtime`` at
+        turn start.
+        """
+        runtime = _current_mcp_runtime.get()
+        if runtime is None:
+            raise RuntimeError(
+                "No MCP runtime bound. Either the agent manifest has "
+                "no mcp_servers, or the session did not bind one. "
+                "Inside a ws_chat turn, call bind_mcp_runtime(runtime) "
+                "before running agent code."
+            )
+        return runtime.namespace
+
+
+def bind_mcp_runtime(runtime: Any) -> Any:
+    """Bind an ``MCPRuntime`` to the current context.
+
+    Returns a token that can be passed to :func:`unbind_mcp_runtime`
+    (or used directly with ``ContextVar.reset``) to restore the prior
+    binding — useful for nested bindings in tests and in the ws_chat
+    handler's ``try/finally``.
+    """
+    return _current_mcp_runtime.set(runtime)
+
+
+def unbind_mcp_runtime(token: Any) -> None:
+    """Restore the binding that was active before ``bind_mcp_runtime``
+    was called with the returned ``token``."""
+    _current_mcp_runtime.reset(token)
 
 
 # ── Module-level default (lazy, thread-safe) ────────────────────────────────
