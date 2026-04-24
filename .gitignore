@@ -7,6 +7,9 @@ python/*.pyo
 .pytest_cache/
 __pycache__/
 
+# E2E diag runner output (regenerated each run)
+python/e2e_diag_results.json
+
 # SQLite (user data — never commit)
 *.db
 *.db-wal
