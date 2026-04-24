@@ -111,25 +111,28 @@ handles this without manual steps.
 
 ## Running on a non-default port
 
-By default dialekt-server binds to port 8765. If you start it on
-another port (e.g. `DIALEKT_PORT=8766`), set `DIALEKT_BACKEND_URL`
-so internal components that self-call the server (in particular the
-SQL retry loop in `dialekt.llm.retry_loop`) know where to reach it:
+By default dialekt-server binds to port 8765. As of 2026-04-24,
+internal self-calls from LLM plugins (DialektSQL, retry loop) go
+through an in-process ASGI dispatch rather than an HTTP roundtrip,
+so **the port doesn't matter for the built-in plugins** — you can
+set `DIALEKT_PORT=8766` and everything just works.
+
+The `DIALEKT_BACKEND_URL` env var is still honoured for **detached**
+callers (a subprocess worker, a CLI tool, a third-party script that
+imports `dialekt.llm.*` outside the server process):
 
 ```bash
-export DIALEKT_PORT=8766
+# Only needed for detached plugin callers — not for dialekt-server itself
 export DIALEKT_BACKEND_URL=http://localhost:8766
-python3 python/server.py
 ```
 
-When you launch `server.py` directly via `python3` (the bundled path),
-`DIALEKT_BACKEND_URL` is auto-set from `DIALEKT_HOST`/`DIALEKT_PORT`
-at startup, so the export is only needed if some external process
-wants to talk to a non-default backend.
+When you launch `server.py` directly via `python3`, the env is
+auto-populated from `DIALEKT_HOST` / `DIALEKT_PORT` at startup as a
+convenience for such external tooling.
 
-Without this, SQL retry attempts silently 404 against the old default
-URL and the retry loop falls back to returning the original failing
-query unchanged.
+See `docs/PLUGIN_ARCHITECTURE.md` for the full `PluginContext` design
+and how to add new plugins that automatically inherit the same
+in-process-vs-http transport switch.
 
 ---
 
