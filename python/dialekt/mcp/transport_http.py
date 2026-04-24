@@ -22,7 +22,7 @@ from dialekt.mcp.errors import MCPTimeoutError
 from dialekt.mcp.transport import HttpTransportSpec
 
 
-DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 30.0
 """Handshake ceiling — see transport_stdio for rationale. Symmetric
 across transports so both surfaces behave the same."""
 

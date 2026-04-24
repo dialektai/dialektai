@@ -73,14 +73,21 @@ def _build_subprocess_env(
     return env
 
 
-DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 30.0
 """How long ``session.initialize()`` may take before we give up.
 
 A server that completes TCP / fd setup but never responds to the
 initialize JSON-RPC request would otherwise wedge the client forever.
 Connect timeout is separate from the per-call ``timeout_seconds``
 on the transport spec because handshake latency and per-tool
-latency are different order-of-magnitude concerns."""
+latency are different order-of-magnitude concerns.
+
+Default bumped to 30s (was 10s) to accommodate Node-based MCP
+servers on cold caches — ``npx -y @modelcontextprotocol/server-*``
+downloads the package on first invocation, which can take
+10-25 seconds on a fresh CI runner before the server even starts
+responding. Production runs see warm caches and hit this ceiling
+rarely; the fast path is unchanged."""
 
 
 @asynccontextmanager
