@@ -1208,6 +1208,8 @@ class MCPServerCreate(BaseModel):
         else:
             if not self.url:
                 raise ValueError("http transport requires url")
+        if self.auth_type == "bearer" and not self.auth_token:
+            raise ValueError("auth_type='bearer' requires auth_token on create")
         if self.auth_token and not self.auth_ref:
             self.auth_ref = "auth_token"
         return self
@@ -1305,6 +1307,7 @@ async def get_mcp_server_endpoint(server_id: str):
 @app.post("/mcp-servers", status_code=201)
 async def create_mcp_server_endpoint(body: MCPServerCreate):
     from fastapi import HTTPException
+    import aiosqlite as _aiosqlite
     cur = await db.execute("SELECT 1 FROM mcp_servers WHERE name = ?", (body.name,))
     if await cur.fetchone():
         raise HTTPException(409, f"MCP server named {body.name!r} already exists")
@@ -1317,27 +1320,30 @@ async def create_mcp_server_endpoint(body: MCPServerCreate):
         set_secret(keyring_key(body.name, body.auth_ref), body.auth_token)
 
     server_id = uuid.uuid4().hex
-    await db.execute(
-        """
-        INSERT INTO mcp_servers (
-            id, name, transport, command_json, env_refs_json,
-            cwd, url, auth_type, auth_ref, timeout_seconds
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            server_id,
-            body.name,
-            body.transport,
-            json.dumps(body.command) if body.command else None,
-            json.dumps(body.env_refs),
-            body.cwd,
-            body.url,
-            body.auth_type,
-            body.auth_ref,
-            body.timeout_seconds,
-        ),
-    )
-    await db.commit()
+    try:
+        await db.execute(
+            """
+            INSERT INTO mcp_servers (
+                id, name, transport, command_json, env_refs_json,
+                cwd, url, auth_type, auth_ref, timeout_seconds
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                server_id,
+                body.name,
+                body.transport,
+                json.dumps(body.command) if body.command else None,
+                json.dumps(body.env_refs),
+                body.cwd,
+                body.url,
+                body.auth_type,
+                body.auth_ref,
+                body.timeout_seconds,
+            ),
+        )
+        await db.commit()
+    except _aiosqlite.IntegrityError as e:
+        raise HTTPException(409, f"MCP server named {body.name!r} already exists") from e
 
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
@@ -1497,6 +1503,10 @@ async def test_mcp_server_endpoint(server_id: str):
         tool_count = len(result.tools)
         await _update_test(True, None, tool_count)
         return {"success": True, "tool_count": tool_count}
+    except (asyncio.TimeoutError, TimeoutError):
+        err = f"Server did not respond within {float(r['timeout_seconds']):g}s"
+        await _update_test(False, err, None)
+        return {"success": False, "error": err}
     except Exception as e:
         err = str(e)[:500] or type(e).__name__
         await _update_test(False, err, None)

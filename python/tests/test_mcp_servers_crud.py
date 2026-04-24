@@ -295,6 +295,36 @@ def test_test_endpoint_unreachable_returns_success_false(client, keyring_store):
     assert one["last_test_at"]
 
 
+def test_create_rejects_bearer_without_token(client, keyring_store):
+    """auth_type=bearer without auth_token must 422, not silently drop to NoAuth."""
+    r = client.post("/mcp-servers", json={
+        "name": "nolevel",
+        "transport": "http",
+        "url": "https://example.com/mcp",
+        "auth_type": "bearer",
+    })
+    assert r.status_code == 422
+    assert "auth_token" in r.text
+
+
+def test_patch_env_secrets_overwrites_keyring_value(client, keyring_store):
+    """PATCH with new env_secrets must overwrite the keyring entry, not append."""
+    created = client.post("/mcp-servers", json={
+        "name": "rotate",
+        "transport": "stdio",
+        "command": ["echo"],
+        "env_refs": {"TOK": "tok"},
+        "env_secrets": [{"ref": "tok", "value": "V1"}],
+    }).json()
+    assert keyring_store["mcp.rotate.tok"] == "V1"
+
+    r = client.patch(f"/mcp-servers/{created['id']}", json={
+        "env_secrets": [{"ref": "tok", "value": "V2"}],
+    })
+    assert r.status_code == 200, r.text
+    assert keyring_store["mcp.rotate.tok"] == "V2"
+
+
 def test_test_endpoint_missing_secret_fails_cleanly(client, keyring_store):
     """If manifest references a secret that isn't in the keyring, the test
     endpoint must surface a readable error — not 500.
