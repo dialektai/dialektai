@@ -203,10 +203,15 @@ jobs:
           mkdir -p release
           cp frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
             "release/dialekt_${VERSION}_aarch64.dmg"
-          # .app is a directory — zip it for artifact upload
+          # .app is a directory — zip it for artifact upload. Use an
+          # absolute path via $GITHUB_WORKSPACE instead of relative
+          # ../ traversal (previous `../../../../../../release/...`
+          # undercounted by one level — it landed at frontend/release/
+          # which doesn't exist, breaking v0.11.0 on the first real
+          # release run).
           cd frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
           APP_NAME="$(ls | grep '\.app$' | head -1)"
-          zip -rqy "../../../../../../release/dialekt_${VERSION}_aarch64.app.zip" "$APP_NAME"
+          zip -rqy "$GITHUB_WORKSPACE/release/dialekt_${VERSION}_aarch64.app.zip" "$APP_NAME"
           cd -
           cd release
           for f in *.dmg *.app.zip; do
