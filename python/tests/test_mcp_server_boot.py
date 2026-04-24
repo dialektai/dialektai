@@ -18,22 +18,35 @@ def test_construction_is_side_effect_free():
     assert server.fastmcp.name == "dialekt"
 
 
-def test_register_tools_noop_when_no_tools_implemented():
-    """Before Commits 3/4/5 land the actual tool modules, register_tools
-    is a no-op — but it must still return cleanly (not raise) so the
-    boot path is testable end-to-end."""
+def test_register_tools_no_plugin_context_skips_backend_tools():
+    """Without a PluginContext, database + agent tools can't proxy
+    backend calls — their register paths early-return. File tools are
+    local and still register (default allowed_file_roots is empty, so
+    they refuse every path at call time; that behaviour is covered in
+    test_mcp_server_file_tools)."""
     server = MCPServer(ServerConfig())
     registered = server.register_tools()
-    assert registered == []
+    # File tools always register (no backend dependency).
+    assert "dialekt_read_file" in registered
+    assert "dialekt_list_directory" in registered
+    # DB + agent tools skip because no plugin_context was supplied.
+    assert "dialekt_list_connections" not in registered
+    assert "dialekt_list_agents" not in registered
 
 
 def test_register_tools_honors_disabled_categories():
-    """Disabling 'database' should prevent the database register step
-    from running — currently a no-op, but the decision point must
-    already exist."""
-    server = MCPServer(ServerConfig(enabled_categories=["file", "agent"]))
+    """Disabling a category must prevent its tools from registering."""
+    server = MCPServer(ServerConfig(enabled_categories=["file"]))
     registered = server.register_tools()
-    assert registered == []
+    assert "dialekt_read_file" in registered
+    # DB + agent absent.
+    for name in (
+        "dialekt_list_connections",
+        "dialekt_query_database",
+        "dialekt_list_agents",
+        "dialekt_get_agent",
+    ):
+        assert name not in registered
 
 
 def test_run_stdio_refuses_when_disabled():
