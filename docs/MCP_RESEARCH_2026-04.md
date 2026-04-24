@@ -70,11 +70,17 @@ MCP tool calls.
   server side. Not all flows are needed for v0.20.0 — we start with
   static bearer tokens and env-var API keys, defer OAuth to M3.
 
-**Dependency impact:** adding `mcp>=1.27,<2` to
-`python/requirements.txt` brings in `anyio`, `httpx`, `pydantic`,
-`jsonschema`, `sse-starlette`, `starlette`, `uvicorn` — all of which
-dialekt already pulls in transitively through FastAPI. No new heavy
-dependencies.
+**Dependency impact:** adding the SDK to `python/requirements.txt`
+brings in `anyio`, `httpx`, `pydantic`, `jsonschema`, `sse-starlette`,
+`starlette`, `uvicorn` — all of which dialekt already pulls in
+transitively through FastAPI. No new heavy dependencies.
+
+**Pin note (2026-04-24):** our effective pin landed as
+`mcp>=1.25,<1.27` + `sse-starlette<3` rather than the first-pass
+`mcp>=1.27,<2`. See `docs/M2_MCP_DESIGN.md` Decision 1 addendum for
+the chain-of-events — short version: 1.27's transitive `sse-starlette`
+bump drags `starlette` past what fastapi 0.115 and open-interpreter
+0.4.3 accept. 1.26 has every API we consume in Этап 1 and 2.
 
 ---
 
@@ -199,9 +205,13 @@ uniquely an **ecosystem member** rather than just another host.
 
 ## 7. Implications for our M2 plan
 
-1. **Python SDK is ready.** `mcp>=1.27,<2` is fine as a hard
-   dependency. Pin to `~=1.27` so we pick up 1.27.x patches but
-   don't auto-jump to a future 2.x that may break.
+1. **Python SDK is ready.** Effective pin is `mcp>=1.25,<1.27` +
+   `sse-starlette<3` (see the pin note in §2). This captures 1.25
+   and 1.26 patch releases but holds 1.27 back until fastapi and
+   open-interpreter catch up on starlette. The API we consume
+   (`stdio_client`, `streamable_http_client`, `ClientSession`,
+   `types`, `FastMCP`, `create_connected_server_and_client_session`)
+   is stable in 1.26.
 2. **Transport priority:** stdio first (matches everything the
    ecosystem actually ships), Streamable HTTP second (for our own
    exposed server so Claude Desktop can reach us remotely). Skip

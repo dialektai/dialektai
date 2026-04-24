@@ -28,6 +28,12 @@ from dialekt.mcp.consent import (
     provider_for_autonomy,
 )
 from dialekt.mcp.runtime import MCPNamespace, MCPRuntime, MCPServerProxy
+from dialekt.mcp.sync_bridge import (
+    SyncMCPNamespace,
+    SyncMCPServerProxy,
+    SyncRuntimeAdapter,
+    create_sync_mcp,
+)
 from dialekt.mcp.secrets_resolver import (
     has_unresolved_refs,
     keyring_key,
@@ -92,4 +98,9 @@ __all__ = [
     "SessionCachingProvider",
     "is_destructive_tool",
     "provider_for_autonomy",
+    # sync bridge (Commit 10)
+    "SyncMCPNamespace",
+    "SyncMCPServerProxy",
+    "SyncRuntimeAdapter",
+    "create_sync_mcp",
 ]

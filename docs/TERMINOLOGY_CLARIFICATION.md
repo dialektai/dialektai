@@ -87,7 +87,9 @@ python/dialekt/mcp/
 ```
 
 - **Protocol:** Model Context Protocol, spec revision `2025-11-25`.
-- **SDK:** `mcp>=1.27,<2` from PyPI.
+- **SDK:** `mcp>=1.25,<1.27` from PyPI (pin rationale in
+  `docs/M2_MCP_DESIGN.md` Decision 1 addendum — 1.27 transitively
+  upgrades starlette past the fastapi + open-interpreter ceiling).
 - **Transports:** stdio (primary) and Streamable HTTP.
 - In user-facing docs and manifest YAML, "MCP server" means
   **exactly and only** this — a process speaking the Model Context
