@@ -49,18 +49,13 @@ SELECT
     arrayElement(['KZ','RU','US','DE','GB'], (number % 5) + 1) AS country
 FROM numbers(500);
 
--- Seed products (10 rows)
-INSERT INTO dialekt_integration.products (id, sku, name, category, price_usd, stock_qty) VALUES
-    (1,  'SKU-001', 'Laptop Pro 15"',  'Electronics',  1299.99, 50),
-    (2,  'SKU-002', 'Wireless Mouse',  'Electronics',    29.99, 200),
-    (3,  'SKU-003', 'Office Chair',    'Furniture',     349.00, 30),
-    (4,  'SKU-004', 'Standing Desk',   'Furniture',     499.00, 15),
-    (5,  'SKU-005', 'USB-C Hub',       'Electronics',    49.99, 100),
-    (6,  'SKU-006', 'Monitor 27"',     'Electronics',   399.99, 45),
-    (7,  'SKU-007', 'Keyboard Mech',   'Electronics',    89.99, 80),
-    (8,  'SKU-008', 'Webcam 4K',       'Electronics',   129.99, 60),
-    (9,  'SKU-009', 'Headphones NC',   'Electronics',   249.99, 70),
-    (10, 'SKU-010', 'Desk Lamp',       'Accessories',    39.99, 150);
+-- Seed products (10 rows).
+-- IMPORTANT: single-line multi-row VALUES is required because the ClickHouse
+-- docker-entrypoint init script parses multi-query files by splitting on
+-- `;`, which chokes on multi-line VALUES tuples (the parser then skips all
+-- subsequent statements — orders/events end up empty). Keeping this on one
+-- line sidesteps the bug. Do not re-indent onto multiple lines.
+INSERT INTO dialekt_integration.products (id, sku, name, category, price_usd, stock_qty) VALUES (1, 'SKU-001', 'Laptop Pro 15', 'Electronics', 1299.99, 50), (2, 'SKU-002', 'Wireless Mouse', 'Electronics', 29.99, 200), (3, 'SKU-003', 'Office Chair', 'Furniture', 349.00, 30), (4, 'SKU-004', 'Standing Desk', 'Furniture', 499.00, 15), (5, 'SKU-005', 'USB-C Hub', 'Electronics', 49.99, 100), (6, 'SKU-006', 'Monitor 27', 'Electronics', 399.99, 45), (7, 'SKU-007', 'Keyboard Mech', 'Electronics', 89.99, 80), (8, 'SKU-008', 'Webcam 4K', 'Electronics', 129.99, 60), (9, 'SKU-009', 'Headphones NC', 'Electronics', 249.99, 70), (10, 'SKU-010', 'Desk Lamp', 'Accessories', 39.99, 150);
 
 -- Seed orders (1000 rows)
 INSERT INTO dialekt_integration.orders (id, customer_id, status, total_usd)
