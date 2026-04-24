@@ -61,6 +61,7 @@ class MCPServer:
         name: str = SERVER_NAME,
         instructions: str = SERVER_INSTRUCTIONS,
         audit_callback: Optional[Callable[..., Any]] = None,
+        plugin_context: Optional[Any] = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.config = config
@@ -71,6 +72,7 @@ class MCPServer:
             config.rate_limit_per_minute, clock=clock
         )
         self._audit_callback = audit_callback
+        self._plugin_context = plugin_context
         self._clock = clock
 
     # ── Tool registration ───────────────────────────────────────────────
@@ -100,8 +102,17 @@ class MCPServer:
         return list(self._registered_tools)
 
     def _register_database_tools(self) -> None:
-        """Commit 3 plugs the five DB tools in here."""
-        log.debug("database tools registration is a no-op until Commit 3")
+        """Attach the 5 database tools via the tools package."""
+        if self._plugin_context is None:
+            log.warning(
+                "database tools skipped — no plugin_context supplied; "
+                "pass one to MCPServer to enable backend-proxying tools"
+            )
+            return
+        from dialekt.mcp.server.tools.database import register_database_tools
+
+        names = register_database_tools(self, self._plugin_context)
+        self._registered_tools.extend(names)
 
     def _register_file_tools(self) -> None:
         """Commit 4 plugs the two file tools in here."""
