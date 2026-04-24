@@ -11,6 +11,7 @@ Retries are opaque to the user (invisible in chat). They are logged for debuggin
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Callable, Awaitable, Optional
 
@@ -18,7 +19,15 @@ import httpx
 
 log = logging.getLogger("dialekt.retry_loop")
 
-_BACKEND = "http://localhost:8765"
+
+def _get_backend() -> str:
+    """Return the dialekt-server base URL.
+
+    Read at call time so that in-process changes (e.g. server.py setting
+    the env var after binding to a custom --port) are picked up, and so
+    tests can override via monkeypatch/env without re-importing.
+    """
+    return os.environ.get("DIALEKT_BACKEND_URL", "http://localhost:8765")
 
 
 class ToolCallError(Exception):
@@ -46,7 +55,7 @@ async def validate_sql(conn_id: str, sql: str) -> tuple[bool, str]:
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.post(
-                f"{_BACKEND}/connections/{conn_id}/query",
+                f"{_get_backend()}/connections/{conn_id}/query",
                 json={"sql": f"EXPLAIN {sql}", "retry": False},
             )
         data = r.json()

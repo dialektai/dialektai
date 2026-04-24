@@ -1973,4 +1973,8 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("DIALEKT_PORT", "8765"))
     host = os.environ.get("DIALEKT_HOST", "127.0.0.1")
+    # Publish the effective URL so in-process consumers (e.g. the SQL
+    # retry loop in dialekt.llm.retry_loop) can self-call this server
+    # even when it's not on the default 8765. Explicit overrides win.
+    os.environ.setdefault("DIALEKT_BACKEND_URL", f"http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="info")
