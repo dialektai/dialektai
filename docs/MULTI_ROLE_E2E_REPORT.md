@@ -151,7 +151,15 @@ Net test-count delta: `test_plugin_context.py` adds 7 new unit tests.
 
 ## Findings
 
-### ADM-1 · `/admin/tenants?status=active` filter silently ignored — P2
+### ADM-1 · `/admin/tenants?status=active` filter silently ignored — **RESOLVED** 2026-04-29 (commit `47badbb`)
+
+Filter now honoured via `WHERE t.status = $1` with an allow-list of
+`{draft, active, suspended}`; unknown values raise HTTP 400 with the
+allowed set in the message. role_admin `test_08` upgraded from
+"skip with finding" to a tight contract check (four status buckets
++ negative case). Multi-role sweep now **35 / 35 = 100 %**.
+
+### Historical: filter behaviour pre-fix — P2
 
 **Evidence:** `test_08_list_tenants_status_filter` finds rows with `status != "active"` in the response when the filter is specified.
 

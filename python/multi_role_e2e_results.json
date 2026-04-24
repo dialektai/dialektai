@@ -5,15 +5,15 @@
   "uf1_resolution": "PluginContext — dialekt/llm/_plugin_context.py (2026-04-24)",
   "summary": {
     "roles": {
-      "admin": {"pass": 8, "fail": 0, "error": 0, "skip": 1, "total": 9},
+      "admin": {"pass": 9, "fail": 0, "error": 0, "skip": 0, "total": 9},
       "developer": {"pass": 16, "fail": 0, "error": 0, "skip": 0, "total": 16},
       "user": {"pass": 10, "fail": 0, "error": 0, "skip": 0, "total": 10}
     },
-    "grand_total": {"pass": 34, "fail": 0, "error": 0, "skip": 1, "total": 35},
+    "grand_total": {"pass": 35, "fail": 0, "error": 0, "skip": 0, "total": 35},
     "pass_rate_of_ran": 1.0,
-    "pass_rate_of_total": 0.971,
+    "pass_rate_of_total": 1.0,
     "pilot_ready": true,
-    "note": "Above 95% threshold — truly pilot-ready. Single remaining skip (ADM-1) is a documented cosmetic filter gap, not a harness limitation."
+    "note": "100% — ADM-1 closed 2026-04-29 (commit 47badbb); no open findings."
   },
   "scenarios": [
     {"role": "admin", "id": "01_admin_login_rejects_bad_key_and_issues_session_for_good", "status": "pass"},
@@ -23,7 +23,7 @@
     {"role": "admin", "id": "05_invite_token_tenant_isolation", "status": "pass"},
     {"role": "admin", "id": "06_suspend_tenant", "status": "pass"},
     {"role": "admin", "id": "07_reactivate_tenant", "status": "pass"},
-    {"role": "admin", "id": "08_list_tenants_status_filter", "status": "skip", "reason": "FINDING ADM-1: ?status=active filter not enforced server-side"},
+    {"role": "admin", "id": "08_list_tenants_status_filter", "status": "pass", "note": "ADM-1 resolved 2026-04-29 — filter enforced, 4-bucket contract check"},
     {"role": "admin", "id": "09_download_invoice_pdf", "status": "pass"},
 
     {"role": "developer", "id": "01_add_postgres_connection_and_test", "status": "pass"},
@@ -58,10 +58,10 @@
     {
       "id": "ADM-1",
       "severity": "P2",
-      "status": "open",
+      "status": "resolved",
+      "resolved_in": "47badbb (2026-04-29)",
       "title": "/admin/tenants?status=active filter not enforced",
-      "evidence": "test_08_list_tenants_status_filter skip output",
-      "proposed_fix": "Add WHERE status = $1 in GET /admin/tenants when query param present"
+      "resolution": "Added Query(None) with allow-list {draft, active, suspended}; unknown values return 400. Test upgraded to 4-bucket contract check."
     },
     {
       "id": "UF-1",
