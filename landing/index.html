@@ -49,8 +49,9 @@ if (!document.getElementById('dlk-land-styles')) {
   const s = document.createElement('style');
   s.id = 'dlk-land-styles';
   s.textContent = `
-    html, body { background: ${LT.bg0}; }
+    html, body { background: ${LT.bg0}; overflow-x: hidden; }
     .dlk-land, .dlk-land * { box-sizing: border-box; }
+    .dlk-land { max-width: 100vw; overflow-x: hidden; }
     .dlk-land {
       font-family: ${LT.ui};
       color: ${LT.text};
@@ -131,6 +132,7 @@ if (!document.getElementById('dlk-land-styles')) {
     }
     @media (max-width: 720px) {
       .install-row { grid-template-columns: 1fr !important; gap: 10px !important; }
+      .install-row .mono-cmd { white-space: normal !important; word-break: break-all; }
     }
     @media (max-width: 860px) {
       .hero-grid { grid-template-columns: 1fr !important; }
@@ -142,6 +144,16 @@ if (!document.getElementById('dlk-land-styles')) {
       .footer-grid { grid-template-columns: 1fr 1fr !important; }
       .diff-split { grid-template-columns: 1fr !important; }
       .how-step { grid-template-columns: 1fr !important; }
+    }
+
+    /* ── Mobile (≤640px) — hide decorative mockups, tighten nav */
+    @media (max-width: 640px) {
+      .hide-mobile { display: none !important; }
+      .dlk-land h1 { font-size: clamp(30px, 8vw, 48px) !important; line-height: 1.05 !important; }
+      .dlk-land h2 { font-size: clamp(24px, 7vw, 40px) !important; }
+      .dlk-land .wrap, .dlk-land .wrap-wide { padding: 0 16px !important; }
+      .footer-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+      .install-row .mono-cmd { font-size: 10px !important; }
     }
   `;
   document.head.appendChild(s);
@@ -394,7 +406,7 @@ function Hero() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, maxWidth: 1100 }}>
-          <h1 style={{ fontSize: 'clamp(42px, 6vw, 84px)', lineHeight: 1.02, letterSpacing: '-0.03em', fontWeight: 600 }}>
+          <h1 style={{ fontSize: 'clamp(30px, 7vw, 84px)', lineHeight: 1.05, letterSpacing: '-0.03em', fontWeight: 600 }}>
             The local AI agent<br />
             <span style={{ color: LT.muted }}>that finishes</span>{' '}
             <span style={{ color: LT.text }}>what you start.</span>
@@ -409,7 +421,7 @@ function Hero() {
         </div>
       </div>
 
-      <div className="wrap-wide" style={{ marginTop: 64 }}>
+      <div className="wrap-wide hide-mobile" style={{ marginTop: 64 }}>
         <HeroProductShot />
         <HeroStatsRow />
       </div>
@@ -702,7 +714,7 @@ function SectionChatVsAgent() {
       <div className="wrap-wide">
         <SecTag n="01" label="The difference" meta="chat vs agent" />
         <div style={{ maxWidth: 820, marginBottom: 40 }}>
-          <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+          <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
             Chat tools answer questions.<br />
             <span style={{ color: LT.cyan }}>dialekt finishes the task.</span>
           </h2>
@@ -803,7 +815,7 @@ function SectionHow() {
       <div className="wrap-wide">
         <SecTag n="02" label="How it works" meta="three steps" />
         <div style={{ maxWidth: 820, marginBottom: 48 }}>
-          <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+          <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
             Give it the task. Watch it work.<br />
             <span style={{ color: LT.muted }}>Approve what matters.</span>
           </h2>
@@ -1003,7 +1015,7 @@ function SectionLocal() {
         <SecTag n="03" label="Local by design" meta="architecture, not marketing" />
         <div className="local-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
           <div>
-            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
               Your code stays on disk.<br />
               <span style={{ color: LT.muted }}>Not as a promise. As a wire.</span>
             </h2>
@@ -1052,7 +1064,7 @@ function SectionCapabilities() {
     <section id="capabilities" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
       <div className="wrap-wide">
         <SecTag n="04" label="What it can do" meta="six tools · all local" />
-        <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1, maxWidth: 820, marginBottom: 40 }}>
+        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 820, marginBottom: 40 }}>
           A tool, not a toy.<br />
           <span style={{ color: LT.muted }}>Every capability is one it actually has.</span>
         </h2>
@@ -1092,7 +1104,7 @@ function SectionHardware() {
         <SecTag n="05" label="Built for your hardware" meta="honest numbers" />
         <div className="hw-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 48 }}>
           <div>
-            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
               Serious work needs<br />
               <span style={{ color: LT.cyan }}>serious silicon.</span>
             </h2>
@@ -1153,7 +1165,7 @@ function SectionWho() {
     <section id="who" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
       <div className="wrap-wide">
         <SecTag n="06" label="Who it's for" meta="three kinds of developer" />
-        <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
+        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
           If your code can't go to the cloud,<br />
           <span style={{ color: LT.muted }}>the agent has to come to you.</span>
         </h2>
@@ -1178,7 +1190,7 @@ function SectionAbout() {
   const founders = [
     {
       initials: 'DA',
-      name: 'Dias Aitbayev',
+      name: 'Dias',
       role: 'Founder · Engineering',
       loc: 'Almaty, KZ',
       bio: "Builds the local runtime, the cloud tenant service, and most of what breaks at 3am. Previously shipped ML infra and desktop apps for KZ fintechs. Opinionated about cold-brew and cache invalidation.",
@@ -1197,7 +1209,7 @@ function SectionAbout() {
     <section id="about" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
       <div className="wrap-wide">
         <SecTag n="07" label="About the team" meta="two founders · cabin-built" />
-        <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
+        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
           Two people.<br />
           <span style={{ color: LT.muted }}>One product. No growth team.</span>
         </h2>
@@ -1283,7 +1295,7 @@ function SectionInstall() {
         <SecTag n="08" label="Install" meta="linux · macos · windows" />
         <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
           <div>
-            <h2 style={{ fontSize: 'clamp(28px, 3.6vw, 48px)', lineHeight: 1.1 }}>
+            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
               Download it.<br />
               <span style={{ color: LT.muted }}>Install it.</span>
             </h2>
@@ -1306,7 +1318,7 @@ function SectionInstall() {
                   <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{r.platform}</div>
                   <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 2 }}>{r.arch}</div>
                 </div>
-                <div className="mono" style={{ fontSize: 12, color: LT.text, padding: '8px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="mono mono-cmd" style={{ fontSize: 12, color: LT.text, padding: '8px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ color: LT.cyan }}>$</span> {r.cmd}
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{r.size}</div>
