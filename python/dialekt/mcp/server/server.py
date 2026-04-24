@@ -115,8 +115,11 @@ class MCPServer:
         self._registered_tools.extend(names)
 
     def _register_file_tools(self) -> None:
-        """Commit 4 plugs the two file tools in here."""
-        log.debug("file tools registration is a no-op until Commit 4")
+        """Attach the 2 file tools via the tools package."""
+        from dialekt.mcp.server.tools.file import register_file_tools
+
+        names = register_file_tools(self)
+        self._registered_tools.extend(names)
 
     def _register_agent_tools(self) -> None:
         """Commit 5 plugs list_agents + get_agent in here."""
