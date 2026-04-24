@@ -43,6 +43,11 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+          # GitHub runners have no Secret Service / KDE Wallet available, so
+          # the default `keyring` backend degrades to `fail.Keyring`. Install
+          # the file-backed plaintext backend so `_save_password` in
+          # postgres_mcp can persist credentials during the E2E run.
+          pip install keyrings.alt
 
       - name: Seed PostgreSQL
         run: |
@@ -54,6 +59,8 @@ jobs:
         env:
           DIALEKT_RUN_E2E: "1"
           DIALEKT_INTEGRATION_PG: postgresql://dialekt_test:dialekt_test@localhost:15432/dialekt_integration
+          # Point keyring at the file-backed plaintext backend installed above.
+          PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
         run: |
           cd python
           source venv/bin/activate
