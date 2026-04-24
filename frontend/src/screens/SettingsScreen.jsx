@@ -1124,23 +1124,437 @@ const MCP_TOOLS = [
   { name: 'playwright', source: 'local binary',                            n: 22, state: 'disabled',  desc: 'browser automation' },
 ];
 
+// ── Section: MCP Servers (Phase 1.3) ──────────────────────────────────────────
+//
+// CRUD surface over /mcp-servers. Mirrors ConnectionsSection structure:
+// inline form (no modal), fetch-direct, showConfirm for destructive actions,
+// per-row [TEST] with inline result. Secrets never round-trip — backend
+// returns has_auth_token: bool and never the plaintext.
+
+const EMPTY_MCP_FORM = {
+  name: '',
+  transport: 'stdio',
+  command_text: '',
+  cwd: '',
+  url: '',
+  auth_type: '',
+  auth_token: '',
+  replace_token: false,
+  env_refs: [],          // [{env_name, ref_name}]
+  env_secrets: [],       // [{ref, value}] — plaintext going to keyring
+  timeout_seconds: '30',
+};
+
+const MCP_NAME_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
 function MCPSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [servers, setServers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [testStatus, setTestStatus] = useState({});
+  const [form, setForm] = useState(EMPTY_MCP_FORM);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/mcp-servers`);
+      const data = await r.json();
+      setServers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      addToast('Failed to load MCP servers', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const fset = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const resetForm = () => {
+    setForm(EMPTY_MCP_FORM);
+    setAdding(false);
+    setEditingId(null);
+    setFormError('');
+  };
+
+  const beginEdit = (s) => {
+    setForm({
+      name: s.name,
+      transport: s.transport,
+      command_text: (s.command || []).join('\n'),
+      cwd: s.cwd || '',
+      url: s.url || '',
+      auth_type: s.auth_type || '',
+      auth_token: '',
+      replace_token: false,
+      env_refs: Object.entries(s.env_refs || {}).map(([env_name, ref_name]) => ({ env_name, ref_name })),
+      env_secrets: [],
+      timeout_seconds: String(s.timeout_seconds || 30),
+    });
+    setEditingId(s.id);
+    setAdding(false);
+    setFormError('');
+  };
+
+  const addEnvRef = () => setForm(f => ({ ...f, env_refs: [...f.env_refs, { env_name: '', ref_name: '' }] }));
+  const removeEnvRef = (i) => setForm(f => ({ ...f, env_refs: f.env_refs.filter((_, j) => j !== i) }));
+  const setEnvRef = (i, k, v) => setForm(f => ({
+    ...f,
+    env_refs: f.env_refs.map((r, j) => j === i ? { ...r, [k]: v } : r),
+  }));
+
+  const addEnvSecret = () => setForm(f => ({ ...f, env_secrets: [...f.env_secrets, { ref: '', value: '' }] }));
+  const removeEnvSecret = (i) => setForm(f => ({ ...f, env_secrets: f.env_secrets.filter((_, j) => j !== i) }));
+  const setEnvSecret = (i, k, v) => setForm(f => ({
+    ...f,
+    env_secrets: f.env_secrets.map((s, j) => j === i ? { ...s, [k]: v } : s),
+  }));
+
+  const validate = () => {
+    if (!MCP_NAME_RE.test(form.name)) return 'Name must be kebab-case (a-z, 0-9, -), start with a letter.';
+    if (editingId == null && servers.some(s => s.name === form.name)) return `Server named "${form.name}" already exists.`;
+    if (form.transport === 'stdio' && !form.command_text.trim()) return 'stdio transport requires a command.';
+    if (form.transport === 'http' && !/^https?:\/\//.test(form.url.trim())) return 'http transport requires a valid URL.';
+    const isCreating = editingId == null;
+    if (form.auth_type === 'bearer' && isCreating && !form.auth_token) return 'Bearer auth requires a token.';
+    const ts = parseFloat(form.timeout_seconds);
+    if (!Number.isFinite(ts) || ts < 5 || ts > 300) return 'Timeout must be between 5 and 300 seconds.';
+    return '';
+  };
+
+  const submit = async () => {
+    const err = validate();
+    if (err) { setFormError(err); return; }
+    setFormError('');
+    setSaving(true);
+
+    const env_refs = Object.fromEntries(form.env_refs.filter(r => r.env_name && r.ref_name).map(r => [r.env_name, r.ref_name]));
+    const env_secrets = form.env_secrets.filter(s => s.ref && s.value);
+
+    const payload = {
+      name: form.name,
+      transport: form.transport,
+      timeout_seconds: parseFloat(form.timeout_seconds),
+      cwd: form.cwd || null,
+      env_refs,
+      env_secrets,
+    };
+    if (form.transport === 'stdio') {
+      payload.command = form.command_text.split('\n').map(s => s.trim()).filter(Boolean);
+    } else {
+      payload.url = form.url.trim();
+      if (form.auth_type) payload.auth_type = form.auth_type;
+      if (form.auth_token && (editingId == null || form.replace_token)) payload.auth_token = form.auth_token;
+    }
+
+    try {
+      const url = editingId ? `${API}/mcp-servers/${editingId}` : `${API}/mcp-servers`;
+      const method = editingId ? 'PATCH' : 'POST';
+      const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const msg = (await r.json().catch(() => ({})))?.detail || `HTTP ${r.status}`;
+        setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        return;
+      }
+      await refresh();
+      addToast(editingId ? 'Server updated' : 'Server added', 'ok');
+      resetForm();
+    } catch (e) {
+      setFormError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = (s) => {
+    showConfirm({
+      title: `Delete "${s.name}"?`,
+      body: 'The server config and its keyring entries will be removed. Agents using this server will fail until you add it again.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          const r = await fetch(`${API}/mcp-servers/${s.id}`, { method: 'DELETE' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          setServers(prev => prev.filter(x => x.id !== s.id));
+          addToast(`"${s.name}" deleted`, 'ok');
+        } catch (e) {
+          addToast(`Delete failed: ${e}`, 'error');
+          refresh();
+        }
+      },
+    });
+  };
+
+  const runTest = async (s) => {
+    setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'testing' } }));
+    try {
+      const r = await fetch(`${API}/mcp-servers/${s.id}/test`, { method: 'POST' });
+      const data = await r.json();
+      if (data.success) {
+        setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'ok', tool_count: data.tool_count } }));
+      } else {
+        setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'error', error: data.error } }));
+      }
+      refresh();
+    } catch (e) {
+      setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'error', error: String(e) } }));
+    }
+  };
+
+  const FInput = ({ label, k, type = 'text', placeholder, style: s }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...s }}>
+      <label style={{ fontSize: 11, color: T.dim }}>{label}</label>
+      <input type={type} value={form[k]} onChange={e => fset(k, e.target.value)}
+        placeholder={placeholder} style={{
+          background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+          padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+        }} />
+    </div>
+  );
+
+  const statusDot = (s) => {
+    const st = testStatus[s.id];
+    const live = st?.phase;
+    if (live === 'testing') return { color: T.amber, label: 'testing…' };
+    if (live === 'ok') return { color: T.green, label: `${st.tool_count} tool${st.tool_count === 1 ? '' : 's'}` };
+    if (live === 'error') return { color: T.red, label: 'error' };
+    if (s.last_test_ok === true) return { color: T.green, label: `${s.tool_count || 0} tool${s.tool_count === 1 ? '' : 's'}` };
+    if (s.last_test_ok === false) return { color: T.red, label: 'error' };
+    return { color: T.dim, label: 'untested' };
+  };
+
+  const MCPRow = ({ s, i }) => {
+    const dot = statusDot(s);
+    const st = testStatus[s.id];
+    const transportLine = s.transport === 'stdio'
+      ? `stdio · ${(s.command || []).slice(0, 2).join(' ')}${(s.command || []).length > 2 ? ' …' : ''}`
+      : `http · ${s.url}`;
+    return (
+      <Card key={s.id} title={s.name} n={String(i + 1).padStart(2, '0')} right={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="mono" style={{ color: dot.color, fontSize: 11 }} aria-label={dot.label}>● {dot.label}</span>
+        </div>
+      }>
+        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="mono" style={{ fontSize: 11, color: T.muted }}>{transportLine}</div>
+          {s.has_auth_token && (
+            <div style={{ fontSize: 11, color: T.dim }}>Bearer: <span className="mono" style={{ color: T.muted }}>••••••••</span></div>
+          )}
+          {s.auth_type === 'bearer' && !s.has_auth_token && (
+            <div style={{ fontSize: 11, color: T.amber }}>⚠ auth_type=bearer but no token set</div>
+          )}
+          {st?.phase === 'error' && st.error && (
+            <div style={{ fontSize: 11, color: T.red, border: `1px solid ${T.red}33`, padding: '6px 10px', background: `${T.red}0a` }}>{st.error}</div>
+          )}
+          {st?.phase === 'ok' && (
+            <div style={{ fontSize: 11, color: T.green }}>✓ {st.tool_count} tool{st.tool_count === 1 ? '' : 's'} discovered</div>
+          )}
+          {s.last_test_at && !st && (
+            <div style={{ fontSize: 10, color: T.dim }}>last tested {s.last_test_at}{s.last_test_error ? ` — ${s.last_test_error}` : ''}</div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button onClick={() => runTest(s)} disabled={st?.phase === 'testing'} style={{
+              background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+              padding: '5px 12px', fontSize: 11, cursor: st?.phase === 'testing' ? 'default' : 'pointer',
+            }}>{st?.phase === 'testing' ? 'TESTING…' : 'TEST'}</button>
+            <button onClick={() => beginEdit(s)} style={{
+              background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+              padding: '5px 12px', fontSize: 11, cursor: 'pointer',
+            }}>EDIT</button>
+            <button onClick={() => remove(s)} style={{
+              background: 'transparent', border: `1px solid ${T.red}66`, color: T.red,
+              padding: '5px 12px', fontSize: 11, cursor: 'pointer',
+            }}>DELETE</button>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const isFormOpen = adding || editingId != null;
+  const formTitle = editingId ? 'Edit MCP server' : 'New MCP server';
+
   return (
-    <BodyShell crumb="02 / CAPABILITIES → MCP TOOLS" title="Model Context Protocol"
-      desc="External capabilities dialekt can call. Each tool's permissions inherit your global policy.">
-      <ComingSoonBanner version="v1.1" label="MCP tool integration is not yet implemented. Connect external tools like GitHub, Slack, Linear, and Figma in v1.1." />
-      <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, border: `1px solid ${T.border}`, background: T.bg1 }}>
-        <Icon name="cog" size={32} color={T.dim} />
-        <div style={{ fontSize: 13, color: T.dim, textAlign: 'center', maxWidth: 340, lineHeight: 1.6 }}>
-          MCP support will let dialekt call external tools — GitHub, Slack, Linear, Figma, Playwright, and more.
-          Each tool inherits your permission policy (allow / ask / deny).
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
-          {['github', 'slack', 'linear', 'figma', 'playwright', 'postgres'].map(name => (
-            <span key={name} className="mono" style={{ fontSize: 10, color: T.dim, border: `1px solid ${T.border}`, padding: '3px 8px' }}>{name}</span>
-          ))}
-        </div>
-      </div>
+    <BodyShell crumb="02 / CAPABILITIES → MCP SERVERS" title="MCP Servers"
+      desc="External MCP servers agents can call. Credentials are stored in your OS keychain — never in config files or logs.">
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : servers.length === 0 && !isFormOpen ? (
+        <Card>
+          <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <Icon name="cog" size={28} color={T.dim} />
+            <div style={{ color: T.dim, fontSize: 13 }}>No MCP servers yet. Add one to expose external tools to your agents.</div>
+            <button onClick={() => setAdding(true)} style={{
+              background: T.cyan, color: '#000', border: 'none', padding: '8px 18px',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '.04em',
+            }}>+ ADD SERVER</button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {servers.map((s, i) => <MCPRow key={s.id} s={s} i={i} />)}
+          {!isFormOpen && (
+            <button onClick={() => setAdding(true)} style={{
+              background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+              padding: '10px', width: '100%', fontSize: 12, cursor: 'pointer', marginTop: 8, letterSpacing: '.04em',
+            }}>+ ADD SERVER</button>
+          )}
+        </>
+      )}
+
+      {isFormOpen && (
+        <Card title={formTitle} n={editingId ? 'EDIT' : 'NEW'}>
+          <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <FInput label="Name *" k="name" placeholder="github" />
+            <div style={{ fontSize: 10, color: T.dim, marginTop: -8 }}>kebab-case, unique</div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, color: T.dim }}>Transport *</label>
+              <div style={{ display: 'flex', gap: 16 }}>
+                {['stdio', 'http'].map(t => (
+                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                    <input type="radio" name="mcp-transport" value={t} checked={form.transport === t}
+                      onChange={e => fset('transport', e.target.value)} />
+                    <span className="mono" style={{ color: T.text }}>{t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {form.transport === 'stdio' ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 11, color: T.dim }}>Command * <span style={{ color: T.dim }}>(one argv token per line)</span></label>
+                  <textarea value={form.command_text} onChange={e => fset('command_text', e.target.value)}
+                    placeholder={'npx\n-y\n@modelcontextprotocol/server-github'} rows={4} style={{
+                      background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                      padding: '8px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)', outline: 'none',
+                      width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                    }} />
+                </div>
+                <FInput label="Working directory (optional)" k="cwd" placeholder="/path/to/cwd" />
+              </>
+            ) : (
+              <>
+                <FInput label="URL *" k="url" placeholder="https://example.com/mcp" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 11, color: T.dim }}>Auth</label>
+                  <select value={form.auth_type} onChange={e => fset('auth_type', e.target.value)} style={{
+                    background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                    padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
+                  }}>
+                    <option value="">None</option>
+                    <option value="bearer">Bearer token</option>
+                  </select>
+                </div>
+                {form.auth_type === 'bearer' && (
+                  <>
+                    {editingId && !form.replace_token ? (
+                      <div style={{ fontSize: 11, color: T.dim, display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span>Token: <span className="mono">••••••••</span></span>
+                        <button type="button" onClick={() => fset('replace_token', true)} style={{
+                          background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                          padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+                        }}>REPLACE</button>
+                      </div>
+                    ) : (
+                      <FInput label={editingId ? 'New bearer token *' : 'Bearer token *'} k="auth_token" type="password" placeholder="ghp_…" />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Env refs + secrets — only meaningful for stdio but harmless for http */}
+            {form.transport === 'stdio' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: T.dim }}>Environment variables (mapped to secret refs)</div>
+                {form.env_refs.map((r, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+                    <input placeholder="GITHUB_TOKEN" value={r.env_name}
+                      onChange={e => setEnvRef(i, 'env_name', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <input placeholder="github_token (secret ref)" value={r.ref_name}
+                      onChange={e => setEnvRef(i, 'ref_name', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <button onClick={() => removeEnvRef(i)} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                      padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                    }}>−</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addEnvRef} style={{
+                  background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+                  padding: '6px 10px', fontSize: 11, cursor: 'pointer', alignSelf: 'flex-start',
+                }}>+ add variable</button>
+
+                <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
+                  Credential values (plaintext → keyring)
+                </div>
+                {form.env_secrets.map((sec, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+                    <input placeholder="github_token (matches ref)" value={sec.ref}
+                      onChange={e => setEnvSecret(i, 'ref', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <input type="password" placeholder="ghp_…" value={sec.value}
+                      onChange={e => setEnvSecret(i, 'value', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12,
+                      }} />
+                    <button onClick={() => removeEnvSecret(i)} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                      padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                    }}>−</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addEnvSecret} style={{
+                  background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+                  padding: '6px 10px', fontSize: 11, cursor: 'pointer', alignSelf: 'flex-start',
+                }}>+ add credential</button>
+                {editingId && (
+                  <div style={{ fontSize: 10, color: T.dim }}>
+                    Existing credentials stay in the keyring unless a new value is provided here.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <FInput label="Timeout (seconds)" k="timeout_seconds" placeholder="30" />
+
+            {formError && (
+              <div style={{ fontSize: 11, color: T.red, border: `1px solid ${T.red}44`, padding: '8px 12px', background: `${T.red}0a` }}>
+                {formError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={submit} disabled={saving} style={{
+                background: T.cyan, color: '#000', border: 'none', padding: '8px 20px',
+                fontSize: 12, fontWeight: 600, cursor: saving ? 'default' : 'pointer', letterSpacing: '.04em',
+              }}>{saving ? 'SAVING…' : (editingId ? 'SAVE' : 'ADD')}</button>
+              <button onClick={resetForm} disabled={saving} style={{
+                background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                padding: '8px 20px', fontSize: 12, cursor: 'pointer',
+              }}>CANCEL</button>
+            </div>
+          </div>
+        </Card>
+      )}
     </BodyShell>
   );
 }
@@ -2243,7 +2657,7 @@ const NAV_GROUPS = [
     { k: 'Terminal & shell',icon: 'terminal'},
     { k: 'Browser',         icon: 'globe'   },
     { k: 'Screen control',  icon: 'screen'  },
-    { k: 'MCP tools',       icon: 'cog', n: 6 },
+    { k: 'MCP Servers',     icon: 'cog' },
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
   ]},
@@ -2267,7 +2681,7 @@ function renderSection(s) {
     case 'Terminal & shell':   return <TerminalSection />;
     case 'Browser':            return <BrowserSection />;
     case 'Screen control':     return <ScreenSection />;
-    case 'MCP tools':          return <MCPSection />;
+    case 'MCP Servers':        return <MCPSection />;
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
     case 'Storage & memory':   return <StorageSection />;
