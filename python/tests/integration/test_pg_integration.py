@@ -79,8 +79,7 @@ def test_connection_test_ok(client, conn_id):
 def test_list_schemas(client, conn_id):
     r = client.get(f"/connections/{conn_id}/schemas")
     assert r.status_code == 200
-    schemas = r.json()
-    schema_names = [s["schema_name"] for s in schemas]
+    schema_names = r.json()  # list of bare strings
     assert "ecom" in schema_names
     assert "analytics" in schema_names
 
@@ -88,7 +87,7 @@ def test_list_schemas(client, conn_id):
 def test_list_tables_in_ecom(client, conn_id):
     r = client.get(f"/connections/{conn_id}/schemas/ecom/tables")
     assert r.status_code == 200
-    tables = [t["table_name"] for t in r.json()]
+    tables = [t["name"] for t in r.json()]
     assert "customers" in tables
     assert "orders" in tables
     assert "order_items" in tables
@@ -98,7 +97,7 @@ def test_list_tables_in_ecom(client, conn_id):
 def test_describe_table(client, conn_id):
     r = client.get(f"/connections/{conn_id}/schemas/ecom/tables/customers/describe")
     assert r.status_code == 200
-    cols = {c["column_name"] for c in r.json()}
+    cols = {c["column"] for c in r.json()}
     assert "id" in cols
     assert "email" in cols
     assert "country" in cols
@@ -118,7 +117,7 @@ def test_fkeys_on_orders(client, conn_id):
     assert r.status_code == 200
     fkeys = r.json()
     assert len(fkeys) >= 1
-    col_names = [fk["column_name"] for fk in fkeys]
+    col_names = [fk["column"] for fk in fkeys]
     assert "customer_id" in col_names
 
 
@@ -127,7 +126,8 @@ def test_execute_count_query(client, conn_id):
     assert r.status_code == 200
     data = r.json()
     assert "rows" in data
-    assert data["rows"][0][0] >= 1000  # we seeded 1000 customers
+    # Values come back stringified (see postgres_mcp.execute_query).
+    assert int(data["rows"][0][0]) >= 1000  # we seeded 1000 customers
 
 
 def test_execute_join_query(client, conn_id):
@@ -145,18 +145,20 @@ def test_execute_join_query(client, conn_id):
 
 
 def test_ddl_rejected(client, conn_id):
+    # Server returns 422 (Unprocessable Entity) — semantically correct for
+    # a syntactically valid request that fails domain rules (SQL safety).
     r = client.post(f"/connections/{conn_id}/query", json={"sql": "DROP TABLE ecom.customers"})
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_dml_rejected(client, conn_id):
     r = client.post(f"/connections/{conn_id}/query", json={"sql": "DELETE FROM ecom.customers"})
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_insert_rejected(client, conn_id):
     r = client.post(f"/connections/{conn_id}/query", json={"sql": "INSERT INTO ecom.customers (email, full_name) VALUES ('x@y.com', 'X')"})
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_schema_rag_reindex(client, conn_id):
@@ -168,7 +170,12 @@ def test_schema_rag_reindex(client, conn_id):
 
 
 def test_schema_rag_search_returns_list(client, conn_id):
-    """Semantic search returns a list (may be empty if nomic model not pulled)."""
+    """Semantic search returns {results:[...], count:N} (may be empty if nomic model not pulled)."""
     r = client.get(f"/connections/{conn_id}/search", params={"q": "customer orders"})
     assert r.status_code == 200
-    assert isinstance(r.json(), list)
+    body = r.json()
+    assert isinstance(body, dict)
+    assert "results" in body
+    assert "count" in body
+    assert isinstance(body["results"], list)
+    assert len(body["results"]) == body["count"]

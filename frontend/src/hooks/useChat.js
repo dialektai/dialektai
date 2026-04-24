@@ -219,9 +219,9 @@ export function useChat() {
       content: text,
       session_id: sessionIdRef.current || null,
     };
-    if (!sessionIdRef.current && agentId) {
-      payload.agent_id = agentId;
-    }
+    // Always forward agent_id when supplied — backend decides whether it's
+    // a first-message bind or an explicit mid-session switch.
+    if (agentId) payload.agent_id = agentId;
     wsRef.current.send(JSON.stringify(payload));
   }, []);
 

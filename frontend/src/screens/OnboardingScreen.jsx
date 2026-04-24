@@ -1,53 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { T } from '../tokens.js';
 import { AppFrame, Logo } from '../components/Shell.jsx';
 
 const MODELS = [
   {
-    rank: '01',
     name: 'llama3.1', tag: '70b-instruct-q4_K_M', vendor: 'Meta · via Ollama',
-    blurb: 'Best all-rounder. Strong reasoning, full tool-use. Fits this machine.',
-    specs: [['Size','42.1 GB'],['Ctx','128k'],['Speed','≈ 22 tok/s'],['RAM','48 GB']],
-    tags: ['reasoning','coding','tool-use'], fit: 'good-fit',
+    blurb: 'Best all-rounder. Strong reasoning, full tool-use.',
+    sizeGB: 42.1, ctx: '128k', tokS: 22, ramGB: 48,
+    tags: ['reasoning','coding','tool-use'],
   },
   {
-    rank: '02',
     name: 'qwen2.5-coder', tag: '32b-instruct-q5_K_M', vendor: 'Alibaba · via Ollama',
     blurb: 'Purpose-built for code. Fastest patch & refactor loops.',
-    specs: [['Size','22.8 GB'],['Ctx','128k'],['Speed','≈ 38 tok/s'],['RAM','28 GB']],
-    tags: ['coding','fast'], fit: 'good-fit',
+    sizeGB: 22.8, ctx: '128k', tokS: 38, ramGB: 28,
+    tags: ['coding','fast'],
   },
   {
-    rank: '03',
     name: 'deepseek-r1', tag: '32b-q4_K_M', vendor: 'DeepSeek · via Ollama',
     blurb: 'Extended thinking. Slower but stronger on planning tasks.',
-    specs: [['Size','19.4 GB'],['Ctx','64k'],['Speed','≈ 14 tok/s'],['RAM','24 GB']],
-    tags: ['reasoning','agents'], fit: 'good-fit',
+    sizeGB: 19.4, ctx: '64k', tokS: 14, ramGB: 24,
+    tags: ['reasoning','agents'],
   },
   {
-    rank: '04',
     name: 'mistral-nemo', tag: '12b-instruct-q6_K', vendor: 'Mistral · via Ollama',
     blurb: 'Balanced quality at a fraction of the RAM. Good daily driver.',
-    specs: [['Size','9.1 GB'],['Ctx','128k'],['Speed','≈ 46 tok/s'],['RAM','14 GB']],
-    tags: ['balanced','fast'], fit: 'good-fit',
+    sizeGB: 9.1, ctx: '128k', tokS: 46, ramGB: 14,
+    tags: ['balanced','fast'],
   },
   {
-    rank: '05',
+    name: 'qwen2.5-coder', tag: '7b-instruct-q4_K_M', vendor: 'Alibaba · via Ollama',
+    blurb: 'Smaller code model. Runs on modest hardware.',
+    sizeGB: 4.7, ctx: '128k', tokS: 58, ramGB: 8,
+    tags: ['coding','lightweight'],
+  },
+  {
     name: 'llama3.2-vision', tag: '11b-q4_K_M', vendor: 'Meta · via Ollama',
     blurb: 'Reads screenshots, PDFs, diagrams. Pair with a text model.',
-    specs: [['Size','7.2 GB'],['Ctx','32k'],['Speed','≈ 32 tok/s'],['RAM','11 GB']],
-    tags: ['vision'], fit: 'good-fit',
+    sizeGB: 7.2, ctx: '32k', tokS: 32, ramGB: 11,
+    tags: ['vision'],
   },
   {
-    rank: '06',
+    name: 'gemma3', tag: '12b-q4_K_M', vendor: 'Google · via Ollama',
+    blurb: 'Modern balanced model from Google. Strong for size.',
+    sizeGB: 7.3, ctx: '128k', tokS: 34, ramGB: 14,
+    tags: ['balanced'],
+  },
+  {
+    name: 'gemma2', tag: '2b-q4_0', vendor: 'Google · via Ollama',
+    blurb: 'Tiny model. Runs anywhere, even low-end laptops.',
+    sizeGB: 1.6, ctx: '8k', tokS: 80, ramGB: 4,
+    tags: ['lightweight','fast'],
+  },
+  {
     name: 'llama3.1', tag: '405b-q4_K_M', vendor: 'Meta · via Ollama',
-    blurb: "Frontier quality. Exceeds this machine's memory — offload to a workstation.",
-    specs: [['Size','240 GB'],['Ctx','128k'],['Speed','≈ 2 tok/s'],['RAM','256 GB']],
-    tags: ['frontier'], fit: 'too-big',
+    blurb: "Frontier quality. Exceeds typical desktop memory.",
+    sizeGB: 240, ctx: '128k', tokS: 2, ramGB: 256,
+    tags: ['frontier'],
   },
 ];
 
-const DEFAULT_IDX = 0;
+// Normalise Ollama tag — "qwen2.5-coder:7b" matches "qwen2.5-coder:7b-instruct-q4_K_M"
+// by stripping quantisation suffix.
+function ollamaFamily(tag) {
+  if (!tag) return '';
+  const head = tag.split(':')[0];
+  const rest = tag.split(':')[1] || '';
+  const size = rest.split('-')[0]; // e.g. "7b" from "7b-instruct-q4_K_M"
+  return size ? `${head}:${size}` : head;
+}
+
+function modelIsInstalled(model, installedTags) {
+  if (!installedTags || installedTags.size === 0) return false;
+  const targetSize = (model.tag || '').split('-')[0];
+  const wantedFamily = `${model.name}:${targetSize}`;
+  for (const t of installedTags) {
+    if (ollamaFamily(t) === wantedFamily) return true;
+    // Also accept :latest installs of the base name
+    if (t === `${model.name}:latest` && !targetSize) return true;
+  }
+  return false;
+}
+
+function modelFits(model, ramGB) {
+  if (ramGB == null) return null; // unknown
+  return model.ramGB <= ramGB;
+}
 
 function Filter({ label, n, active }) {
   return (
@@ -64,10 +101,12 @@ function Filter({ label, n, active }) {
   );
 }
 
-function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected, onClick }) {
-  const tooBig = fit === 'too-big';
-  const ramTotal = 32;
-  const ramVal = parseInt(specs[3][1]);
+function ModelCard({ rank, model, ramTotalGB, installed, fits, selected, onClick }) {
+  // Disable only when we know it doesn't fit. Unknown RAM → allow click
+  // so users on non-Chromium browsers aren't locked out.
+  const tooBig = fits === false;
+  const shortBy = tooBig ? model.ramGB - (ramTotalGB || 0) : 0;
+  const shortName = (model.tag || '').split('-')[0];
   return (
     <div
       onClick={tooBig ? undefined : onClick}
@@ -84,11 +123,16 @@ function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected,
         <span className="mono" style={{ fontSize: 10, color: selected ? T.cyan : T.dim, letterSpacing: '.14em' }}>{rank}</span>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="mono" style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: '-0.01em' }}>{name}</span>
-            <span className="mono" style={{ fontSize: 11, color: T.muted }}>:{tag.split('-').slice(-1)[0] || tag}</span>
+            <span className="mono" style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: '-0.01em' }}>{model.name}</span>
+            <span className="mono" style={{ fontSize: 11, color: T.muted }}>:{shortName}</span>
           </div>
-          <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2, letterSpacing: '.04em' }}>{vendor}</div>
+          <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2, letterSpacing: '.04em' }}>{model.vendor}</div>
         </div>
+        {installed && (
+          <span className="mono" style={{ fontSize: 9, color: T.green, border: `1px solid ${T.green}`, padding: '2px 6px', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+            ✓ Installed
+          </span>
+        )}
         {selected && (
           <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.1em', display: 'flex', alignItems: 'center', gap: 4 }}>
             <div style={{ width: 10, height: 10, background: T.cyan, transform: 'rotate(45deg)' }} />
@@ -97,25 +141,27 @@ function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected,
         )}
       </div>
 
-      <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.55, marginTop: 6, marginBottom: 12 }}>{blurb}</div>
+      <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.55, marginTop: 6, marginBottom: 12 }}>{model.blurb}</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', borderTop: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-        {specs.map(([k, v], i) => (
-          <div key={i} style={{ padding: '8px 10px', borderRight: i < specs.length - 1 ? `1px solid ${T.border}` : 'none' }}>
-            <div className="upper" style={{ color: T.dim, fontSize: 9 }}>{k}</div>
-            <div className="mono" style={{ fontSize: 11, color: T.text, marginTop: 2 }}>{v}</div>
-          </div>
-        ))}
+        <Spec k="Size" v={`${model.sizeGB} GB`} />
+        <Spec k="Ctx" v={model.ctx} />
+        <Spec k="Speed" v={`≈ ${model.tokS} tok/s`} last={false} />
+        <Spec k="RAM" v={`${model.ramGB} GB`} last />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12 }}>
-        {tags.map((t, i) => (
+        {model.tags.map((t, i) => (
           <span key={i} className="mono" style={{ fontSize: 9, color: T.muted, border: `1px solid ${T.border}`, padding: '2px 5px', letterSpacing: '.06em', textTransform: 'uppercase' }}>{t}</span>
         ))}
         <div style={{ flex: 1 }} />
         {tooBig ? (
           <span className="mono" style={{ fontSize: 10, color: T.amber, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span className="dlk-dot amber" /> exceeds RAM
+          </span>
+        ) : fits === null ? (
+          <span className="mono" style={{ fontSize: 10, color: T.dim, display: 'flex', alignItems: 'center', gap: 4 }}>
+            RAM check unavailable
           </span>
         ) : (
           <span className="mono" style={{ fontSize: 10, color: T.green, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -126,13 +172,32 @@ function ModelCard({ rank, name, tag, vendor, blurb, specs, tags, fit, selected,
 
       <div style={{ marginTop: 10 }}>
         <div style={{ height: 3, background: T.bg0, border: `1px solid ${T.border}`, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: tooBig ? '100%' : `${Math.min(95, (ramVal / ramTotal) * 100)}%`, background: tooBig ? T.amber : T.cyan }} />
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0,
+            width: tooBig ? '100%' : `${Math.min(95, ramTotalGB ? (model.ramGB / ramTotalGB) * 100 : 50)}%`,
+            background: tooBig ? T.amber : T.cyan,
+          }} />
         </div>
         <div className="mono" style={{ fontSize: 9, color: T.dim, marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
-          <span>mem · {specs[3][1]} of {ramTotal} GB</span>
-          <span>{tooBig ? '+192 GB short' : 'fits'}</span>
+          <span>mem · {model.ramGB} GB of {ramTotalGB ? `${ramTotalGB} GB` : '?'}</span>
+          <span>
+            {tooBig
+              ? `needs +${shortBy} GB`
+              : fits === null
+                ? ''
+                : 'fits'}
+          </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Spec({ k, v, last }) {
+  return (
+    <div style={{ padding: '8px 10px', borderRight: last ? 'none' : `1px solid ${T.border}` }}>
+      <div className="upper" style={{ color: T.dim, fontSize: 9 }}>{k}</div>
+      <div className="mono" style={{ fontSize: 11, color: T.text, marginTop: 2 }}>{v}</div>
     </div>
   );
 }
@@ -155,11 +220,81 @@ const STEPS = [
 ];
 
 export default function OnboardingScreen({ onNav }) {
-  const [selectedIdx, setSelectedIdx] = useState(DEFAULT_IDX);
-  const sel = MODELS[selectedIdx];
-  const fullName = `${sel.name}:${sel.tag}`;
+  const [installedTags, setInstalledTags] = useState(() => new Set());
+  const [ramTotalGB, setRamTotalGB] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('http://127.0.0.1:11434/api/tags')
+      .then(r => r.ok ? r.json() : { models: [] })
+      .then(data => {
+        if (cancelled) return;
+        setInstalledTags(new Set((data.models || []).map(m => m.name)));
+      })
+      .catch(() => { if (!cancelled) setInstalledTags(new Set()); });
+
+    // navigator.deviceMemory is Chromium-only and rounded to powers of 2 — prefer the backend.
+    fetch('http://127.0.0.1:8765/system')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data) return;
+        if (typeof data.ram_total_gb === 'number') setRamTotalGB(data.ram_total_gb);
+        else if (typeof navigator.deviceMemory === 'number') setRamTotalGB(navigator.deviceMemory);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        if (typeof navigator.deviceMemory === 'number') setRamTotalGB(navigator.deviceMemory);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Decorate each model with install/fit info, then sort: installed+fits > fits > unknown > too-big.
+  const annotated = useMemo(() => {
+    return MODELS.map(m => ({
+      model: m,
+      installed: modelIsInstalled(m, installedTags),
+      fits: modelFits(m, ramTotalGB),
+    }));
+  }, [installedTags, ramTotalGB]);
+
+  const sorted = useMemo(() => {
+    const rank = (e) => {
+      if (e.installed && e.fits !== false) return 0;
+      if (e.fits === true) return 1;
+      if (e.fits === null) return 2;
+      return 3; // too big
+    };
+    return [...annotated]
+      .map((e, origIdx) => ({ ...e, origIdx }))
+      .sort((a, b) => rank(a) - rank(b));
+  }, [annotated]);
+
+  const compatibleCount = annotated.filter(e => e.fits !== false).length;
+
+  // Auto-select first installed+fits model; if none installed, first fits; never a too-big.
+  const defaultSelected = useMemo(() => {
+    const firstPick =
+      sorted.find(e => e.installed && e.fits !== false) ||
+      sorted.find(e => e.fits === true) ||
+      sorted.find(e => e.fits === null) ||
+      sorted[0];
+    return firstPick ? `${firstPick.model.name}:${firstPick.model.tag}` : null;
+  }, [sorted]);
+
+  const [selectedKey, setSelectedKey] = useState(null);
+  const activeKey = selectedKey || defaultSelected;
+  const sel = annotated.find(e => `${e.model.name}:${e.model.tag}` === activeKey) || annotated[0];
+  const fullName = sel ? `${sel.model.name}:${sel.model.tag}` : '';
+
+  const selectedTooBig = sel && sel.fits === false;
 
   const handleDownload = () => {
+    if (selectedTooBig) return;
+    if (sel && sel.installed) {
+      onNav?.('onboarding-step4');
+      return;
+    }
     onNav?.('download', {
       model: fullName,
       onComplete: () => onNav?.('onboarding-step4'),
@@ -205,12 +340,16 @@ export default function OnboardingScreen({ onNav }) {
             <div className="upper" style={{ color: T.dim, marginBottom: 8 }}>Your machine</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} className="mono">
               <Row k="CPU"  v="12 cores · x86_64" />
-              <Row k="RAM"  v="32 GB" />
+              <Row k="RAM"  v={ramTotalGB ? `${ramTotalGB} GB` : '—'} />
               <Row k="DISK" v="915 GB NVMe" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 10 }}>
               <span className="dlk-dot cyan live" />
-              <span className="mono" style={{ color: T.cyan, letterSpacing: '.08em' }}>compatible with 5 models</span>
+              <span className="mono" style={{ color: T.cyan, letterSpacing: '.08em' }}>
+                {ramTotalGB == null
+                  ? 'RAM check unavailable'
+                  : `compatible with ${compatibleCount} model${compatibleCount === 1 ? '' : 's'}`}
+              </span>
             </div>
           </div>
         </div>
@@ -218,24 +357,27 @@ export default function OnboardingScreen({ onNav }) {
         {/* Right — model grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '36px 44px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <Filter label="All" n={12} active />
-            <Filter label="Coding" n={5} />
-            <Filter label="Reasoning" n={4} />
-            <Filter label="Vision" n={3} />
-            <Filter label="Lightweight" n={6} />
+            <Filter label="All" n={MODELS.length} active />
             <div style={{ flex: 1 }} />
             <span className="mono" style={{ fontSize: 10, color: T.dim }}>sort: recommended</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
-            {MODELS.map((m, i) => (
-              <ModelCard
-                key={i}
-                {...m}
-                selected={i === selectedIdx}
-                onClick={() => setSelectedIdx(i)}
-              />
-            ))}
+            {sorted.map((entry, i) => {
+              const key = `${entry.model.name}:${entry.model.tag}`;
+              return (
+                <ModelCard
+                  key={key}
+                  rank={String(i + 1).padStart(2, '0')}
+                  model={entry.model}
+                  ramTotalGB={ramTotalGB}
+                  installed={entry.installed}
+                  fits={entry.fits}
+                  selected={key === activeKey}
+                  onClick={() => setSelectedKey(key)}
+                />
+              );
+            })}
           </div>
 
           {/* Sticky footer */}
@@ -248,13 +390,33 @@ export default function OnboardingScreen({ onNav }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, color: T.muted }}>Selected</div>
               <div className="mono" style={{ fontSize: 13, color: T.text }}>
-                {fullName} <span style={{ color: T.dim }}>· {sel.specs[0][1]} download</span>
+                {fullName}
+                {sel && (
+                  <span style={{ color: T.dim }}>
+                    {' · '}
+                    {sel.installed
+                      ? 'already installed — no download'
+                      : `${sel.model.sizeGB} GB download`}
+                  </span>
+                )}
+                {selectedTooBig && (
+                  <span style={{ color: T.amber, marginLeft: 8 }}>
+                    · requires {sel.model.ramGB} GB RAM
+                  </span>
+                )}
               </div>
             </div>
             <button className="dlk-btn" onClick={() => onNav?.('onboarding-step2')}>Back</button>
             <button className="dlk-btn" onClick={() => onNav?.('onboarding-step4')}>Skip for now</button>
-            <button className="dlk-btn primary" style={{ padding: '7px 16px' }} onClick={handleDownload}>
-              Download & continue <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
+            <button
+              className="dlk-btn primary"
+              style={{ padding: '7px 16px', opacity: selectedTooBig ? 0.4 : 1, cursor: selectedTooBig ? 'not-allowed' : 'pointer' }}
+              disabled={selectedTooBig}
+              onClick={handleDownload}
+            >
+              {sel && sel.installed
+                ? 'Use this model'
+                : <>Download & continue <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span></>}
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -78,20 +78,41 @@ async def admin_login(request: Request):
 
 
 @router.get("/tenants")
-async def list_tenants(pool=Depends(get_pool), _=Depends(_require_admin)):
+async def list_tenants(
+    status: str | None = Query(
+        None,
+        description="Filter by tenant status (draft / active / suspended). "
+                    "Unknown values are rejected with 400.",
+    ),
+    pool=Depends(get_pool),
+    _=Depends(_require_admin),
+):
+    _ALLOWED_STATUSES = {"draft", "active", "suspended"}
+    if status is not None and status not in _ALLOWED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {sorted(_ALLOWED_STATUSES)}",
+        )
+
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
+        base_query = """
             SELECT t.*,
                    COUNT(DISTINCT tu.id) AS user_count,
                    COUNT(DISTINCT l.id) AS license_count
             FROM tenants t
             LEFT JOIN tenant_users tu ON tu.tenant_id = t.id
             LEFT JOIN licenses l ON l.tenant_id = t.id
+            {where}
             GROUP BY t.id
             ORDER BY t.created_at DESC
-            """
-        )
+        """
+        if status is None:
+            rows = await conn.fetch(base_query.format(where=""))
+        else:
+            rows = await conn.fetch(
+                base_query.format(where="WHERE t.status = $1"),
+                status,
+            )
     return [dict(r) for r in rows]
 
 

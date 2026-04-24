@@ -116,30 +116,42 @@ chmod +x "$TAURI_PATH"
 echo "✅ installed → $TAURI_PATH"
 
 # ── smoke test ────────────────────────────────────────────────────────────────
-echo "ℹ  smoke-testing binary (starts + responds to /health)..."
-"$TAURI_PATH" --help >/dev/null 2>&1 || true  # may not support --help, that's OK
+# Skip in CI / non-interactive environments where Ollama / DB deps aren't up —
+# the sidecar's lifespan tries to reach Ollama and can hang on retry backoffs.
+# Set DIALEKT_SKIP_SMOKE=1 to bypass the startup test. Binary presence is
+# already verified by the build step ("built dist/dialekt-server"); smoke is
+# just a dev-convenience check.
+if [[ "${DIALEKT_SKIP_SMOKE:-0}" == "1" ]]; then
+    echo "ℹ  smoke test skipped (DIALEKT_SKIP_SMOKE=1)"
+else
+    echo "ℹ  smoke-testing binary (starts + responds to /health)..."
+    "$TAURI_PATH" --help >/dev/null 2>&1 || true  # may not support --help, that's OK
 
-# Quick boot check: start the server on a free port, curl /health, kill it.
-PORT="${DIALEKT_SIDECAR_SMOKE_PORT:-18765}"
-DIALEKT_PORT="$PORT" "$TAURI_PATH" &
-PID=$!
-# Give uvicorn up to 15s to come up.
-OK=""
-for i in $(seq 1 15); do
-    sleep 1
-    if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-        OK=1
-        echo "✅ /health OK on port $PORT after ${i}s"
-        break
+    # Quick boot check: start the server on a free port, curl /health, kill it.
+    PORT="${DIALEKT_SIDECAR_SMOKE_PORT:-18765}"
+    DIALEKT_PORT="$PORT" "$TAURI_PATH" &
+    PID=$!
+    # Give uvicorn up to 15s to come up.
+    OK=""
+    for i in $(seq 1 15); do
+        sleep 1
+        if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+            OK=1
+            echo "✅ /health OK on port $PORT after ${i}s"
+            break
+        fi
+    done
+    kill "$PID" 2>/dev/null || true
+    # Force-kill after a short grace so `wait` can't block forever on a
+    # sidecar that's stuck in lifespan (e.g. Ollama retry backoff).
+    ( sleep 5; kill -KILL "$PID" 2>/dev/null || true ) &
+    wait "$PID" 2>/dev/null || true
+
+    if [[ -z "$OK" ]]; then
+        echo "⚠  smoke test failed — binary built but /health did not respond on :$PORT." >&2
+        echo "    Check with:  $TAURI_PATH" >&2
+        exit 3
     fi
-done
-kill "$PID" 2>/dev/null || true
-wait "$PID" 2>/dev/null || true
-
-if [[ -z "$OK" ]]; then
-    echo "⚠  smoke test failed — binary built but /health did not respond on :$PORT." >&2
-    echo "    Check with:  $TAURI_PATH" >&2
-    exit 3
 fi
 
 echo

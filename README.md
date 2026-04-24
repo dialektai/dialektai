@@ -1,5 +1,10 @@
 # dialekt.ai
 
+[![CI](https://github.com/dialektai/dialektai/actions/workflows/ci.yml/badge.svg)](https://github.com/dialektai/dialektai/actions/workflows/ci.yml)
+[![E2E Integration](https://github.com/dialektai/dialektai/actions/workflows/e2e-integration.yml/badge.svg)](https://github.com/dialektai/dialektai/actions/workflows/e2e-integration.yml)
+[![tests](https://img.shields.io/badge/tests-375%20passing-brightgreen)](https://github.com/dialektai/dialektai/actions)
+[![license](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 A local AI agent for your desktop — runs entirely on your machine, executes code, manages files, and controls your OS via natural language.
 
 Built with **Tauri + React** (frontend) and **FastAPI + Open Interpreter** (backend). Models run locally through **Ollama** — no cloud, no telemetry, no data leaving your computer.
@@ -121,12 +126,16 @@ dialekt agents are defined as portable YAML files (`.agent.yaml`).
 
 **Manifest format:** [AGENT_MANIFEST_SPEC.md](AGENT_MANIFEST_SPEC.md) — covers all fields, types, security rules, and examples.
 
-**Validator:** [`dialekt-manifest-validator`](https://github.com/vibecoderkz/dialekt-manifest-validator) — validate manifests before importing or publishing.
+**Validator:** [`dialekt-manifest-validator`](https://github.com/dialektai/dialekt-manifest-validator) — validate manifests before importing or publishing.
 
 ```bash
-pip install dialekt-manifest-validator==0.1.0
+pip install "git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.2.0"
 dialekt-validate-manifest my-agent.agent.yaml
 ```
+
+> Distributed via GitHub tags while the schema stabilises — see
+> [`docs/SCHEMA_RELEASE.md`](docs/SCHEMA_RELEASE.md) for the release
+> runbook and future PyPI migration path.
 
 ---
 

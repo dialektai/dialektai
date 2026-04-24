@@ -1,6 +1,11 @@
 # dialekt backend dependencies
 # Install: pip install -r requirements.txt
 
+# setuptools<81 is required because open-interpreter imports pkg_resources,
+# which was removed from setuptools in 82+. Without this pin, WebSocket
+# chat handler crashes on make_interpreter() and closes the connection
+# with code 1006 before any reply reaches the client.
+setuptools<81
 aiosqlite>=0.19.0
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
@@ -11,7 +16,9 @@ anyio>=4.0.0
 starlette>=0.37.0
 pydantic>=2.0.0
 python-multipart>=0.0.9
-dialekt-manifest-validator>=0.1.0
+# dialekt-manifest-validator is distributed via GitHub tags (not PyPI).
+# To bump, update the @v0.X.Y pin below AND follow docs/SCHEMA_RELEASE.md.
+dialekt-manifest-validator @ git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.2.0
 asyncpg>=0.29.0
 aiomysql>=0.2.0
 clickhouse-connect>=0.7.0

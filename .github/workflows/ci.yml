@@ -80,6 +80,10 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+          # GitHub runners have no Secret Service backend; install the
+          # file-backed plaintext keyring so connection passwords persist
+          # during integration tests. See E2E workflow for rationale.
+          pip install keyrings.alt
       - name: Seed integration DB
         run: |
           cd python
@@ -89,6 +93,7 @@ jobs:
       - name: Run integration tests
         env:
           DIALEKT_INTEGRATION_PG: postgresql://dialekt_test:dialekt_test@localhost:15432/dialekt_integration
+          PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
         run: |
           cd python
           source venv/bin/activate
@@ -119,7 +124,7 @@ jobs:
       - name: Install dialekt-cloud deps
         run: |
           cd dialekt-cloud
-          pip install -r requirements.txt pytest pytest-asyncio httpx
+          pip install -e ".[test]"
       - name: Run cloud tests
         env:
           DATABASE_URL: postgresql://dialekt_cloud:dialekt_cloud_pass@localhost:5433/dialekt_cloud_test
@@ -128,4 +133,3 @@ jobs:
         run: |
           cd dialekt-cloud
           python -m pytest tests/ -v --tb=short
-        continue-on-error: true  # cloud tests may fail if DB schema not applied yet

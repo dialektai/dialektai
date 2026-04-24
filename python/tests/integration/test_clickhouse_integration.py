@@ -76,14 +76,14 @@ def test_connection_test_ok(client, conn_id):
 def test_list_schemas(client, conn_id):
     r = client.get(f"/ch-connections/{conn_id}/schemas")
     assert r.status_code == 200
-    schema_names = [s["schema_name"] for s in r.json()]
+    schema_names = r.json()  # list of bare strings
     assert CH_DB in schema_names
 
 
 def test_list_tables(client, conn_id):
     r = client.get(f"/ch-connections/{conn_id}/schemas/{CH_DB}/tables")
     assert r.status_code == 200
-    tables = [t["table_name"] for t in r.json()]
+    tables = [t["name"] for t in r.json()]
     assert "customers" in tables
     assert "orders" in tables
     assert "events" in tables
@@ -94,7 +94,7 @@ def test_describe_table(client, conn_id):
         f"/ch-connections/{conn_id}/schemas/{CH_DB}/tables/customers/describe"
     )
     assert r.status_code == 200
-    cols = {c["column_name"] for c in r.json()}
+    cols = {c["column"] for c in r.json()}
     assert "id" in cols
     assert "email" in cols
     assert "country" in cols
@@ -120,6 +120,7 @@ def test_execute_count_query(client, conn_id):
     assert r.status_code == 200
     data = r.json()
     assert "rows" in data
+    # Stringified by the query endpoint — cast before comparing.
     assert int(data["rows"][0][0]) >= 500
 
 
@@ -148,11 +149,12 @@ def test_events_table_large_count(client, conn_id):
 
 
 def test_ddl_rejected(client, conn_id):
+    # Server returns 422 (Unprocessable Entity) for SQL-safety rejections.
     r = client.post(
         f"/ch-connections/{conn_id}/query",
         json={"sql": f"DROP TABLE {CH_DB}.customers"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_insert_rejected(client, conn_id):
@@ -162,7 +164,7 @@ def test_insert_rejected(client, conn_id):
             "sql": f"INSERT INTO {CH_DB}.customers (id, email, full_name, country) VALUES (9999, 'x@y.com', 'X', 'US')"
         },
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_event_type_breakdown(client, conn_id):

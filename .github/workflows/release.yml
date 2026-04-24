@@ -34,7 +34,9 @@ jobs:
       - name: Run pytest
         run: |
           cd python && source venv/bin/activate
-          pytest -q --tb=short
+          # Integration tests require live PG/MySQL/CH DBs — run locally or
+          # in separate workflow with docker services. Unit tests gate CI here.
+          pytest -q --tb=short --ignore=tests/integration
 
   # ── 2. Linux build (.deb + .AppImage) ────────────────────────────────────
   # ubuntu-22.04 runner has GLIBC 2.35 — matching our support baseline.
@@ -94,8 +96,10 @@ jobs:
           # are fine to build), fall back to --prefer-binary.
           pip install --prefer-binary --only-binary=:all: -r requirements.txt pyinstaller \
               || pip install --prefer-binary -r requirements.txt pyinstaller
-          # Skip smoke test inside the sandbox — Ollama isn't present in CI.
-          DIALEKT_BUILD_MODE=native bash build_sidecar.sh || true
+          # Skip smoke test inside the sandbox — Ollama isn't present in CI,
+          # and the sidecar's lifespan retries Ollama on startup which can
+          # hang the runner indefinitely. Binary presence is verified below.
+          DIALEKT_BUILD_MODE=native DIALEKT_SKIP_SMOKE=1 bash build_sidecar.sh
           # The script's copy step runs regardless of smoke; verify output:
           TRIPLE="x86_64-unknown-linux-gnu"
           test -f "../frontend/src-tauri/binaries/dialekt-server-$TRIPLE"

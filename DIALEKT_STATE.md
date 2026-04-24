@@ -218,22 +218,28 @@ into postgres_mcp.py /query endpoint. 5 new integration tests added
 - Self-correcting SQL retry loop (Goal 8.3) intercepts bad SELECTs before
   execution and fixes them via local LLM; verified via 5 new integration tests.
 
-### CI status for v0.9.0 (as of 2026-04-23 evening)
+### CI status for v0.9.0 — PUBLISHED ✓
 
-- Two runs stuck on "Build Python sidecar": `24821806834` (92+ min) and
-  `24825965114` (14+ min after re-push). Both cancelled.
-- Diagnosed cause: pip compiling C extensions from source because no
-  manylinux wheel matched CPython 3.12 × manylinux_2_35 for a heavy
-  transitive (tokenizers / tiktoken via open-interpreter → litellm).
-- Workflow fix committed in **1870905**:
-  - wheel cache via actions/cache@v4 on `~/.cache/pip/wheels`
-  - `--prefer-binary --only-binary=:all:` fast-fail first pass,
-    `--prefer-binary` sdist-allowed fallback
-  - `timeout-minutes: 15` on the sidecar step
-- Founder action required: re-push tag to trigger a new run.
-  ```
-  git tag -d v0.9.0 && git push origin :refs/tags/v0.9.0
-  git tag v0.9.0    && git push origin v0.9.0
-  ```
-- Artifact status: no `.deb` / `.AppImage` on the v0.9.0 Release until
-  the workflow-fix run completes.
+Release URL: https://github.com/dialektai/dialektai/releases/tag/v0.9.0
+
+Final run: `24828297439` at commit `e998256`, total duration 11.5 min.
+Published 2026-04-23T09:54:57Z.
+
+Artifacts:
+- `dialekt_0.9.0_amd64.deb` — 141,514,024 bytes (135 MB)
+- `dialekt_0.9.0_amd64.AppImage` — 230,140,408 bytes (219 MB)
+- `.sha256` sidecar for each
+
+Four CI iterations before success (kept for postmortem):
+| Run | Duration | Outcome |
+|---|---|---|
+| `24821806834` | 1h43m | cancelled — stuck compiling sdist-only transitive |
+| `24825965114` | 16m | cancelled — same pattern after re-push |
+| `24827362027` | 17m | failure — `test` job ran integration tests against runner with no PG |
+| `24828297439` | 11m34s | **success** — `--ignore=tests/integration` + wheel cache + DIALEKT_SKIP_SMOKE=1 |
+
+Workflow hardening commits (all on `feat/stage-2-partial`, tagged `v0.9.0`):
+- `1870905` — wheel cache, `--only-binary=:all:` fast-fail, 15-min step timeout
+- `d202d42` — `--ignore=tests/integration` on the `test` job
+- `e998256` — `DIALEKT_SKIP_SMOKE=1` on the sidecar build step + SIGKILL
+  fallback inside `build_sidecar.sh` so `wait` can never block forever

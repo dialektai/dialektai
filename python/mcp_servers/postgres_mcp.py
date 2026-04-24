@@ -146,9 +146,16 @@ async def _require_connection(conn_id: str) -> dict:
 
 @router.get("")
 async def list_connections():
+    # All three MCP routers share a single `connections` table keyed on
+    # the `type` column. Without this filter this endpoint returned mysql
+    # and clickhouse rows too — which tripped the Settings → Connections
+    # UI into rendering every connection three times (once per driver
+    # tag). See docs/OVERNIGHT_E2E_REPORT_2026-04-23.md §N2.
+    # Accept 'postgres' as well as the canonical 'postgresql' stored by
+    # create_connection — old manifests or manual inserts may use either.
     cursor = await _db.execute(
         "SELECT id, name, type, host, port, database, username, row_limit, created_at, updated_at "
-        "FROM connections ORDER BY name"
+        "FROM connections WHERE type IN ('postgresql', 'postgres') ORDER BY name"
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]

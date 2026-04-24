@@ -82,15 +82,14 @@ def test_connection_test_ok(client, conn_id):
 def test_list_schemas(client, conn_id):
     r = client.get(f"/mysql-connections/{conn_id}/schemas")
     assert r.status_code == 200
-    schemas = r.json()
-    schema_names = [s["schema_name"] for s in schemas]
+    schema_names = r.json()  # list of bare strings
     assert "dialekt_integration" in schema_names
 
 
 def test_list_tables(client, conn_id):
     r = client.get(f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables")
     assert r.status_code == 200
-    tables = [t["table_name"] for t in r.json()]
+    tables = [t["name"] for t in r.json()]
     assert "customers" in tables
     assert "orders" in tables
     assert "products" in tables
@@ -102,7 +101,7 @@ def test_describe_table(client, conn_id):
         f"/mysql-connections/{conn_id}/schemas/dialekt_integration/tables/customers/describe"
     )
     assert r.status_code == 200
-    cols = {c["column_name"] for c in r.json()}
+    cols = {c["column"] for c in r.json()}
     assert "id" in cols
     assert "email" in cols
     assert "country" in cols
@@ -127,7 +126,7 @@ def test_foreign_keys_on_orders(client, conn_id):
     assert r.status_code == 200
     fkeys = r.json()
     assert len(fkeys) >= 1
-    col_names = [fk["column_name"] for fk in fkeys]
+    col_names = [fk["column"] for fk in fkeys]
     assert "customer_id" in col_names
 
 
@@ -139,7 +138,7 @@ def test_execute_count_query(client, conn_id):
     assert r.status_code == 200
     data = r.json()
     assert "rows" in data
-    assert data["rows"][0][0] >= 500
+    assert int(data["rows"][0][0]) >= 500
 
 
 def test_execute_join_query(client, conn_id):
@@ -157,11 +156,12 @@ def test_execute_join_query(client, conn_id):
 
 
 def test_ddl_rejected(client, conn_id):
+    # Server returns 422 (Unprocessable Entity) for SQL-safety rejections.
     r = client.post(
         f"/mysql-connections/{conn_id}/query",
         json={"sql": "DROP TABLE customers"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_dml_rejected(client, conn_id):
@@ -169,7 +169,7 @@ def test_dml_rejected(client, conn_id):
         f"/mysql-connections/{conn_id}/query",
         json={"sql": "DELETE FROM customers"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_insert_rejected(client, conn_id):
@@ -177,7 +177,7 @@ def test_insert_rejected(client, conn_id):
         f"/mysql-connections/{conn_id}/query",
         json={"sql": "INSERT INTO customers (email, full_name) VALUES ('x@y.com', 'X')"},
     )
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_product_category_grouping(client, conn_id):

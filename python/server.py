@@ -298,6 +298,14 @@ async def lifespan(app: FastAPI):
     from dialekt.license_refresh import start_refresher, stop_refresher
     app.state.license_refresher = asyncio.create_task(start_refresher(load_settings, save_settings))
 
+    # UF-1 (2026-04-24): give the LLM plugins a context that dispatches
+    # back into this very app instead of a network hop to localhost:8765.
+    # Plugins (DialektSQL, retry_loop) read the context via get_context(),
+    # so they pick up the in-process routing without any direct call.
+    from dialekt.llm._plugin_context import PluginContext, set_context
+    set_context(PluginContext(app=app))
+    log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
+
     yield
     from mcp_servers.postgres_mcp import close_all_pools
     from mcp_servers.mysql_mcp import close_all_pools_mysql
@@ -305,6 +313,13 @@ async def lifespan(app: FastAPI):
     await close_all_pools_mysql()
     try:
         await stop_refresher(app.state.license_refresher)
+    except Exception:
+        pass
+    # Drop the plugin context so a subsequent lifespan (e.g. tests that
+    # re-enter the app) starts from a clean default.
+    try:
+        from dialekt.llm._plugin_context import set_context
+        set_context(None)
     except Exception:
         pass
     await db.close()
@@ -457,6 +472,7 @@ async def system_stats():
     return {
         "cpu": round(cpu),
         "ram": round(vm.percent),
+        "ram_total_gb": round(vm.total / (1024**3)),
         "gpu": gpu,
         "disk": round(dsk.percent),
     }
@@ -477,6 +493,86 @@ async def about():
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────────────
+
+@app.post("/admin/reload-schema")
+async def admin_reload_schema():
+    """Re-import `dialekt_manifest` so a pip-upgrade of the validator
+    takes effect without restarting the server.
+
+    Background: Python caches imports in `sys.modules` for the life of
+    the interpreter. A pip install --upgrade replaces files on disk
+    but the running server keeps using the constants it loaded at
+    boot — the classic symptom being "autonomy.recommended: manual"
+    rejected with a 422 quoting the *previous* allowed list (see
+    docs/OVERNIGHT_E2E_REPORT_2026-04-23.md §N1 + docs/UPGRADE.md).
+
+    We reload both the schema module and the validator (plus the
+    package itself) so every name in `dialekt_manifest` re-binds to
+    the on-disk version. Returns the new constants + package version
+    so the caller can confirm the reload actually landed.
+
+    Admin-only (same scope as /admin/stats). Safe to call any time —
+    worst case it's a no-op.
+    """
+    import importlib
+    import sys
+
+    reloaded = []
+    errors: list[str] = []
+    # Order matters: reload the leaf modules before the package re-export
+    # so the names on `dialekt_manifest.*` pick up the new objects.
+    for modname in (
+        "dialekt_manifest.schema",
+        "dialekt_manifest.validator",
+        "dialekt_manifest.errors",
+        "dialekt_manifest",
+    ):
+        mod = sys.modules.get(modname)
+        if mod is None:
+            # Module wasn't imported yet — fresh import will pick up
+            # the on-disk version anyway; nothing to reload.
+            continue
+        try:
+            importlib.reload(mod)
+            reloaded.append(modname)
+        except Exception as e:
+            errors.append(f"{modname}: {type(e).__name__}: {e}")
+
+    # Surface the new constants so the UI can show them in a toast and
+    # the user knows the reload actually took effect.
+    try:
+        from dialekt_manifest.schema import (
+            AUTONOMY_LEVELS,
+            CAPABILITY_GROUPS,
+            CONNECTION_TYPES,
+            SUPPORTED_SPEC_VERSIONS,
+        )
+        constants = {
+            "autonomy_levels": list(AUTONOMY_LEVELS),
+            "capability_groups": sorted(CAPABILITY_GROUPS),
+            "connection_types": sorted(CONNECTION_TYPES),
+            "supported_spec_versions": sorted(SUPPORTED_SPEC_VERSIONS),
+        }
+    except Exception as e:
+        constants = {}
+        errors.append(f"schema constants import: {type(e).__name__}: {e}")
+
+    # Package version, best-effort
+    try:
+        from importlib.metadata import version as _pkg_version
+        pkg_version = _pkg_version("dialekt-manifest-validator")
+    except Exception:
+        pkg_version = None
+
+    log.info(f"admin_reload_schema: reloaded={reloaded} errors={errors} version={pkg_version}")
+    return {
+        "ok": not errors,
+        "reloaded": reloaded,
+        "errors": errors,
+        "package_version": pkg_version,
+        "constants": constants,
+    }
+
 
 @app.get("/admin/stats")
 async def admin_stats():
@@ -1445,6 +1541,74 @@ async def resolve_agent_context(agent: dict) -> dict:
     return result
 
 
+def get_installed_ollama_models() -> set[str]:
+    """Fetch currently installed Ollama models via /api/tags.
+
+    Returns an empty set on any error so callers can cleanly fall back to
+    the global default model.
+    """
+    try:
+        import httpx
+        with httpx.Client(timeout=2.0) as c:
+            r = c.get("http://127.0.0.1:11434/api/tags")
+            r.raise_for_status()
+            return {m["name"] for m in r.json().get("models", [])}
+    except Exception as e:
+        log.warning(f"pick_model: could not fetch Ollama models: {e}")
+        return set()
+
+
+def pick_model_for_agent(manifest: dict | None, installed: set[str], default: str) -> str:
+    """Pick the best local model for an agent.
+
+    Fallback chain:
+      1. manifest.model.preferred (exact match in installed)
+      2. first manifest.model.acceptable installed
+      3. family match of preferred (e.g. qwen2.5-coder:32b -> qwen2.5-coder:7b)
+      4. family match of any acceptable
+      5. global default
+    """
+    model_config = (manifest or {}).get("model") or {}
+    preferred = model_config.get("preferred")
+    acceptable = model_config.get("acceptable") or []
+
+    if preferred and preferred in installed:
+        log.info(f"pick_model: using preferred {preferred}")
+        return preferred
+
+    for candidate in acceptable:
+        if candidate in installed:
+            log.info(f"pick_model: using acceptable fallback {candidate}")
+            return candidate
+
+    def family_of(name: str) -> str:
+        return name.split(":", 1)[0] if ":" in name else name
+
+    def best_family_match(name: str) -> str | None:
+        family = family_of(name)
+        matches = [m for m in installed if family_of(m) == family]
+        # Prefer smallest tag (more likely to fit on the local machine).
+        return sorted(matches)[0] if matches else None
+
+    if preferred:
+        m = best_family_match(preferred)
+        if m:
+            log.info(f"pick_model: family-match {preferred} -> {m}")
+            return m
+
+    for candidate in acceptable:
+        m = best_family_match(candidate)
+        if m:
+            log.info(f"pick_model: family-match {candidate} -> {m}")
+            return m
+
+    log.warning(
+        f"pick_model: no match for preferred={preferred!r} acceptable={acceptable!r}, "
+        f"using default {default!r}"
+    )
+    return default
+
+
 def make_interpreter(
     agent: dict | None = None,
     agent_context: dict | None = None,
@@ -1458,7 +1622,24 @@ def make_interpreter(
     )
     s = load_settings()
     interpreter.reset()
-    model = s.get("model", "gemma3-12b")
+
+    default_model = s.get("model", "gemma3-12b")
+    manifest_dict: dict | None = None
+    if agent and agent.get("manifest_yaml"):
+        try:
+            import yaml as _yml
+            manifest_dict = _yml.safe_load(agent["manifest_yaml"]) or {}
+        except Exception as e:
+            log.warning(f"pick_model: manifest parse failed for {agent.get('name')!r}: {e}")
+
+    if manifest_dict and (manifest_dict.get("model") or {}):
+        installed = get_installed_ollama_models()
+        model = pick_model_for_agent(manifest_dict, installed, default_model)
+        log.info(f"Agent {agent.get('name')!r}: using model {model}")
+    else:
+        model = default_model
+        log.info(f"No agent manifest, using session default model {model}")
+
     interpreter.llm.model = f"ollama_chat/{model}"
     interpreter.llm.api_base = "http://localhost:11434"
     interpreter.llm.context_window = int(s.get("context_window", 8192))
@@ -1466,6 +1647,23 @@ def make_interpreter(
     interpreter.llm.temperature = float(s.get("temperature", 0.7))
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
+
+    # Register dialekt's SQL executor so agents with a bound DB connection
+    # can actually run the sql blocks they emit. The handler reads the
+    # connection id + driver from the stashed attributes at execution time.
+    # Driver picks which backend router receives the query (/connections,
+    # /mysql-connections, /ch-connections).
+    conn_id = (agent_context or {}).get("connection_id") if agent_context else None
+    driver = (agent_context or {}).get("database_type") if agent_context else None
+    interpreter._dialekt_sql_conn = conn_id
+    interpreter._dialekt_sql_driver = driver
+    try:
+        from dialekt.llm.sql_language import DialektSQL
+        langs = interpreter.computer.terminal.languages
+        if not any(getattr(L, "name", "") == DialektSQL.name for L in langs):
+            langs.insert(0, DialektSQL)
+    except Exception as e:
+        log.warning(f"Could not register DialektSQL language: {e}")
 
     if agent and agent.get("system_prompt"):
         raw_prompt = agent["system_prompt"]
@@ -1643,21 +1841,42 @@ async def ws_chat(ws: WebSocket):
             except Exception:
                 pass
 
+            # Determine which agent to bind on this turn.
+            # Priority: explicit agent_id in message → existing session's agent_id
+            # → current binding → no agent.
+            requested_agent_id = msg.get("agent_id")
+
             if session_id is None:
                 sid_from_client = msg.get("session_id")
-                agent_id_for_session = msg.get("agent_id")
                 if sid_from_client:
                     session_id = sid_from_client
+                    # Resume — pull agent_id from DB if client didn't send one.
+                    if not requested_agent_id:
+                        row = await (await db.execute(
+                            "SELECT agent_id FROM sessions WHERE id = ?",
+                            (session_id,),
+                        )).fetchone()
+                        if row and row[0]:
+                            requested_agent_id = row[0]
                 else:
-                    session_id = await db_create_session(agent_id=agent_id_for_session)
-                    if agent_id_for_session:
-                        agent = await db_get_agent(agent_id_for_session)
-                        if agent:
-                            current_agent_id = agent["id"]
-                            agent_ctx = await resolve_agent_context(agent)
-                            itp = make_interpreter(agent, agent_ctx)
-                            _active_interpreters[ws_id] = itp
+                    session_id = await db_create_session(agent_id=requested_agent_id)
                     first_message = True
+
+            # (Re)bind interpreter if the requested agent differs from current.
+            if requested_agent_id and requested_agent_id != current_agent_id:
+                agent = await db_get_agent(requested_agent_id)
+                if agent:
+                    current_agent_id = agent["id"]
+                    agent_ctx = await resolve_agent_context(agent)
+                    itp = make_interpreter(agent, agent_ctx)
+                    _active_interpreters[ws_id] = itp
+                    # Persist binding on the session row in case it wasn't set
+                    # (e.g. client sent agent_id without pre-creating session).
+                    await db.execute(
+                        "UPDATE sessions SET agent_id = ? WHERE id = ?",
+                        (current_agent_id, session_id),
+                    )
+                    await db.commit()
 
             log.info(f"[{session_id[:8]}] User: {content[:80]}")
 
@@ -1769,4 +1988,8 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("DIALEKT_PORT", "8765"))
     host = os.environ.get("DIALEKT_HOST", "127.0.0.1")
+    # Publish the effective URL so in-process consumers (e.g. the SQL
+    # retry loop in dialekt.llm.retry_loop) can self-call this server
+    # even when it's not on the default 8765. Explicit overrides win.
+    os.environ.setdefault("DIALEKT_BACKEND_URL", f"http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="info")

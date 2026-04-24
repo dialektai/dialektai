@@ -21,11 +21,16 @@ const STEPS = [
 
 // ── Autonomy level descriptions ───────────────────────────────────────────────
 
+// Values here must match dialekt_manifest.schema.AUTONOMY_LEVELS exactly.
+// Before 2026-04-23 the wizard emitted full-auto / ask-before-run / manual
+// which the validator rejected — breaking Publish whenever the user
+// picked anything except ask-before-write. Labels stay user-friendly;
+// only the string value is schema-bound.
 const AUTONOMY_OPTS = [
-  { value: 'full-auto',       label: 'Full Auto',        desc: 'Agent acts without asking. Reads, writes, executes, and publishes results autonomously. Use only for trusted, well-tested agents.' },
+  { value: 'autonomous',       label: 'Full Auto',        desc: 'Agent acts without asking. Reads, writes, executes, and publishes results autonomously. Use only for trusted, well-tested agents.' },
   { value: 'ask-before-write', label: 'Ask Before Write', desc: 'Agent reads and analyzes freely, but asks for approval before writing files, sending messages, or making persistent changes. Recommended default.' },
-  { value: 'ask-before-run',  label: 'Ask Before Run',   desc: 'Agent asks before executing any command or writing data. Safer for agents that interact with external systems or run shell commands.' },
-  { value: 'manual',          label: 'Manual',           desc: 'Every action requires user confirmation. Useful for learning, auditing, or sensitive production environments.' },
+  { value: 'review-only',      label: 'Ask Before Run',   desc: 'Agent asks before executing any command or writing data. Safer for agents that interact with external systems or run shell commands.' },
+  { value: 'manual',           label: 'Manual',           desc: 'Every action requires user confirmation — including reads. Useful for learning, auditing, or sensitive production environments.' },
 ];
 
 // ── YAML builder ──────────────────────────────────────────────────────────────
@@ -103,13 +108,21 @@ system_prompt: |
 ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
 `;
 
-  if (data.variables && data.variables.length > 0) {
+  // Schema expects a dict keyed by variable name (dialekt_manifest.schema.AgentManifest
+  // declares `variables: Optional[dict[str, Variable]]`), not a YAML list.
+  // Each Variable has type (string/number/boolean/list) + required + description.
+  // We filter out rows with an empty key so an abandoned "Add variable"
+  // click doesn't write `: {...}` into the manifest.
+  const namedVars = (data.variables || []).filter(v => v.key && v.key.trim());
+  if (namedVars.length > 0) {
     yaml += `\nvariables:\n`;
-    data.variables.forEach(v => {
-      if (!v.key) return;
-      yaml += `  - key: "${v.key}"\n`;
-      yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
+    namedVars.forEach(v => {
+      const key = v.key.trim();
+      const type = v.type || 'string';
+      yaml += `  ${key}:\n`;
+      yaml += `    type: "${type}"\n`;
       yaml += `    required: ${v.required ? 'true' : 'false'}\n`;
+      yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
     });
   }
 
@@ -123,7 +136,14 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
   }
 
   if (data.connection_type && data.connection_type !== 'none') {
-    yaml += `\nconnections:\n  - type: "${data.connection_type}"\n    id: "${data.connection_id || ''}"\n`;
+    // Schema shape is {required: [Connection, …]}, not a flat list. Fields
+    // are type + role + purpose; the specific connection_id is NOT part
+    // of the manifest — binding lives in agent_bindings (POST /agents/{id}/binding,
+    // which the wizard does separately on publish). `role` and `purpose`
+    // are required strings per dialekt_manifest.schema.Connection.
+    const role = data.connection_role || 'readonly';
+    const purpose = escapeYaml(data.connection_purpose || 'Database access for this agent');
+    yaml += `\nconnections:\n  required:\n    - type: "${data.connection_type}"\n      role: "${role}"\n      purpose: "${purpose}"\n`;
   }
 
   yaml += `\nautonomy:\n  recommended: "${data.autonomy_recommended}"\n  max_allowed: "${data.autonomy_max}"\n`;
@@ -261,6 +281,7 @@ function StepIdentity({ data, setData, errors }) {
           >
             <option value="en">English</option>
             <option value="ru">Russian</option>
+            <option value="kk">Kazakh</option>
             <option value="multi">Multilingual</option>
           </select>
         </Field>
@@ -406,13 +427,17 @@ function StepSystemPrompt({ data, setData, errors }) {
 
 // ── Step 3: Capabilities ──────────────────────────────────────────────────────
 
+// Keys here must match the manifest schema's CAPABILITY_GROUPS set
+// (dialekt_manifest/schema.py:11). Before this fix the wizard emitted
+// `filesystem`, `terminal`, `screen` which the validator rejects with
+// 422 on publish. Labels are user-facing and can stay friendly.
 const CAP_META = {
-  filesystem:    { label: 'Filesystem',    desc: 'Read and write local files and directories' },
-  network:       { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
-  browser:       { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
-  database_read: { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
-  terminal:      { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
-  screen:        { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
+  filesystem_read: { label: 'Filesystem',    desc: 'Read and write local files and directories' },
+  network:         { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
+  browser:         { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
+  database_read:   { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
+  shell_execute:   { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
+  screen_capture:  { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
 };
 
 function StepCapabilities({ data, setData }) {
@@ -423,8 +448,13 @@ function StepCapabilities({ data, setData }) {
 
   return (
     <div>
-      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 16 }}>
-        GRANT PERMISSIONS — select what this agent is allowed to do
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        DECLARE CAPABILITIES — tag what this agent uses
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        These tags describe what the agent needs access to. Currently used for documentation
+        and future policy enforcement — runtime gates live in Settings → Permissions (global)
+        and the Autonomy slider (per-agent).
       </div>
       {Object.entries(CAP_META).map(([key, meta]) => {
         const active = data.capabilities[key];
@@ -515,35 +545,55 @@ function StepConnections({ data, setData }) {
       </Field>
 
       {data.connection_type !== 'none' && (
-        <Field label="Connection">
-          {loading ? (
-            <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, padding: '8px 0' }}>
-              loading connections...
-            </div>
-          ) : connList.length === 0 ? (
-            <div style={{
-              padding: '12px 14px', background: T.bg1,
-              border: `1px solid ${T.border}`,
-              fontFamily: T.mono, fontSize: 11, color: T.dim,
-            }}>
-              No connections saved — add one in{' '}
-              <span style={{ color: T.cyan }}>Settings → Connections</span>
-            </div>
-          ) : (
+        <>
+          <Field label="Connection">
+            {loading ? (
+              <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, padding: '8px 0' }}>
+                loading connections...
+              </div>
+            ) : connList.length === 0 ? (
+              <div style={{
+                padding: '12px 14px', background: T.bg1,
+                border: `1px solid ${T.border}`,
+                fontFamily: T.mono, fontSize: 11, color: T.dim,
+              }}>
+                No connections saved — add one in{' '}
+                <span style={{ color: T.cyan }}>Settings → Connections</span>
+              </div>
+            ) : (
+              <select
+                value={data.connection_id}
+                onChange={e => setData(d => ({ ...d, connection_id: e.target.value }))}
+                style={{ ...INPUT, cursor: 'pointer' }}
+              >
+                <option value="">-- select connection --</option>
+                {connList.map(c => (
+                  <option key={c.id || c.name} value={c.id || c.name}>
+                    {c.name || c.id}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label="Role">
             <select
-              value={data.connection_id}
-              onChange={e => setData(d => ({ ...d, connection_id: e.target.value }))}
+              value={data.connection_role}
+              onChange={e => setData(d => ({ ...d, connection_role: e.target.value }))}
               style={{ ...INPUT, cursor: 'pointer' }}
             >
-              <option value="">-- select connection --</option>
-              {connList.map(c => (
-                <option key={c.id || c.name} value={c.id || c.name}>
-                  {c.name || c.id}
-                </option>
-              ))}
+              <option value="readonly">Read only — SELECT queries</option>
+              <option value="readwrite">Read / write — SELECT + INSERT/UPDATE</option>
+              <option value="admin">Admin — DDL + all operations</option>
             </select>
-          )}
-        </Field>
+          </Field>
+          <Field label="Purpose">
+            <TextInput
+              value={data.connection_purpose}
+              onChange={v => setData(d => ({ ...d, connection_purpose: v }))}
+              placeholder="Database access for this agent"
+            />
+          </Field>
+        </>
       )}
 
       {data.connection_type === 'none' && (
@@ -563,7 +613,7 @@ function StepConnections({ data, setData }) {
 function StepVariables({ data, setData }) {
   const addVar = () => setData(d => ({
     ...d,
-    variables: [...d.variables, { key: '', description: '', required: true }],
+    variables: [...d.variables, { key: '', type: 'string', description: '', required: true }],
   }));
 
   const removeVar = idx => setData(d => ({
@@ -627,7 +677,7 @@ function StepVariables({ data, setData }) {
             <Icon name="x" size={13} color={T.dim} />
           </button>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 2fr auto', gap: 10, alignItems: 'end' }}>
             <div>
               <label style={LABEL}>Key</label>
               <input
@@ -636,6 +686,19 @@ function StepVariables({ data, setData }) {
                 placeholder="API_KEY"
                 style={{ ...INPUT, fontFamily: T.mono }}
               />
+            </div>
+            <div>
+              <label style={LABEL}>Type</label>
+              <select
+                value={v.type || 'string'}
+                onChange={e => updateVar(idx, 'type', e.target.value)}
+                style={{ ...INPUT, cursor: 'pointer' }}
+              >
+                <option value="string">string</option>
+                <option value="number">number</option>
+                <option value="boolean">boolean</option>
+                <option value="list">list</option>
+              </select>
             </div>
             <div>
               <label style={LABEL}>Description</label>
@@ -733,14 +796,27 @@ function StepAutonomy({ data, setData }) {
 
 // ── Step 7: Trigger ───────────────────────────────────────────────────────────
 
+// `comingSoon` flags trigger types that the schema either doesn't accept
+// at all (webhook / event) or can't drive end-to-end yet (scheduled —
+// no scheduler process exists in the backend). They still render in
+// the list so the roadmap signal is visible, but Publish is gated.
 const TRIGGER_OPTS = [
   { value: 'interactive', label: 'Interactive',  desc: 'User types a message to start the agent. Standard chat mode.' },
-  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.' },
-  { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.' },
-  { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).' },
+  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.', comingSoon: true },
+  { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.', comingSoon: true },
+  { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).', comingSoon: true },
 ];
 
+// Helper consumed by the Publish step to disable the button when the
+// chosen trigger can't actually run yet.
+function triggerSupported(triggerType) {
+  const opt = TRIGGER_OPTS.find(o => o.value === triggerType);
+  return !!opt && !opt.comingSoon;
+}
+
 function StepTrigger({ data, setData }) {
+  const selectedOpt = TRIGGER_OPTS.find(o => o.value === data.trigger_type);
+  const selectedUnavailable = selectedOpt && selectedOpt.comingSoon;
   return (
     <div>
       <Field label="Trigger Type">
@@ -756,6 +832,7 @@ function StepTrigger({ data, setData }) {
                 background: active ? `${T.cyan}11` : T.bg1,
                 border: `1px solid ${active ? T.cyan : T.border}`,
                 cursor: 'pointer',
+                opacity: opt.comingSoon ? 0.75 : 1,
               }}
             >
               <div style={{
@@ -770,16 +847,40 @@ function StepTrigger({ data, setData }) {
                   }} />
                 )}
               </div>
-              <div>
-                <div style={{ fontFamily: T.mono, fontSize: 12, color: active ? T.cyan : T.text, marginBottom: 2 }}>
-                  {opt.label}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: T.mono, fontSize: 12, color: active ? T.cyan : T.text }}>
+                    {opt.label}
+                  </span>
+                  {opt.comingSoon && (
+                    <span className="mono" style={{
+                      fontSize: 9, color: T.amber,
+                      border: `1px solid ${T.amber}66`,
+                      padding: '1px 6px', letterSpacing: '.08em',
+                      textTransform: 'uppercase',
+                    }}>Soon</span>
+                  )}
                 </div>
-                <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim }}>{opt.desc}</div>
+                <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginTop: 2 }}>{opt.desc}</div>
               </div>
             </div>
           );
         })}
       </Field>
+
+      {selectedUnavailable && (
+        <div style={{
+          padding: '12px 14px', marginTop: -4, marginBottom: 12,
+          background: `${T.amber}0a`, border: `1px solid ${T.amber}44`,
+          fontFamily: T.mono, fontSize: 11, color: T.muted, lineHeight: 1.7,
+        }}>
+          <span style={{ color: T.amber }}>NOTE</span>{'  '}
+          The <span style={{ color: T.text }}>{selectedOpt.label}</span> trigger
+          is coming in a future release — contact{' '}
+          <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for early access.
+          Publish is disabled until you switch to Interactive.
+        </div>
+      )}
 
       <Field label="Input Placeholder">
         <TextInput
@@ -899,6 +1000,23 @@ function StepPublish({ data, saving, onSave }) {
         </div>
       </div>
 
+      {/* Trigger gate: Publish blocked when user picked a scheduled/webhook/event
+          trigger — those options are in the UI as a roadmap signal but the
+          backend has no runtime for them yet (no scheduler, no webhook listener). */}
+      {!triggerSupported(data.trigger_type) && (
+        <div style={{
+          padding: '12px 14px', marginBottom: 12,
+          background: `${T.amber}0a`, border: `1px solid ${T.amber}44`,
+          fontFamily: T.mono, fontSize: 11, color: T.muted, lineHeight: 1.7,
+        }}>
+          <span style={{ color: T.amber }}>⚠ PUBLISH BLOCKED</span>{'  '}
+          This agent is configured with a trigger that isn't available yet.
+          Go back to step 8 and pick <span style={{ color: T.text }}>Interactive</span>,
+          or contact <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for
+          early access to scheduled / webhook / event triggers.
+        </div>
+      )}
+
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: 12 }}>
         <button
@@ -915,13 +1033,14 @@ function StepPublish({ data, saving, onSave }) {
         </button>
         <button
           onClick={() => onSave('published')}
-          disabled={saving}
+          disabled={saving || !triggerSupported(data.trigger_type)}
           style={{
             flex: 2, padding: '12px', background: T.cyan,
             border: `1px solid ${T.cyan}`, color: T.bg0,
             fontFamily: T.mono, fontSize: 12, fontWeight: 700,
-            cursor: saving ? 'not-allowed' : 'pointer',
-            letterSpacing: '.1em', opacity: saving ? 0.7 : 1,
+            cursor: (saving || !triggerSupported(data.trigger_type)) ? 'not-allowed' : 'pointer',
+            letterSpacing: '.1em',
+            opacity: (saving || !triggerSupported(data.trigger_type)) ? 0.4 : 1,
           }}
         >
           {saving ? 'PUBLISHING...' : 'PUBLISH AGENT'}
@@ -1009,15 +1128,17 @@ export default function AgentWizardScreen({ onNav }) {
     recommended_ram_gb: '16',
     system_prompt: '',
     capabilities: {
-      filesystem: false,
+      filesystem_read: false,
       network: false,
       browser: false,
       database_read: false,
-      terminal: false,
-      screen: false,
+      shell_execute: false,
+      screen_capture: false,
     },
     connection_type: 'none',
     connection_id: '',
+    connection_role: 'readonly',
+    connection_purpose: 'Database access for this agent',
     variables: [],
     autonomy_recommended: 'ask-before-write',
     autonomy_max: 'ask-before-write',
@@ -1075,6 +1196,29 @@ export default function AgentWizardScreen({ onNav }) {
         if (errs.length > 8) addToast(`…and ${errs.length - 8} more errors`, 'error');
         return;
       }
+      const created = await res.json().catch(() => ({}));
+
+      // Persist the DB binding so SQL Analyst (and similar agents) work
+      // out-of-the-box. Without this, the binding only lives inside the
+      // YAML manifest and agent_bindings stays empty, so DialektSQL has
+      // no connection_id at runtime.
+      if (created.id && data.connection_id && data.connection_type && data.connection_type !== 'none') {
+        try {
+          await fetch(`${API}/agents/${created.id}/binding`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              connection_id: data.connection_id,
+              connection_type: data.connection_type,
+            }),
+          });
+        } catch (bindErr) {
+          // Agent itself was saved — don't fail the flow; user can set
+          // the binding later from Settings → Agents.
+          addToast('Agent saved but connection binding failed — set it in Settings → Agents', 'warning');
+        }
+      }
+
       addToast(status === 'draft' ? 'Agent saved as draft' : 'Agent published successfully', 'success');
       setTimeout(() => onNav('settings'), 600);
     } catch (err) {

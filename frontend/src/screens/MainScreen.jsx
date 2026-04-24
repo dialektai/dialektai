@@ -5,6 +5,27 @@ import ChatColumn from '../components/ChatColumn.jsx';
 import RightPanel from '../components/RightPanel.jsx';
 import { useChat } from '../hooks/useChat.js';
 
+const API = 'http://localhost:8765';
+
+// Extract required connection types from a manifest YAML. Matches the
+// server-side parsing — light regex instead of a YAML library.
+function parseRequiredConnTypes(manifestYaml) {
+  if (!manifestYaml) return [];
+  const connIdx = manifestYaml.indexOf('connections:');
+  if (connIdx < 0) return [];
+  const tail = manifestYaml.slice(connIdx);
+  const nextTopLevel = tail.search(/\n[a-z_][\w]*:/);
+  const block = nextTopLevel > 0 ? tail.slice(0, nextTopLevel) : tail;
+  const re = /^\s*-?\s*type:\s*["']?([a-zA-Z_][\w-]*)["']?\s*$/gm;
+  const types = new Set();
+  let m;
+  while ((m = re.exec(block)) !== null) {
+    const t = m[1].toLowerCase();
+    types.add(t === 'postgresql' || t === 'pg' ? 'postgres' : t);
+  }
+  return Array.from(types);
+}
+
 export default function MainScreen({ onNav, initialMessage, sessionId: initSessionId }) {
   const {
     messages, streaming, connected, ollamaOnline,
@@ -14,7 +35,50 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
 
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [localTitle, setLocalTitle] = useState(null);
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [agentDetails, setAgentDetails] = useState(null); // {id, name, requiredTypes}
+  const [hasBinding, setHasBinding] = useState(null); // null=unknown, true/false when checked
   const didInit = useRef(false);
+
+  // Whenever the user picks a different agent, refresh its manifest
+  // summary + current binding. This drives the empty-state nudge.
+  useEffect(() => {
+    if (!selectedAgentId) {
+      setAgentDetails(null);
+      setHasBinding(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [a, b] = await Promise.all([
+          fetch(`${API}/agents/${selectedAgentId}`).then(r => r.ok ? r.json() : null),
+          fetch(`${API}/agents/${selectedAgentId}/binding`).then(r => r.ok ? r.json() : null),
+        ]);
+        if (cancelled) return;
+        if (!a) { setAgentDetails(null); setHasBinding(null); return; }
+        setAgentDetails({
+          id: a.id,
+          name: a.name,
+          requiredTypes: parseRequiredConnTypes(a.manifest_yaml),
+        });
+        setHasBinding(!!(b && b.connection_id));
+      } catch {
+        if (!cancelled) { setAgentDetails(null); setHasBinding(null); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedAgentId]);
+
+  const missingBinding =
+    !!agentDetails &&
+    agentDetails.requiredTypes.length > 0 &&
+    hasBinding === false;
+
+  const handleSend = (text) => {
+    if (missingBinding) return; // disabled path; guard anyway
+    send(text, selectedAgentId);
+  };
 
   const displayTitle = localTitle || sessionTitle;
 
@@ -54,6 +118,8 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
         onSessionSwitch={switchSession}
         onNewSession={handleNewSession}
         onModelSwitch={switchModel}
+        selectedAgentId={selectedAgentId}
+        onAgentSelect={setSelectedAgentId}
       />
       <ChatColumn
         messages={messages}
@@ -63,12 +129,18 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
         sessionId={sessionId}
         autonomy={autonomy}
         activeModel={activeModel}
-        onSend={send}
+        onSend={handleSend}
         onStop={stop}
         onNewSession={handleNewSession}
         onSessionTitleChange={handleTitleChange}
         onAutonomyChange={setAutonomyLevel}
         onConfirm={confirm}
+        bindingNotice={missingBinding ? {
+          agentName: agentDetails.name,
+          requiredTypes: agentDetails.requiredTypes,
+          onPickConnection: () => onNav?.('settings', { initialSection: 'Agents', focusAgentId: selectedAgentId }),
+          onAddConnection: () => onNav?.('settings', { initialSection: 'Connections' }),
+        } : null}
       />
       <RightPanel
         messages={messages}

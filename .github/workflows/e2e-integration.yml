@@ -1,0 +1,75 @@
+name: E2E Integration
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: E2E suite (18 scenarios)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dialekt_integration
+          POSTGRES_USER: dialekt_test
+          POSTGRES_PASSWORD: dialekt_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          # GitHub runners have no Secret Service / KDE Wallet available, so
+          # the default `keyring` backend degrades to `fail.Keyring`. Install
+          # the file-backed plaintext backend so `_save_password` in
+          # postgres_mcp can persist credentials during the E2E run.
+          pip install keyrings.alt
+
+      - name: Seed PostgreSQL
+        run: |
+          PGPASSWORD=dialekt_test psql -h localhost -p 15432 \
+            -U dialekt_test -d dialekt_integration \
+            -f python/tests/integration/seed/postgres_seed.sql
+
+      - name: Run E2E suite
+        env:
+          DIALEKT_RUN_E2E: "1"
+          DIALEKT_INTEGRATION_PG: postgresql://dialekt_test:dialekt_test@localhost:15432/dialekt_integration
+          # Point keyring at the file-backed plaintext backend installed above.
+          PYTHON_KEYRING_BACKEND: keyrings.alt.file.PlaintextKeyring
+        run: |
+          cd python
+          source venv/bin/activate
+          python -m pytest tests/test_e2e_integration.py -v --tb=short
+
+      - name: Upload results JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diag-results
+          path: python/e2e_diag_results.json
+          if-no-files-found: ignore
