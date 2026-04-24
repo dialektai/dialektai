@@ -2,22 +2,32 @@
 
 Used by agents (via ``PluginContext``) to talk to external MCP
 servers the manifest declares. Construction goes through one of the
-factory classmethods; after that the instance is an async context
-manager that yields tool discovery + invocation.
+factory classmethods; the instance is an async context manager that
+yields tool discovery + invocation.
 
-Skeleton in this commit. The factories and the context manager are
-declared; ``list_tools`` and ``call_tool`` raise ``NotImplementedError``
-— implemented in Commit 3 on top of an in-memory transport, with
-real stdio / HTTP transports landing in Commits 4 and 5 respectively.
+Transport wiring is layered:
 
-See ``docs/M2_MCP_DESIGN.md`` Decisions 1, 4, 5, 6.
+    - ``_build_session_opener`` dispatches on the transport kind and
+      returns the async-context-manager factory that will open a
+      ``mcp.ClientSession`` when entered.
+    - For stdio → the dispatcher currently raises ``NotImplementedError``;
+      Commit 4 plugs in ``mcp.client.stdio.stdio_client``.
+    - For HTTP → same story, Commit 5 plugs in
+      ``mcp.client.streamable_http.streamablehttp_client``.
+
+Tests bypass transport entirely by assigning a custom
+``_session_opener`` before entering the client — for example, a
+``mcp.shared.memory.create_connected_server_and_client_session``
+bound to an in-process ``FastMCP`` server.
+
+See ``docs/M2_MCP_DESIGN.md`` Decisions 1, 4, 6.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from dialekt.mcp.auth import Credentials, EnvVarsAuth, NoAuth
-from dialekt.mcp.connection import MCPConnection
+from dialekt.mcp.errors import MCPConfigError
 from dialekt.mcp.transport import (
     HttpTransportSpec,
     StdioTransportSpec,
@@ -25,8 +35,13 @@ from dialekt.mcp.transport import (
 )
 
 if TYPE_CHECKING:
-    from mcp import ListToolsResult
+    from contextlib import AbstractAsyncContextManager
+
+    from mcp import ClientSession, ListToolsResult
     from mcp.types import CallToolResult
+
+
+SessionOpener = Callable[[], "AbstractAsyncContextManager[ClientSession]"]
 
 
 class MCPClient:
@@ -35,7 +50,12 @@ class MCPClient:
     Construction is cheap and has no side effects — no process is
     spawned, no URL is hit, no credentials are read from the keyring.
     The connection opens only when the instance is entered as an
-    async context manager.
+    async context manager::
+
+        client = MCPClient.from_stdio_command([...])
+        async with client:
+            tools = await client.list_tools()
+            result = await client.call_tool("name", {"arg": "value"})
     """
 
     def __init__(
@@ -45,7 +65,9 @@ class MCPClient:
     ) -> None:
         self.transport = transport
         self.credentials = credentials or NoAuth()
-        self._connection: MCPConnection | None = None
+        self._session: ClientSession | None = None
+        self._session_ctx: AbstractAsyncContextManager[ClientSession] | None = None
+        self._session_opener: SessionOpener | None = None
 
     @classmethod
     def from_stdio_command(
@@ -91,20 +113,60 @@ class MCPClient:
         return cls(transport=transport, credentials=credentials)
 
     async def __aenter__(self) -> "MCPClient":
-        raise NotImplementedError(
-            "MCPClient.__aenter__ is implemented in Commit 3 "
-            "(basic MCPClient) against an in-memory transport."
-        )
+        if self._session is not None:
+            raise RuntimeError("MCPClient is already open.")
+
+        opener = self._session_opener or self._build_session_opener()
+        self._session_ctx = opener()
+        self._session = await self._session_ctx.__aenter__()
+        return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        raise NotImplementedError(
-            "MCPClient.__aexit__ is implemented in Commit 3."
-        )
+        ctx = self._session_ctx
+        self._session = None
+        self._session_ctx = None
+        if ctx is not None:
+            await ctx.__aexit__(exc_type, exc, tb)
+
+    @property
+    def session(self) -> "ClientSession":
+        """The underlying ``mcp.ClientSession``. Only valid while open."""
+        if self._session is None:
+            raise RuntimeError(
+                "MCPClient is not open — use `async with client:` first."
+            )
+        return self._session
 
     async def list_tools(self) -> "ListToolsResult":
-        raise NotImplementedError("implemented in Commit 3")
+        """Return the tool catalog the server advertises."""
+        return await self.session.list_tools()
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any] | None = None
     ) -> "CallToolResult":
-        raise NotImplementedError("implemented in Commit 3")
+        """Invoke a tool by name with structured arguments.
+
+        Thin pass-through today; Commit 7 will add the PluginContext
+        integration layer that wraps this call with rate-limiting,
+        timeout handling, and audit-log emission.
+        """
+        return await self.session.call_tool(name, arguments or {})
+
+    def _build_session_opener(self) -> SessionOpener:
+        """Return a factory that opens a ``ClientSession`` for this transport.
+
+        Overridden by test setup (``client._session_opener = ...``)
+        and by the transport commits (4-5) which plug in the real
+        stdio and HTTP session openers from the MCP SDK.
+        """
+        if isinstance(self.transport, StdioTransportSpec):
+            raise NotImplementedError(
+                "stdio transport wiring lands in Commit 4"
+            )
+        if isinstance(self.transport, HttpTransportSpec):
+            raise NotImplementedError(
+                "Streamable HTTP transport wiring lands in Commit 5"
+            )
+        raise MCPConfigError(
+            f"unknown transport kind: {type(self.transport).__name__}"
+        )

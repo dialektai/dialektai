@@ -112,27 +112,29 @@ def test_from_http_url_without_token_uses_noauth():
     assert isinstance(client.credentials, NoAuth)
 
 
-def test_methods_raise_not_implemented_in_skeleton():
-    """Until Commit 3, runtime methods must surface NotImplementedError,
-    not silently return garbage."""
+def test_real_transports_not_yet_wired():
+    """stdio + HTTP transport wiring is deferred to Commits 4 and 5 —
+    both paths must surface NotImplementedError, not silently succeed.
+    In-memory session injection (used by test_mcp_client.py) bypasses
+    this dispatcher entirely.
+    """
     import asyncio
 
     from dialekt.mcp import MCPClient
 
-    client = MCPClient.from_http_url("https://example.com/mcp")
-
-    async def _enter():
-        async with client:
+    async def _enter_http():
+        async with MCPClient.from_http_url("https://example.com/mcp"):
             pass
 
-    with pytest.raises(NotImplementedError):
-        asyncio.run(_enter())
+    with pytest.raises(NotImplementedError, match="Commit 5"):
+        asyncio.run(_enter_http())
 
-    async def _list():
-        await client.list_tools()
+    async def _enter_stdio():
+        async with MCPClient.from_stdio_command(["nonexistent"]):
+            pass
 
-    with pytest.raises(NotImplementedError):
-        asyncio.run(_list())
+    with pytest.raises(NotImplementedError, match="Commit 4"):
+        asyncio.run(_enter_stdio())
 
 
 def test_connection_session_access_before_open_raises():
