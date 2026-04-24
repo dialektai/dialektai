@@ -280,35 +280,89 @@ async def test_07_reactivate_tenant(client, admin_headers, tenant_a_bearer):
 
 @pytest.mark.asyncio
 async def test_08_list_tenants_status_filter(client, admin_headers):
-    """Verify behaviour of GET /admin/tenants?status=active.
+    """Verify GET /admin/tenants?status=… filter behaviour.
 
-    Per plan: if the param works, assert only active tenants come back.
-    If not implemented, assert the current behaviour (returns all)
-    and document as a finding in the final report — no fix in this
-    sweep.
+    ADM-1 fix (2026-04-29) wired the query param through to WHERE
+    t.status = $1. This test now asserts the tight contract:
+      • status=active → only active tenants
+      • status=suspended → only suspended tenants (including the one
+        we suspend here)
+      • no filter → everything
+      • unknown status → 400 with allow-list message
     """
-    r = await client.get(
-        "/admin/tenants?status=active", headers=admin_headers
+    # Seed: create a draft and suspend another existing one so every
+    # bucket has at least one row.
+    unique = uuid.uuid4().hex[:8]
+    r_draft = await client.post(
+        "/admin/tenants",
+        headers=admin_headers,
+        json={
+            "company_name": f"Filter-draft {unique}",
+            "admin_email": f"draft-{unique}@f.kz",
+            "plan": "team",
+            "seats": 3,
+        },
     )
-    assert r.status_code == 200
-    rows = r.json()
-    assert isinstance(rows, list)
+    assert r_draft.status_code == 201
+    draft_id = r_draft.json()["tenant_id"]
 
-    # If the filter is honoured, every row must be status=active.
-    # If it is ignored, other statuses are present — we record that
-    # as the current contract (documented as a finding, not failed).
-    non_active = [t for t in rows if t.get("status") != "active"]
-    if not non_active:
-        # Filter works — tight assertion
-        assert all(t["status"] == "active" for t in rows)
-    else:
-        # Filter silently ignored — current behaviour; flagged in report.
-        # Do NOT fail the test; spec says "document, don't fix".
-        pytest.skip(
-            f"FINDING: /admin/tenants?status=active filter not enforced — "
-            f"returned {len(rows)} rows including {len(non_active)} non-active. "
-            f"Document in MULTI_ROLE_E2E_REPORT.md."
-        )
+    # Pick a tenant and flip it suspended (any active one works).
+    all_r = await client.get("/admin/tenants", headers=admin_headers)
+    assert all_r.status_code == 200
+    actives = [t for t in all_r.json() if t["status"] == "active"]
+    assert actives, "need at least one active tenant for the filter test"
+    suspend_id = actives[0]["id"]
+    await client.patch(
+        f"/admin/tenants/{suspend_id}",
+        headers=admin_headers,
+        json={"status": "suspended"},
+    )
+
+    # Tight assertions per status value
+    r_active = await client.get("/admin/tenants?status=active", headers=admin_headers)
+    assert r_active.status_code == 200
+    active_rows = r_active.json()
+    assert active_rows, "expected at least one active tenant"
+    assert all(t["status"] == "active" for t in active_rows), (
+        f"filter not honoured: got statuses {[t['status'] for t in active_rows]}"
+    )
+    assert all(t["id"] != suspend_id for t in active_rows), (
+        "suspended tenant leaked into active results"
+    )
+    assert all(t["id"] != draft_id for t in active_rows), (
+        "draft tenant leaked into active results"
+    )
+
+    r_draft_filter = await client.get(
+        "/admin/tenants?status=draft", headers=admin_headers,
+    )
+    assert r_draft_filter.status_code == 200
+    draft_ids = [t["id"] for t in r_draft_filter.json()]
+    assert draft_id in draft_ids
+    assert all(t["status"] == "draft" for t in r_draft_filter.json())
+
+    r_susp = await client.get(
+        "/admin/tenants?status=suspended", headers=admin_headers,
+    )
+    assert r_susp.status_code == 200
+    susp_ids = [t["id"] for t in r_susp.json()]
+    assert suspend_id in susp_ids
+    assert all(t["status"] == "suspended" for t in r_susp.json())
+
+    # Unknown status → 400 with allow-list message
+    r_bad = await client.get(
+        "/admin/tenants?status=totally-bogus", headers=admin_headers,
+    )
+    assert r_bad.status_code == 400, r_bad.text
+    assert "draft" in r_bad.text and "active" in r_bad.text and "suspended" in r_bad.text
+
+    # Cleanup: restore the suspended tenant so sibling tests don't
+    # inherit a weird state.
+    await client.patch(
+        f"/admin/tenants/{suspend_id}",
+        headers=admin_headers,
+        json={"status": "active"},
+    )
 
 
 # ── 9 · Download invoice PDF ────────────────────────────────────────────────
