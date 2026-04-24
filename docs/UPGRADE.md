@@ -16,9 +16,19 @@ holds the old constants in memory.
 
 ### Steps (recommended, no restart)
 
-1. Upgrade the package while dialekt keeps running:
+1. Upgrade the package while dialekt keeps running. The schema is
+   distributed via GitHub tags (not PyPI — see `docs/SCHEMA_RELEASE.md`
+   for the why), so install from a pinned tag:
    ```bash
-   pip install --upgrade dialekt-manifest-validator
+   # Reinstall from latest supported tag (check docs/SCHEMA_RELEASE.md
+   # for the current one; v0.2.0 is the minimum dialekt 0.8+ accepts)
+   pip install --upgrade --force-reinstall \
+     "git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.2.0"
+   ```
+   To pin a specific version:
+   ```bash
+   pip install \
+     "git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.X.Y"
    ```
 2. Open **Settings → Admin → Maintenance** and click **Reload validation schema**.
    A toast confirms the new version + autonomy-level count.
@@ -39,7 +49,8 @@ the button is unreachable, restart manually:
    Or, if you run it under pm2 / systemd, use the relevant stop command.
 3. Upgrade the package:
    ```bash
-   pip install --upgrade dialekt-manifest-validator
+   pip install --upgrade --force-reinstall \
+     "git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.2.0"
    ```
 4. Relaunch dialekt desktop. The server starts fresh and picks up the
    new schema.

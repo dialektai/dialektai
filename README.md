@@ -121,12 +121,16 @@ dialekt agents are defined as portable YAML files (`.agent.yaml`).
 
 **Manifest format:** [AGENT_MANIFEST_SPEC.md](AGENT_MANIFEST_SPEC.md) — covers all fields, types, security rules, and examples.
 
-**Validator:** [`dialekt-manifest-validator`](https://github.com/vibecoderkz/dialekt-manifest-validator) — validate manifests before importing or publishing.
+**Validator:** [`dialekt-manifest-validator`](https://github.com/dialektai/dialekt-manifest-validator) — validate manifests before importing or publishing.
 
 ```bash
-pip install dialekt-manifest-validator==0.1.0
+pip install "git+https://github.com/dialektai/dialekt-manifest-validator.git@v0.2.0"
 dialekt-validate-manifest my-agent.agent.yaml
 ```
+
+> Distributed via GitHub tags while the schema stabilises — see
+> [`docs/SCHEMA_RELEASE.md`](docs/SCHEMA_RELEASE.md) for the release
+> runbook and future PyPI migration path.
 
 ---
 
