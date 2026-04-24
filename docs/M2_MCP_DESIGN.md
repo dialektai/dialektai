@@ -199,42 +199,63 @@ MCP tool?
 
 **Decision:**
 
-The existing `PluginContext` gets two new methods:
+The existing `PluginContext` grows one new method — a **factory**,
+not a cache:
 
 ```python
 class PluginContext:
-    def get_mcp_client(self, agent_id: str, server_name: str) -> MCPClient: ...
-    def list_mcp_tools(self, agent_id: str) -> list[MCPToolDescriptor]: ...
+    def new_mcp_manager(self, agent_id: str, **kwargs) -> MCPClientManager: ...
 ```
 
-`MCPClient` is dialekt's thin wrapper around the SDK's `ClientSession`.
-It is created **lazily** on first use (first call to
-`get_mcp_client` for that `(agent_id, server_name)` pair). It is
-**cached for the agent's lifetime** in the context (not per-request)
-because MCP connections are stateful: negotiation + tool listing
-happen once, tool calls happen many times.
+Inside the manager, individual `MCPClient`s are created **lazily**
+on first use (first `call_tool` for a given `server_name`) and
+**cached until `manager.shutdown()`**. Subsequent calls reuse the
+open `ClientSession`.
+
+**Factory, not cache — revised during Этап 1 (2026-04-24):** the
+original plan cached managers inside `PluginContext`. The first-
+pass design doc (pre-implementation) used the wording "cached for
+the agent's lifetime," which — in retrospect — conflates *agent*
+(a manifest template) with *agent session* (one WebSocket chat).
+Caching managers in the context means they would survive across
+chat sessions, which leaks MCP subprocesses and HTTP clients every
+time a pilot opens a new chat.
+
+Factory semantics make ownership unambiguous: each `ws_chat` session
+creates its own manager at connect, tears it down at disconnect.
+This matches existing `PluginContext` patterns (DB pools, file
+handles) — the context provides the wiring, the session owns the
+state.
 
 **Tool-call path:**
 
-1. Agent's Open Interpreter Python block calls a thin generated
-   wrapper: `ctx.mcp.github.list_repos(org="dialektai")`.
-2. Wrapper resolves to `ctx.get_mcp_client(agent_id,
-   "github").call_tool("list_repos", {"org": "dialektai"})`.
-3. Client sends JSON-RPC `tools/call`, awaits, returns structured
-   result. Errors are surfaced as `MCPToolError` subclassing
-   `RuntimeError` so existing retry loops in DialektSQL compile
-   unchanged (they just don't retry MCP errors — only SQL ones).
+1. `ws_chat` session connects → handler calls
+   `mgr = ctx.new_mcp_manager(agent_id)`.
+2. Agent's Open Interpreter Python block calls a thin generated
+   wrapper: `ctx.mcp.github.list_repos(org="dialektai")` (Commit 9
+   wires the wrapper).
+3. Wrapper resolves to
+   `await mgr.call_tool("github", "list_repos", {...}, transport=...,
+   credentials=..., binding_id=...)`.
+4. Manager lazily opens the MCPClient if needed, enforces rate
+   limit + timeout, calls JSON-RPC `tools/call`, classifies any
+   error via `classify_sdk_error`, emits an audit row, returns
+   the structured result.
+5. `ws_chat` session disconnect → handler awaits `mgr.shutdown()`,
+   which closes every open client.
 
-**Why lazy + cached:** eager init at agent start would spawn every
-configured MCP server every time an agent loads, even if the user
-never triggers its tools. On resource-constrained laptops this is
-unacceptable (we already fight RAM for the Ollama model). Lazy
-means subprocess spawns happen on demand; cached means we're not
-paying handshake cost per message.
+**Why lazy + cached _inside the manager_:** eager init at agent
+start would spawn every configured MCP server every time an agent
+loads, even if the user never triggers its tools. On resource-
+constrained laptops this is unacceptable (we already fight RAM for
+the Ollama model). Lazy means subprocess spawns happen on demand;
+cached-within-manager means we're not paying handshake cost per
+message.
 
 **Lifecycle:** when a chat session ends (`ws_chat` disconnect), the
-context tears down any MCP clients it opened for that agent. This
-is the same hook that already closes DB pools.
+session handler — the owner — awaits `mgr.shutdown()`. The context
+does NOT register managers, does NOT chase them on `ctx.close()`.
+This keeps the ownership rule ("the creator shuts it down") crisp.
 
 **Thread/loop safety:** the existing persistent-portal pattern
 (see PLUGIN_ARCHITECTURE.md) already solves "asyncpg pool bound to
