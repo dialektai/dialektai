@@ -1,5 +1,6 @@
 import { T } from '../tokens.js';
 import Icon from './Icon.jsx';
+import UpdateBanner from './UpdateBanner.jsx';
 
 async function tauriWin(fn) {
   if (!window.__TAURI_INTERNALS__) return;
@@ -100,6 +101,7 @@ export function AppFrame({ children, title = 'dialekt.ai', ollamaOnline }) {
           )}
         </div>
       </div>
+      <UpdateBanner />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {children}
       </div>
