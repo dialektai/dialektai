@@ -51,6 +51,15 @@ export default function OfflineScreen({ onNav }) {
   const [starting, setStarting] = useState(false);
   const [lastChecked, setLastChecked] = useState('just now');
   const [hasLicense, setHasLicense] = useState(null);   // null = unknown
+  // Live diagnostic state (replaces hardcoded mockup rows pre-v0.26.x).
+  const [diag, setDiag] = useState({
+    backend: 'unknown',
+    backend_detail: 'pinging…',
+    ollama: 'unknown',
+    ollama_detail: 'pinging…',
+    models: 'unknown',
+    models_detail: '—',
+  });
   const timerRef = useRef(null);
 
   // Probe license status so the "first-time pilot" banner can decide
@@ -69,11 +78,30 @@ export default function OfflineScreen({ onNav }) {
     try {
       const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
       const d = await r.json();
+      const models = Array.isArray(d.models) ? d.models : [];
+      setDiag({
+        backend: 'ok',
+        backend_detail: `localhost:8765 (${d.status || 'ok'})`,
+        ollama: d.ollama ? 'ok' : 'fail',
+        ollama_detail: d.ollama ? 'localhost:11434 reachable' : 'localhost:11434 unreachable from backend',
+        models: models.length > 0 ? 'ok' : 'warn',
+        models_detail: models.length > 0
+          ? `${models.length} model(s): ${models.slice(0, 2).join(', ')}${models.length > 2 ? ', …' : ''}`
+          : 'no models — run `ollama pull <name>`',
+      });
       if (d.ollama) {
         onNav?.('empty');
         return;
       }
-    } catch {}
+    } catch {
+      setDiag(prev => ({
+        ...prev,
+        backend: 'fail',
+        backend_detail: 'localhost:8765 unreachable',
+        ollama: 'unknown',
+        ollama_detail: 'cannot probe — backend offline',
+      }));
+    }
     setChecking(false);
     setLastChecked('just now');
     setAttempt(a => a + 1);
@@ -157,10 +185,9 @@ export default function OfflineScreen({ onNav }) {
                 <div style={{ flex: 1 }} />
                 <span className="mono" style={{ fontSize: 10, color: T.dim }}>{lastChecked}</span>
               </div>
-              <DiagRow label="Ollama binary installed"        state="ok"   detail="v0.17.4 · /usr/local/bin/ollama" />
-              <DiagRow label="Ollama process running"         state="fail" detail="pgrep returned no match" />
-              <DiagRow label="Port 11434 reachable"           state="fail" detail="connection refused" />
-              <DiagRow label="Models directory present"       state="ok"   detail="gemma3-12b · 7.3 GB cached" />
+              <DiagRow label="dialekt backend reachable"      state={diag.backend === 'unknown' ? 'warn' : diag.backend} detail={diag.backend_detail} />
+              <DiagRow label="Ollama reachable from backend"  state={diag.ollama === 'unknown' ? 'warn' : diag.ollama}   detail={diag.ollama_detail} />
+              <DiagRow label="Models available"               state={diag.models === 'unknown' ? 'warn' : diag.models}   detail={diag.models_detail} />
               <DiagRow label="Network (outbound)"             state="warn" detail="not required — local only" last />
             </div>
 

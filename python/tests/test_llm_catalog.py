@@ -101,10 +101,24 @@ def test_resolver_default_falls_back_to_ollama():
     assert r["api_key"] is None
 
 
-def test_resolver_canonicalises_old_style_ollama_tag():
-    """Legacy 'gemma3-12b' → 'gemma3:12b'. Migration safety."""
+def test_resolver_canonicalises_old_style_ollama_tag(monkeypatch):
+    """Legacy 'gemma3-12b' → 'gemma3:12b' when Ollama has neither literal nor
+    :latest installed (migration-safety fallback path)."""
+    from dialekt.llm import resolver as _r
+    monkeypatch.setattr(_r, "_installed_ollama_tags", lambda: frozenset())
     r = resolve_litellm_model({"model": "gemma3-12b"})
     assert r["model"] == "ollama_chat/gemma3:12b"
+
+
+def test_resolver_prefers_literal_when_ollama_has_it(monkeypatch):
+    """v0.26.x bug fix: if Ollama has 'gemma3-12b:latest' installed (custom
+    pull, non-canonical), the resolver must use that literal name and NOT
+    silently mangle to the canonical 'gemma3:12b' which would 404."""
+    from dialekt.llm import resolver as _r
+    monkeypatch.setattr(_r, "_installed_ollama_tags",
+                        lambda: frozenset({"gemma3-12b", "gemma3-12b:latest"}))
+    r = resolve_litellm_model({"model": "gemma3-12b"})
+    assert r["model"] == "ollama_chat/gemma3-12b:latest"
 
 
 def test_resolver_preserves_modern_ollama_tag():
