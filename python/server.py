@@ -223,6 +223,14 @@ def _handle_consent_response(ws_id: str, msg: dict) -> bool:
       - unknown request_id (orphan response — frontend bug or replay)
       - future already done (response raced a timeout)
     Unknown ``decision`` values are coerced to DENIED (defensive default).
+
+    Special v0.24 wire shorthand: ``decision == "approved_all"`` resolves
+    the head request as APPROVED **and** snapshot-resolves every other
+    pending consent future for this ws_id as APPROVED. Snapshot semantics
+    (mentor ruling §A): only requests pending at decision-resolution
+    time get bulk-approved; future requests in the same turn re-prompt
+    normally. ConsentDecision enum is intentionally NOT extended —
+    batch is a wire-level shorthand, not a runtime-policy concept.
     """
     from dialekt.mcp import ConsentDecision
 
@@ -235,6 +243,22 @@ def _handle_consent_response(ws_id: str, msg: dict) -> bool:
         log.debug("consent response dropped (unknown/stale): %s", key)
         return False
     raw = msg.get("decision", "denied")
+
+    if raw == "approved_all":
+        # Resolve the head; then snapshot-resolve every OTHER pending
+        # future for this ws_id as APPROVED. Audit per-call rows still
+        # emit through the normal path (mentor ruling Q1: keep per-call
+        # rows with batch_request_id linkage for forensic joins).
+        fut.set_result(ConsentDecision.APPROVED)
+        prefix = f"{ws_id}:"
+        siblings = [k for k in _pending_consents
+                    if k.startswith(prefix) and k != key]
+        for sk in siblings:
+            sf = _pending_consents.get(sk)
+            if sf is not None and not sf.done():
+                sf.set_result(ConsentDecision.APPROVED)
+        return True
+
     try:
         decision = ConsentDecision(raw)
     except (ValueError, TypeError):

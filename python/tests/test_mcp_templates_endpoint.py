@@ -84,18 +84,32 @@ def test_template_ids_are_unique(client):
 # ── Specific template invariants we don't want to drift ────────────────────
 
 
-def test_github_template_marked_validated(client):
-    """github is the validated reference template (ws_chat_mcp_integration
-    + run_github_e2e harness on 2026-04-25). If it's ever flipped to
-    `validated: false` the catalog has regressed — fail loudly."""
+def test_github_template_uses_official_go_binary(client):
+    """v0.24: github template migrated from upstream-deprecated
+    @modelcontextprotocol/server-github (npm) to github-mcp-server
+    (official Go binary from github.com/github/github-mcp-server).
+    Catalog ships with validated:false until a fresh PAT re-runs
+    the v0.20 harness against the new command — validation_notes
+    documents the reasoning. If the catalog ever silently reverts
+    to the npm command, this test fails loudly."""
     r = client.get("/mcp-templates")
     github = next(
         (t for t in r.json()["templates"] if t["id"] == "github"), None
     )
     assert github is not None, "github template must exist in catalog"
-    assert github["validated"] is True
     assert github["transport"] == "stdio"
-    assert github["command"][:2] == ["npx", "-y"]
+    assert github["command"] == ["github-mcp-server", "stdio"], (
+        f"github template must use the official Go binary command, "
+        f"not the deprecated npm package. Got: {github['command']}"
+    )
+    assert github["validated"] is False, (
+        "github template ships with validated:false until re-validation "
+        "against the Go binary lands"
+    )
+    assert "github-mcp-server" in github.get("validation_notes", ""), (
+        "validation_notes must document the migration from the npm "
+        "package and the install hint for the Go binary"
+    )
 
 
 def test_filesystem_template_uses_string_prompt_for_sandbox(client):
@@ -151,19 +165,22 @@ def test_template_schema_no_plaintext_secrets(client):
             )
 
 
-def test_only_validated_github_and_filesystem_have_validated_true(client):
-    """Honesty bar: the only two templates that have actually been
-    run end-to-end as part of dialekt's regression suite or the
-    GitHub MCP validation pass are `github` and `filesystem`. All
-    other templates must ship as `validated: false` with an amber
-    pill in the UI. If a community template is flipped to `true`
-    without a corresponding entry in MCP_PRODUCTION_VALIDATION.md,
-    this test fails — preventing accidental promotion.
+def test_only_validated_filesystem_has_validated_true(client):
+    """Honesty bar: post-v0.24 the only template with validated:true
+    is `filesystem` (covered end-to-end by the regression suite via
+    test_ws_chat_mcp_integration). The `github` template flipped
+    back to validated:false in v0.24 because the underlying server
+    migrated from the (validated) npm package to the (pending-
+    re-validation) Go binary. Other community templates must ship
+    as validated:false. If anything flips to true without a
+    documented validation pass, this test fails — preventing
+    accidental promotion.
     """
     r = client.get("/mcp-templates")
     for tpl in r.json()["templates"]:
         if tpl["validated"]:
-            assert tpl["id"] in ("github", "filesystem"), (
+            assert tpl["id"] in ("filesystem",), (
                 f"template {tpl['id']!r} cannot be `validated: true` "
-                f"without a documented validation pass"
+                f"without a documented validation pass against the "
+                f"current `command` shape"
             )

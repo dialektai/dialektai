@@ -285,9 +285,13 @@ export function useChat() {
   }, []);
 
   // ── MCP consent ────────────────────────────────────────────────────
-  // Three decisions map to the backend ConsentDecision enum:
+  // Decisions map to backend ConsentDecision enum + v0.24 wire shorthand:
   //   "approved"          — single tool call only
   //   "approved_session"  — cache (server, tool) for this WS session
+  //   "approved_all"      — v0.24: head + all currently-queued resolve as
+  //                         APPROVED on the backend; FE clears its queue
+  //                         to match. Snapshot semantics — future
+  //                         requests in the same turn re-prompt normally.
   //   "denied"            — refuse, runtime raises MCPConsentDenied
   const respondConsent = useCallback((decision) => {
     setConsentQueue(prev => {
@@ -300,7 +304,11 @@ export function useChat() {
           decision,
         }));
       }
-      return prev.slice(1);
+      // approved_all: backend resolves head + all siblings, so FE
+      // queue must drop everything (not just the head). Other
+      // decisions only pop the head; remaining items re-render in
+      // the modal one-by-one.
+      return decision === 'approved_all' ? [] : prev.slice(1);
     });
   }, []);
 

@@ -329,3 +329,148 @@ def test_unknown_decision_coerced_to_denied():
         assert decision == ConsentDecision.DENIED
 
     asyncio.run(run())
+
+
+# ── v0.24 approve_all batching ──────────────────────────────────────────────
+
+
+def test_approved_all_resolves_head_and_all_siblings_for_same_ws():
+    """approved_all decision resolves the head request as APPROVED and
+    snapshot-resolves every other pending consent for this ws_id as
+    APPROVED. Mentor ruling §A: snapshot semantics, atomic at decision-
+    resolution time."""
+    async def run():
+        srv._pending_consents.clear()
+        ws = FakeWS()
+        loop = asyncio.get_event_loop()
+        prompt = srv._build_consent_prompt_fn(ws, "ws-batch", loop)
+
+        # Fire 3 concurrent prompts (simulating an agent burst).
+        async def responder():
+            # Wait until all 3 futures are pending.
+            for _ in range(200):
+                if len(srv._pending_consents) >= 3:
+                    break
+                await asyncio.sleep(0.001)
+            # Pick the first request_id as the "head" the user clicks
+            # Approve All on; the other two are siblings.
+            keys = sorted(srv._pending_consents.keys())
+            _, head_req = keys[0].split(":", 1)
+            srv._handle_consent_response("ws-batch", {
+                "request_id": head_req,
+                "decision": "approved_all",
+            })
+
+        responder_task = asyncio.create_task(responder())
+        results = await asyncio.gather(
+            prompt(_make_request(tool_name="t1")),
+            prompt(_make_request(tool_name="t2")),
+            prompt(_make_request(tool_name="t3")),
+        )
+        await responder_task
+
+        assert all(d == ConsentDecision.APPROVED for d in results), results
+        # Pending map fully drained — every future was resolved.
+        assert all(k.startswith("ws-other:") or not k.startswith("ws-batch:")
+                   for k in srv._pending_consents.keys())
+
+
+    asyncio.run(run())
+
+
+def test_approved_all_does_not_affect_other_ws_id():
+    """Sibling resolution is scoped to the current ws_id. Other
+    sessions in the same process keep their pending consents intact."""
+    async def run():
+        srv._pending_consents.clear()
+        ws_a = FakeWS()
+        ws_b = FakeWS()
+        loop = asyncio.get_event_loop()
+        prompt_a = srv._build_consent_prompt_fn(ws_a, "ws-A", loop)
+        prompt_b = srv._build_consent_prompt_fn(ws_b, "ws-B", loop)
+
+        b_decision_holder = {}
+
+        async def fire_b():
+            # ws-B has its own pending consent that must NOT be
+            # auto-resolved by ws-A clicking Approve All.
+            try:
+                d = await asyncio.wait_for(
+                    prompt_b(_make_request(tool_name="ws_b_tool")),
+                    timeout=2.0,
+                )
+                b_decision_holder["d"] = d
+            except asyncio.TimeoutError:
+                b_decision_holder["d"] = "timeout"
+
+        async def responder():
+            # Wait until A has 2 pending and B has 1 pending.
+            for _ in range(200):
+                a_count = sum(1 for k in srv._pending_consents if k.startswith("ws-A:"))
+                b_count = sum(1 for k in srv._pending_consents if k.startswith("ws-B:"))
+                if a_count >= 2 and b_count >= 1:
+                    break
+                await asyncio.sleep(0.001)
+            keys = [k for k in srv._pending_consents if k.startswith("ws-A:")]
+            _, head_req = sorted(keys)[0].split(":", 1)
+            srv._handle_consent_response("ws-A", {
+                "request_id": head_req,
+                "decision": "approved_all",
+            })
+            # Now resolve ws-B explicitly so the test does not hang.
+            await asyncio.sleep(0.05)
+            b_keys = [k for k in srv._pending_consents if k.startswith("ws-B:")]
+            if b_keys:
+                _, bid = b_keys[0].split(":", 1)
+                srv._handle_consent_response("ws-B", {
+                    "request_id": bid,
+                    "decision": "denied",
+                })
+
+        b_task = asyncio.create_task(fire_b())
+        responder_task = asyncio.create_task(responder())
+        a_results = await asyncio.gather(
+            prompt_a(_make_request(tool_name="a1")),
+            prompt_a(_make_request(tool_name="a2")),
+        )
+        await b_task
+        await responder_task
+
+        # A both APPROVED via batch, B explicitly DENIED (not affected
+        # by the batch on A).
+        assert all(d == ConsentDecision.APPROVED for d in a_results)
+        assert b_decision_holder["d"] == ConsentDecision.DENIED
+
+    asyncio.run(run())
+
+
+def test_approved_all_falls_through_to_approved_when_no_siblings():
+    """Mentor P2 nit: if approved_all arrives with queueLength=1 (no
+    siblings to resolve), the head still resolves as APPROVED — same
+    as plain `approved`. Defensive: the frontend gates the button on
+    queueLength > 1, but a buggy/old client could send approved_all
+    with one pending."""
+    async def run():
+        srv._pending_consents.clear()
+        ws = FakeWS()
+        prompt = srv._build_consent_prompt_fn(ws, "ws-solo", asyncio.get_event_loop())
+
+        async def responder():
+            for _ in range(100):
+                if srv._pending_consents:
+                    break
+                await asyncio.sleep(0.001)
+            key = next(iter(srv._pending_consents))
+            _, req_id = key.split(":", 1)
+            srv._handle_consent_response("ws-solo", {
+                "request_id": req_id,
+                "decision": "approved_all",
+            })
+
+        task = asyncio.create_task(responder())
+        decision = await prompt(_make_request())
+        await task
+        assert decision == ConsentDecision.APPROVED
+
+    asyncio.run(run())
+

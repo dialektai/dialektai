@@ -30,6 +30,7 @@ export default function ConsentModal({
   queueLength,
   onApprove,
   onApproveSession,
+  onApproveAll,
   onDeny,
   onTimeoutAck,
 }) {
@@ -55,11 +56,17 @@ export default function ConsentModal({
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onDeny?.();
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a' && queueLength > 1) {
+        // v0.24: Shift+Cmd/Ctrl+A approves the entire visible burst.
+        // Mentor-ruled key choice: 'A' carries select-all-pending
+        // semantic; modifier guard avoids ambient typing collision.
+        e.preventDefault();
+        onApproveAll?.();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [request, onApprove, onApproveSession, onDeny, onTimeoutAck]);
+  }, [request, onApprove, onApproveSession, onApproveAll, onDeny, onTimeoutAck, queueLength]);
 
   if (!request) return null;
 
@@ -177,6 +184,15 @@ export default function ConsentModal({
                   color: T.text, padding: '8px 16px', fontSize: 12,
                   cursor: 'pointer', letterSpacing: '.04em',
                 }}>Approve for session (⇧⏎)</button>
+              {queueLength > 1 && (
+                <button
+                  onClick={onApproveAll}
+                  style={{
+                    background: 'transparent', border: `1px solid ${T.cyan}66`,
+                    color: T.cyan, padding: '8px 16px', fontSize: 12,
+                    cursor: 'pointer', letterSpacing: '.04em',
+                  }}>Approve all {queueLength} pending (⇧⌘A)</button>
+              )}
               <button
                 autoFocus
                 onClick={onApprove}
