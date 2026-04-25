@@ -7,6 +7,7 @@ import { getCloudApi } from '../lib/cloud.js';
 import McpTemplateModal from '../components/McpTemplateModal.jsx';
 import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
 import McpToolList from '../components/McpToolList.jsx';
+import MCPAuditDashboard from '../components/MCPAuditDashboard.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -2958,6 +2959,7 @@ function AdminSection() {
   const [loading, setLoading] = useState(true);
   const [reloadingSchema, setReloadingSchema] = useState(false);
   const [schemaInfo, setSchemaInfo] = useState(null);
+  const [tab, setTab] = useState('stats'); // 'stats' | 'usage'
 
   const load = () => {
     setLoading(true);
@@ -3014,7 +3016,26 @@ function AdminSection() {
     <BodyShell crumb="03 / SYSTEM → ADMIN" title="Admin Panel"
       desc="System-wide usage statistics, agent breakdown, and maintenance actions.">
 
-      {loading ? (
+      {/* Tabs: Stats (default) | Usage (MCP audit dashboard, v0.25). */}
+      <div style={{
+        display: 'flex', gap: 0, marginBottom: 18,
+        borderBottom: `1px solid ${T.border}`,
+      }}>
+        {[['stats', 'Stats'], ['usage', 'Usage']].map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)} style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: `2px solid ${tab === k ? T.cyan : 'transparent'}`,
+            color: tab === k ? T.text : T.muted,
+            padding: '8px 16px', fontSize: 11, fontFamily: T.mono,
+            letterSpacing: '.06em', cursor: 'pointer', marginBottom: -1,
+          }}>{label.toUpperCase()}</button>
+        ))}
+      </div>
+
+      {tab === 'usage' ? (
+        <MCPAuditDashboard />
+      ) : loading ? (
         <div style={{ color: T.dim, fontSize: 13, padding: '16px 0' }}>Loading…</div>
       ) : stats ? (
         <>

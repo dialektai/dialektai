@@ -81,9 +81,13 @@ of the surfaces that did ship.
 - **Target:** when MCP argument schemas land upstream.
 
 ### B6. /audit/log audit-row consumer view for MCP events
-- **Where deferred:** out of scope for the RC
-- **What's missing:** the runtime emits `mcp_consent_requested`, `mcp_consent_decision`, `mcp_tool_call` rows into `audit_log`. The Settings → Admin → Usage tab does not yet visualize these distinct kinds. The audit data is correct and queryable; only the visualization is missing.
-- **Target:** M2 Month 2 dashboard pass.
+- **Where deferred:** out of scope for the RC.
+- **Status:** Closed in **v0.25** by `MCPAuditDashboard` mounted under Settings → Admin → Usage tab (mentor-approved 2026-04-25 after 3 design passes; backend `GET /audit/log` shipped commit 1/2 PR #17, frontend tab shipped commit 2/2).
+
+### B7. Auth on `/audit/log` (both directions) before cloud / multi-user
+- **Where deferred:** v0.25 audit dashboard mentor pass 1 ruling.
+- **What's missing:** both `POST /audit/log` (write side, shipped M2 Month 1) and `GET /audit/log` (read side, shipped v0.25) are unauthenticated. Acceptable today because the desktop is single-user, binds to localhost, and the dashboard only views local data. The moment dialekt-cloud or any multi-user surface starts proxying audit reads/writes, both endpoints need a real auth check (bearer token, license-key bind, or session token — to be designed alongside the cloud admin surface).
+- **Target:** before any non-localhost deployment of `dialekt-cloud` proxies `/audit/log`. Tracked here so it cannot be silently shipped without a corresponding auth layer.
 
 ---
 
