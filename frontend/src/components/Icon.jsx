@@ -28,7 +28,7 @@ const paths = {
   plug: 'M7 3v4M13 3v4M5 7h10v3a4 4 0 01-4 4H9a4 4 0 01-4-4V7zM10 14v4',
 };
 
-export default function Icon({ name, size = 14, color = 'currentColor' }) {
+export default function Icon({ name, size = 14, color = 'currentColor', title }) {
   return (
     <svg
       width={size} height={size}
@@ -39,7 +39,10 @@ export default function Icon({ name, size = 14, color = 'currentColor' }) {
       strokeLinecap="square"
       strokeLinejoin="miter"
       style={{ flexShrink: 0 }}
+      role={title ? 'img' : undefined}
+      aria-label={title || undefined}
     >
+      {title && <title>{title}</title>}
       <path d={paths[name] || paths.diamond} />
     </svg>
   );

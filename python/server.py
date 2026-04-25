@@ -680,16 +680,49 @@ async def db_create_agent(name: str, description: str, system_prompt: str,
     return agent_id
 
 
+def _mcp_server_names_from_manifest(manifest_yaml: str | None) -> list[str]:
+    """Parse the manifest YAML once and project the mcp_servers names.
+
+    Empty list when the manifest is missing, malformed, or has no
+    mcp_servers block. Used by /agents serializers so the frontend can
+    show an MCP indicator without re-parsing YAML in the browser
+    (Phase 1.6, design doc §5.2).
+    """
+    if not manifest_yaml:
+        return []
+    try:
+        import yaml as _yml
+        m = _yml.safe_load(manifest_yaml) or {}
+    except Exception:
+        return []
+    servers = m.get("mcp_servers") or []
+    out: list[str] = []
+    for entry in servers:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+            if isinstance(name, str) and name:
+                out.append(name)
+    return out
+
+
+def _serialize_agent_row(row: dict) -> dict:
+    """Augment a raw `agents` row with derived fields. Single source of
+    truth for the /agents response shape."""
+    out = dict(row)
+    out["mcp_server_names"] = _mcp_server_names_from_manifest(out.get("manifest_yaml"))
+    return out
+
+
 async def db_get_agent(agent_id: str) -> dict | None:
     cursor = await db.execute("SELECT * FROM agents WHERE id = ?", (agent_id,))
     row = await cursor.fetchone()
-    return dict(row) if row else None
+    return _serialize_agent_row(dict(row)) if row else None
 
 
 async def db_list_agents() -> list[dict]:
     cursor = await db.execute("SELECT * FROM agents ORDER BY updated_at DESC")
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return [_serialize_agent_row(dict(r)) for r in rows]
 
 
 async def db_update_agent(agent_id: str, **fields) -> None:

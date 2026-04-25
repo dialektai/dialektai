@@ -349,6 +349,8 @@ export default function LeftPanel({
               {agents.map(a => {
                 const isSelected = a.id === selectedAgentId;
                 const statusColor = a.status === 'published' ? T.green : a.status === 'archived' ? T.dim : T.amber;
+                const mcpNames = Array.isArray(a.mcp_server_names) ? a.mcp_server_names : [];
+                const hasMcp = mcpNames.length > 0;
                 return (
                   <div
                     key={a.id}
@@ -365,6 +367,14 @@ export default function LeftPanel({
                     <span style={{ fontSize: 11, color: isSelected ? T.text : T.muted, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {a.name}
                     </span>
+                    {hasMcp && (
+                      <Icon
+                        name="plug"
+                        size={11}
+                        color={isSelected ? T.cyan : T.muted}
+                        title={`Uses MCP: ${mcpNames.join(', ')}`}
+                      />
+                    )}
                     {isSelected && <span className="mono" style={{ fontSize: 9, color: T.cyan }}>active</span>}
                   </div>
                 );
