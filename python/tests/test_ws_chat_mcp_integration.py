@@ -171,16 +171,28 @@ def test_ctx_mcp_resolves_inside_raw_thread_via_copy_context():
                 try:
                     namespace = get_context().mcp
                     captured["namespace_class"] = type(namespace).__name__
-                    # `ctx.mcp.<server>` returns a SyncMCPServerProxy in
-                    # the sync_bridge; calling a tool on it dispatches
-                    # back to the runtime loop and returns the value.
-                    captured["server_proxy_class"] = type(namespace.fs).__name__
+                    server_proxy = namespace.fs
+                    captured["server_proxy_class"] = type(server_proxy).__name__
+                    # The strongest regression check: actually CALL a
+                    # tool through the sync bridge from this raw worker
+                    # thread. Without copy_context() this entire chain
+                    # would have raised RuntimeError before the call.
+                    # list_directory is a read-only fs MCP tool; the
+                    # consent provider auto-approves non-destructive
+                    # tools regardless of autonomy level.
+                    result = server_proxy.list_directory(path=str(sandbox_path))
+                    captured["call_returned"] = True
+                    captured["result_type"] = type(result).__name__
                 except Exception as e:
                     captured["error"] = repr(e)
 
             t = threading.Thread(target=lambda: ctx_copy.run(worker))
             t.start()
-            t.join(timeout=10.0)
+            # Use to_thread to avoid blocking the event loop — the sync
+            # bridge dispatches the tool call BACK to this same loop
+            # via asyncio.run_coroutine_threadsafe, and a plain
+            # `t.join()` would deadlock against that dispatch.
+            await asyncio.to_thread(t.join, 30.0)
 
             try:
                 assert "error" not in captured, (
@@ -188,6 +200,9 @@ def test_ctx_mcp_resolves_inside_raw_thread_via_copy_context():
                 )
                 assert "namespace_class" in captured, captured
                 assert "server_proxy_class" in captured, captured
+                assert captured.get("call_returned") is True, (
+                    f"cross-thread tool call did not complete: {captured}"
+                )
             finally:
                 unbind_mcp_runtime(bind_token)
                 await srv._shutdown_session_mcp_runtime("t-thread")
