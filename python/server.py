@@ -326,6 +326,24 @@ async def _build_session_mcp_runtime(
         prompt_fn = _build_consent_prompt_fn(ws, ws_id, loop)
         consent_provider = provider_for_autonomy(autonomy, prompt_fn)
 
+        # Build per-server ToolPolicy from the manifest's allow_tools
+        # / deny_tools fields (v0.22). When a manifest has no scoping
+        # fields, the dict stays empty and MCPRuntime treats every
+        # call as "all tools allowed" — backwards-compat with v0.20/
+        # v0.21 manifests preserved.
+        from dialekt.mcp.runtime import ToolPolicy
+        tool_policies: dict = {}
+        for entry in servers:
+            name = entry.get("name") or ""
+            allow_raw = entry.get("allow_tools")
+            deny_raw = entry.get("deny_tools") or []
+            if allow_raw is None and not deny_raw:
+                continue  # no scoping → leave server out of policies
+            tool_policies[name] = ToolPolicy(
+                allow=frozenset(allow_raw) if allow_raw is not None else None,
+                deny=frozenset(deny_raw),
+            )
+
         # Use the existing PluginContext audit callback. It already POSTs
         # to /audit/log with the **payload kwargs the runtime emits
         # (kind, action, result, agent_id, binding_id, target,
@@ -340,6 +358,7 @@ async def _build_session_mcp_runtime(
             audit_callback=audit_cb,
             autonomy=autonomy,
             agent_id=agent_id,
+            tool_policies=tool_policies,
         )
         sync_adapter = create_sync_mcp(runtime)
         bind_token = bind_mcp_runtime(sync_adapter)
