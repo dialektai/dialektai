@@ -231,6 +231,128 @@ def _cancel_pending_consents(ws_id: str) -> None:
         if fut is not None and not fut.done():
             fut.cancel()
 
+
+# ── MCP runtime per chat session (Phase 1.5a) ────────────────────────────────
+# Module-global ws_id → MCPRuntime map. Populated when an agent's manifest
+# declares mcp_servers, popped in ws_chat finally. Test introspection only;
+# do not use for runtime logic — the agent reaches the runtime via
+# bind_mcp_runtime + the `ctx.mcp` namespace, not by looking it up here.
+_active_mcp_runtimes: dict = {}
+
+
+async def _build_session_mcp_runtime(
+    *, manifest: dict, ws, ws_id: str, loop, agent_id: str,
+):
+    """Construct an MCPRuntime + sync adapter for one chat session.
+
+    Returns ``(runtime, sync_adapter, manager, bind_token)`` on success,
+    or ``None`` if the manifest declares no mcp_servers.
+
+    Soft-fails on configuration errors (missing secret, malformed
+    transport spec): emits an ``mcp_setup_error`` WS frame and returns
+    ``None`` so the chat continues without MCP — the agent's
+    ``ctx.mcp`` raises ``RuntimeError`` on first use, which surfaces
+    as a normal tool error rather than killing the session.
+    """
+    servers = list(manifest.get("mcp_servers") or [])
+    if not servers:
+        return None
+
+    from dialekt.mcp import (
+        BearerAuth, EnvVarsAuth, NoAuth,
+        HttpTransportSpec, StdioTransportSpec,
+        provider_for_autonomy,
+    )
+    from dialekt.mcp.manager import MCPClientManager
+    from dialekt.mcp.runtime import MCPRuntime
+    from dialekt.mcp.sync_bridge import create_sync_mcp
+    from dialekt.mcp.secrets_resolver import resolve_env, resolve_secret_refs
+    from dialekt.llm._plugin_context import bind_mcp_runtime, get_context
+
+    try:
+        server_specs: dict = {}
+        for entry in servers:
+            name = entry.get("name") or ""
+            transport_kind = entry.get("transport") or "stdio"
+            timeout = float(entry.get("timeout_seconds") or 30.0)
+            if transport_kind == "stdio":
+                env_raw = dict(entry.get("env") or {})
+                env_resolved = resolve_env(env_raw, server_name=name) if env_raw else {}
+                spec = StdioTransportSpec(
+                    command=list(entry.get("command") or []),
+                    env=env_resolved,
+                    cwd=entry.get("cwd"),
+                    timeout_seconds=timeout,
+                )
+                creds = EnvVarsAuth(vars=env_resolved) if env_resolved else NoAuth()
+            else:
+                spec = HttpTransportSpec(
+                    url=entry.get("url") or "",
+                    timeout_seconds=timeout,
+                )
+                auth = entry.get("auth") or {}
+                if auth.get("type") == "bearer" and auth.get("token"):
+                    token = resolve_secret_refs(auth["token"], server_name=name)
+                    creds = BearerAuth(token=token)
+                else:
+                    creds = NoAuth()
+            server_specs[name] = (spec, creds, timeout)
+
+        autonomy = ((manifest.get("autonomy") or {}).get("recommended")
+                    or "ask-before-write")
+        prompt_fn = _build_consent_prompt_fn(ws, ws_id, loop)
+        consent_provider = provider_for_autonomy(autonomy, prompt_fn)
+
+        # Use the existing PluginContext audit callback. It already POSTs
+        # to /audit/log with the **payload kwargs the runtime emits
+        # (kind, action, result, agent_id, binding_id, target,
+        # duration_ms, error_kind, extra). No re-rolled implementation.
+        audit_cb = get_context()._default_audit_callback
+
+        manager = MCPClientManager(agent_id=agent_id, audit_callback=audit_cb)
+        runtime = MCPRuntime(
+            manager=manager,
+            server_specs=server_specs,
+            consent_provider=consent_provider,
+            audit_callback=audit_cb,
+            autonomy=autonomy,
+            agent_id=agent_id,
+        )
+        sync_adapter = create_sync_mcp(runtime)
+        bind_token = bind_mcp_runtime(sync_adapter)
+        return runtime, sync_adapter, manager, bind_token
+    except Exception as e:
+        log.warning(
+            "MCP setup failed for ws_id=%s agent=%s: %s",
+            ws_id, agent_id, e,
+        )
+        try:
+            await ws.send_text(json.dumps({
+                "type": "mcp_setup_error",
+                "error": str(e)[:500],
+            }))
+        except Exception:
+            pass
+        return None
+
+
+async def _shutdown_session_mcp_runtime(ws_id: str) -> None:
+    """Pop and shut down the runtime registered for this ws_id, if any."""
+    entry = _active_mcp_runtimes.pop(ws_id, None)
+    if entry is None:
+        return
+    runtime, _adapter, manager, bind_token = entry
+    from dialekt.llm._plugin_context import unbind_mcp_runtime
+    try:
+        unbind_mcp_runtime(bind_token)
+    except Exception:
+        pass
+    try:
+        await manager.shutdown()
+    except Exception:
+        log.debug("MCP manager shutdown failed", exc_info=True)
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS connections (
     id         TEXT PRIMARY KEY,
@@ -2314,6 +2436,24 @@ async def ws_chat(ws: WebSocket):
                     if agent_for_join:
                         agent_ctx_for_join = await resolve_agent_context(agent_for_join)
 
+                # Phase 1.5a: build per-session MCPRuntime if the agent's
+                # manifest declares mcp_servers. Soft-fails on config
+                # errors; chat continues without MCP.
+                if agent_for_join and agent_for_join.get("manifest_yaml"):
+                    try:
+                        import yaml as _yml
+                        _parsed_for_mcp = _yml.safe_load(agent_for_join["manifest_yaml"]) or {}
+                    except Exception:
+                        _parsed_for_mcp = {}
+                    if _parsed_for_mcp.get("mcp_servers"):
+                        built = await _build_session_mcp_runtime(
+                            manifest=_parsed_for_mcp,
+                            ws=ws, ws_id=ws_id, loop=loop,
+                            agent_id=agent_for_join["id"],
+                        )
+                        if built is not None:
+                            _active_mcp_runtimes[ws_id] = built
+
                 # Load message history — used for both summarization and few-shot query
                 cursor = await db.execute(
                     "SELECT role, content FROM messages WHERE session_id=? AND type='message' ORDER BY created_at",
@@ -2517,6 +2657,7 @@ async def ws_chat(ws: WebSocket):
     finally:
         _active_interpreters.pop(ws_id, None)
         _cancel_pending_consents(ws_id)
+        await _shutdown_session_mcp_runtime(ws_id)
 
 
 if __name__ == "__main__":
