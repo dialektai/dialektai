@@ -8,7 +8,7 @@
 // in that case every cloud call will fail anyway, so the value doesn't matter.
 
 const DESKTOP_API = 'http://localhost:8765';
-export const DEFAULT_CLOUD = 'https://dialekt-cloud.dias.now';
+export const DEFAULT_CLOUD = 'https://api.dias.now';
 
 let cached = null;
 let lastProbe = 0;
