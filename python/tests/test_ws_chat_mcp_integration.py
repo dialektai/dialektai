@@ -123,6 +123,79 @@ def test_build_soft_fails_on_invalid_transport_kind_and_emits_setup_error():
 
 
 @pytest.mark.skipif(NPX is None, reason=SKIP_REASON)
+def test_ctx_mcp_resolves_inside_raw_thread_via_copy_context():
+    """Regression for mentor P0: `bind_mcp_runtime` uses a ContextVar.
+    OI runs in a raw `threading.Thread` — ContextVars don't inherit.
+    The fix wraps the thread spawn in `contextvars.copy_context().run`.
+    This test asserts the live resolution path (not just registry
+    state): bind in an asyncio task, spawn a raw thread via
+    `copy_context().run(...)`, call `ctx.mcp.<server>.<tool>(...)`
+    from inside the thread, get back a real `CallToolResult`.
+    """
+    import contextvars
+    import threading
+    from dialekt.llm._plugin_context import bind_mcp_runtime, unbind_mcp_runtime, get_context
+
+    async def run():
+        srv._active_mcp_runtimes.clear()
+        with tempfile.TemporaryDirectory() as sandbox:
+            sandbox_path = Path(sandbox)
+            (sandbox_path / "hello.txt").write_text("world")
+            ws = FakeWS()
+            manifest = {
+                "autonomy": {"recommended": "ask-before-write"},
+                "mcp_servers": [{
+                    "name": "fs",
+                    "transport": "stdio",
+                    "command": [
+                        NPX, "-y",
+                        "@modelcontextprotocol/server-filesystem",
+                        str(sandbox_path),
+                    ],
+                    "timeout_seconds": 60,
+                }],
+            }
+            built = await srv._build_session_mcp_runtime(
+                manifest=manifest, ws=ws, ws_id="t-thread",
+                loop=asyncio.get_event_loop(), agent_id="agent-thread",
+            )
+            assert built is not None
+            _runtime, _adapter, _manager, bind_token = built
+
+            # Snapshot the context AFTER the bind so the worker thread
+            # inherits the ContextVar.
+            ctx_copy = contextvars.copy_context()
+            captured: dict = {}
+
+            def worker():
+                try:
+                    namespace = get_context().mcp
+                    captured["namespace_class"] = type(namespace).__name__
+                    # `ctx.mcp.<server>` returns a SyncMCPServerProxy in
+                    # the sync_bridge; calling a tool on it dispatches
+                    # back to the runtime loop and returns the value.
+                    captured["server_proxy_class"] = type(namespace.fs).__name__
+                except Exception as e:
+                    captured["error"] = repr(e)
+
+            t = threading.Thread(target=lambda: ctx_copy.run(worker))
+            t.start()
+            t.join(timeout=10.0)
+
+            try:
+                assert "error" not in captured, (
+                    f"ctx.mcp resolution from raw thread failed: {captured.get('error')}"
+                )
+                assert "namespace_class" in captured, captured
+                assert "server_proxy_class" in captured, captured
+            finally:
+                unbind_mcp_runtime(bind_token)
+                await srv._shutdown_session_mcp_runtime("t-thread")
+
+    asyncio.run(run())
+
+
+@pytest.mark.skipif(NPX is None, reason=SKIP_REASON)
 def test_build_happy_path_with_filesystem_mcp_and_shutdown_clears_registry():
     """Real npx-spawned filesystem MCP. Helper returns a 4-tuple
     (runtime, adapter, manager, bind_token). Registering it and then
@@ -156,7 +229,24 @@ def test_build_happy_path_with_filesystem_mcp_and_shutdown_clears_registry():
             assert "t-fs" in srv._active_mcp_runtimes
             assert ws.sent == [], "happy path must not emit setup-error frames"
 
-            # Shutdown should clear the registry without exceptions.
+            # Force a real subprocess connect so shutdown has work to do.
+            # Mentor P1: prior version asserted only registry semantics
+            # while manager._clients stayed empty, making shutdown a
+            # no-op. invoke_tool(...) opens the stdio MCP client; we
+            # then assert it lands in the manager AND that shutdown
+            # actually closes it (manager goes _shutdown=True).
+            await runtime.invoke_tool("fs", "list_directory", arguments={"path": str(Path('.').resolve())[:0] or "/"})
+            # Some servers may reject the path; we don't care about the
+            # result — only that get_client got called and the manager
+            # opened the subprocess.
+            # The client cache lives at manager._clients; after
+            # invoke_tool the "fs" entry must be present.
+            assert "fs" in manager._clients, (
+                "invoke_tool must have triggered manager.get_client('fs', ...)"
+            )
+
+            # Shutdown should close the client and flip the shutdown flag.
             await srv._shutdown_session_mcp_runtime("t-fs")
             assert "t-fs" not in srv._active_mcp_runtimes
+            assert manager._shutdown is True, "manager.shutdown() must mark _shutdown"
     asyncio.run(run())

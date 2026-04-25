@@ -2647,7 +2647,15 @@ async def ws_chat(ws: WebSocket):
                         send({"type": "done"}), loop
                     ).result(timeout=5)
 
-            thread = threading.Thread(target=run_oi, daemon=True)
+            # Carry the current async context (incl. bind_mcp_runtime's
+            # ContextVar) into OI's raw thread so ctx.mcp can resolve
+            # the runtime from inside synchronous Python blocks. Raw
+            # threading.Thread does NOT inherit contextvars, only
+            # asyncio tasks and asyncio.to_thread workers do — so we
+            # must copy explicitly. Mentor commit-A review P0.
+            import contextvars as _contextvars
+            _ctx_copy = _contextvars.copy_context()
+            thread = threading.Thread(target=lambda: _ctx_copy.run(run_oi), daemon=True)
             thread.start()
 
     except WebSocketDisconnect:
