@@ -358,11 +358,19 @@ p { margin: 0; }
 
 @media (max-width: 860px) {
   .nav-links { display: none; }
-  .nav-inner { gap: 14px; }
+  .nav-inner { gap: 12px; padding: 0 18px; }
   .pricing-grid { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .nav-cta .btn { padding: 8px 12px; font-size: 13px; }
 }
-@media (max-width: 540px) {
+@media (max-width: 560px) {
+  /* Compact mobile nav: hide secondary "Have a key" button (still in footer + login link),
+     keep brand + lang toggle + primary CTA only. */
+  .nav-cta .btn:not(.primary) { display: none; }
+  .nav-cta .btn.primary { padding: 8px 12px; font-size: 12.5px; }
+  .lang-toggle button { padding: 3px 8px; font-size: 11px; }
+  .brand { font-size: 19px; }
+  .nav-inner { gap: 10px; height: 56px; }
   .footer-grid { grid-template-columns: 1fr; }
   .footer-bottom { flex-direction: column; align-items: flex-start; gap: 6px; }
 }

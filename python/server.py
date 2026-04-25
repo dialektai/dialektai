@@ -380,7 +380,11 @@ async def _build_session_mcp_runtime(
         # duration_ms, error_kind, extra). No re-rolled implementation.
         audit_cb = get_context()._default_audit_callback
 
-        manager = MCPClientManager(agent_id=agent_id, audit_callback=audit_cb)
+        manager = MCPClientManager(
+            agent_id=agent_id,
+            audit_callback=audit_cb,
+            health_registry=_mcp_health,
+        )
         runtime = MCPRuntime(
             manager=manager,
             server_specs=server_specs,
@@ -1503,8 +1507,34 @@ class MCPServerUpdate(BaseModel):
     timeout_seconds: Optional[float] = Field(default=None, ge=5.0, le=300.0)
 
 
+# v0.26 process-resilience health registry. Per-process singleton.
+# Persist callback writes 'live: <error_kind>' into mcp_servers.last_test_error
+# so a stdio child crash surfaces in the existing red-dot UI without a
+# new schema column. Exceptions inside _fire_persist are swallowed.
+async def _persist_health_to_row(server_name: str, status: str, error: str | None) -> None:
+    if status == "crashed":
+        msg = f"live: {error}" if error else "live: server unavailable"
+        await db.execute(
+            "UPDATE mcp_servers SET last_test_ok=0, last_test_error=?, "
+            "last_test_at=datetime('now'), updated_at=datetime('now') WHERE name=?",
+            (msg, server_name),
+        )
+    elif status == "healthy":
+        await db.execute(
+            "UPDATE mcp_servers SET last_test_ok=1, last_test_error=NULL, "
+            "last_test_at=datetime('now'), updated_at=datetime('now') WHERE name=?",
+            (server_name,),
+        )
+    await db.commit()
+
+
+from dialekt.mcp.health import MCPHealthRegistry  # noqa: E402
+_mcp_health = MCPHealthRegistry(persist_callback=_persist_health_to_row)
+
+
 def _mcp_row_to_response(row: dict) -> dict:
     """Serialize a mcp_servers row for the API. NEVER includes secret plaintext."""
+    health = _mcp_health.status(row["name"])
     return {
         "id": row["id"],
         "name": row["name"],
@@ -1521,6 +1551,8 @@ def _mcp_row_to_response(row: dict) -> dict:
         "last_test_at": row["last_test_at"],
         "last_test_ok": bool(row["last_test_ok"]) if row["last_test_ok"] is not None else None,
         "last_test_error": row["last_test_error"],
+        # v0.26 live_status: "unknown" until call_tool reports.
+        "live_status": health.status if health else "unknown",
         "tool_count": row["tool_count"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],

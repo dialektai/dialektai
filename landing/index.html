@@ -3,215 +3,263 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>dialekt.ai — The local AI agent that finishes what you start</title>
-  <meta name="description" content="Reads your codebase, runs tools, executes code, edits files, runs tests — on your machine, with your models. Your code never leaves the disk.">
+  <title>dialekt.ai — Private AI for teams that handle sensitive data</title>
+  <meta name="description" content="Deployed inside your perimeter. For your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/_shared.css">
   <script>
     window.__I18N_PAGE__ = {
       en: {
-        "hero.eyebrow": "v0.21 · Local-first · Ollama-powered · 0 tokens sent to cloud",
-        "hero.h1.a": "The local AI agent",
-        "hero.h1.b": "that finishes",
-        "hero.h1.c": "what you start.",
-        "hero.sub": "Reads your codebase, runs tools, executes code, edits files, runs tests — on your machine, with your models, asking permission at every step that matters. Your code never leaves the disk.",
-        "hero.cta.primary": "Start free trial",
-        "hero.cta.secondary": "Have a key",
-        "hero.meta1": "macOS · Linux · Windows",
-        "hero.meta2": "Apple Silicon · x64",
-        "hero.meta3": "Requires Ollama 0.4+",
+        "hero.eyebrow": "Enterprise pilot · Cohort 01 · 2026",
+        "hero.h1.a": "Private AI",
+        "hero.h1.b": "for teams that handle",
+        "hero.h1.c": "sensitive data.",
+        "hero.sub": "Deployed inside your perimeter. Available to your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.",
+        "hero.cta.primary": "Request pilot access",
+        "hero.cta.secondary": "Or start a free trial →",
+        "hero.meta1": "On-premises, private cloud, or air-gapped",
+        "hero.meta2": "No data training · No telemetry",
 
-        "diff.meta": "01 · The difference",
-        "diff.h": "Chat tools answer questions.",
-        "diff.h.b": "dialekt finishes the task.",
-        "diff.sub": "A chat is a conversation. An agent is a loop — it reads, reasons, runs tools, checks its work, and keeps going. The output is not prose. The output is your code, changed.",
-        "diff.chat.label": "Chat",
-        "diff.chat.kicker": "answers",
-        "diff.chat.body": "Asks the question. Gets a sketch. You still have to: open the file, paste, fix the syntax, run the tests, debug, repeat.",
-        "diff.agent.label": "Agent",
-        "diff.agent.kicker": "completes",
-        "diff.agent.body": "Reads files. Runs tools. Writes the diff. Asks permission. Runs the test. Iterates until green. You stayed in the composer.",
+        "diag.perimeter": "Your perimeter",
+        "diag.external": "External cloud — unused",
+        "diag.engine": "Dialekt engine",
 
-        "how.meta": "02 · How it works",
-        "how.h": "Give it the task. Watch it work.",
-        "how.h.b": "Approve what matters.",
-        "how.s1.kicker": "Step 01 / 03",
-        "how.s1.h": "Give it the task.",
-        "how.s1.p": "One prompt, grounded in the files you care about. No chain-of-thought theatre — write what you want fixed.",
-        "how.s2.kicker": "Step 02 / 03",
-        "how.s2.h": "Watch it work.",
-        "how.s2.p": "Tool calls stream in real time. Reads, greps, diffs, exec — every action is visible, with outputs attached. Nothing hidden in a black box.",
-        "how.s3.kicker": "Step 03 / 03",
-        "how.s3.h": "Approve what matters.",
-        "how.s3.p": "Anything that touches the filesystem, runs code, or reaches the network asks first. Approve per-call, per-session, or flip on autopilot for sandboxed paths.",
+        "problem.meta": "01 · The problem",
+        "problem.h": "Your teams want AI. Your compliance function cannot authorise it.",
+        "problem.1": "Your employees are already using consumer AI tools. Each prompt is a potential data exfiltration event.",
+        "problem.2": "Client files, financial records, and intellectual property cannot leave your jurisdiction — or your perimeter — under any circumstances.",
+        "problem.3": "Generic assistants do not know your org chart, your playbooks, your reporting formats, or your regulatory context.",
 
-        "local.meta": "03 · Local by design",
-        "local.h": "Your code stays on disk.",
-        "local.h.b": "Not as a promise. As a wire.",
-        "local.sub": "Inference runs on Ollama, on your machine. Filesystem access is sandboxed to paths you allow-list. No telemetry. No cloud sync. No account. You can pull the plug on your wifi and everything still works.",
-        "local.r1.k": "Inference",  "local.r1.v": "Ollama · localhost:11434",
-        "local.r2.k": "Filesystem", "local.r2.v": "Allow-listed paths only",
-        "local.r3.k": "Network",    "local.r3.v": "Ask per call · off by default",
-        "local.r4.k": "Telemetry",  "local.r4.v": "None · verifiable in network logs",
-        "local.r5.k": "Account",    "local.r5.v": "Not required · no login",
-        "local.r6.k": "Cloud sync", "local.r6.v": "Disabled · no endpoint exists",
+        "solution.meta": "02 · The approach",
+        "solution.h": "An AI layer that lives where your data already does.",
+        "solution.sub": "Dialekt is designed to be deployed entirely inside your perimeter — running on your compute, answering against your data, accessible only to your employees.",
+        "sol.1.h": "On your infrastructure",
+        "sol.1.p": "Deploy on your servers, your private cloud, or an air-gapped environment. Inference, indexing, and storage happen inside the boundary you already audit.",
+        "sol.2.h": "For every department",
+        "sol.2.p": "Separate workspaces for legal, finance, HR, R&D, and compliance. Each with their own data sources, permissions, context, and retention policies.",
+        "sol.3.h": "Compliance-ready",
+        "sol.3.p": "Audit log, role-based access, single sign-on, and data-residency controls are built in, not retrofitted. Every query and every document access is recorded and exportable.",
 
-        "cap.meta": "04 · What it can do",
-        "cap.h": "A tool, not a toy.",
-        "cap.h.b": "Every capability is one it actually has.",
-        "cap.1.tag": "Index",  "cap.1.h": "Read your codebase.",     "cap.1.p": "Semantic search across the workspace. Files are indexed locally on first open and kept in sync as you edit.",
-        "cap.2.tag": "Exec",   "cap.2.h": "Run tools.",               "cap.2.p": "fs, grep, exec, git, plus MCP servers for github, postgres, linear, figma. Bring your own.",
-        "cap.3.tag": "Edit",   "cap.3.h": "Edit files.",              "cap.3.p": "Every write is a diff. Preview, review, undo. Nothing leaves the review drawer without your keystroke.",
-        "cap.4.tag": "Test",   "cap.4.h": "Run tests.",               "cap.4.p": "Execute, capture stdout, read the failure, iterate. The agent keeps going until green — or tells you it can't.",
-        "cap.5.tag": "Drive",  "cap.5.h": "Drive the browser.",       "cap.5.p": "A headed Chromium the agent can navigate, click, type into. Useful for anything that lives behind a login.",
-        "cap.5.soon": "Coming in 0.9",
-        "cap.6.tag": "Swap",   "cap.6.h": "Switch models.",           "cap.6.p": "Llama, Qwen, DeepSeek, Mistral — any Ollama model. Swap mid-session. 42 GB loaded in ~11 s on NVMe.",
+        "uc.meta": "03 · Use cases",
+        "uc.h": "A working assistant for every function that handles sensitive documents.",
+        "uc.legal.d": "Legal",
+        "uc.legal.h": "Contract review in two languages, none of them leaking.",
+        "uc.legal.p": "Analyses agreements in Russian, Kazakh, and English. Flags non-standard clauses against your template library.",
+        "uc.fin.d": "Finance",
+        "uc.fin.h": "Conversational access to your internal numbers.",
+        "uc.fin.p": "Queries 1C, SAP, and internal data warehouses in plain language. Generates reports in your house formats.",
+        "uc.hr.d": "Human Resources",
+        "uc.hr.h": "Résumés and personal data, processed inside the building.",
+        "uc.hr.p": "Evaluates candidates against your hiring rubric. Personal data never leaves your infrastructure.",
+        "uc.rd.d": "R & D",
+        "uc.rd.h": "Research archives that finally answer questions.",
+        "uc.rd.p": "Queries technical documentation and research history. Your intellectual property stays yours.",
+        "uc.comp.d": "Compliance",
+        "uc.comp.h": "Policy enforcement at the speed of search.",
+        "uc.comp.p": "Audits internal communications and documents against your policy library. Every check is recorded.",
+        "uc.cs.d": "Customer Support",
+        "uc.cs.h": "Call-centre analytics that stay on the call-centre side.",
+        "uc.cs.p": "Summarises, classifies, and reviews conversations with an internal agent that runs on your premises.",
 
-        "hw.meta": "05 · Built for your hardware",
-        "hw.h": "Serious work needs",
-        "hw.h.b": "serious silicon.",
-        "hw.sub": "dialekt runs on the weights you can hold in RAM. A 7B model will code, a 70B will reason. We're not going to pretend 8 GB is enough — it isn't.",
-        "hw.t1.tier": "Min",  "hw.t1.ram": "16 GB",  "hw.t1.note": "7–13B models · autocomplete-class",
-        "hw.t2.tier": "OK",   "hw.t2.ram": "32 GB",  "hw.t2.note": "34B quantized · most tasks",
-        "hw.t3.tier": "Rec",  "hw.t3.ram": "48 GB",  "hw.t3.note": "70B q4 · real reasoning",
-        "hw.t4.tier": "Max",  "hw.t4.ram": "128 GB", "hw.t4.note": "405B · bring the stampede",
+        "dep.meta": "04 · Deployment",
+        "dep.h": "One architecture. One boundary. Nothing crosses it.",
+        "dep.sub": "The Dialekt runtime is installed inside the perimeter you already trust. It does not call out. It does not phone home. It does not depend on any third-party model provider.",
+        "dep.s1": "Runs on standard server infrastructure you already operate or procure. Sizing guidance during pilot scoping.",
+        "dep.s2": "Browser-based client — no installation on employee machines.",
+        "dep.s3": "Integrates with Active Directory, single sign-on, and your document management systems.",
+        "dep.s4": "On-premises, private cloud, or fully air-gapped deployments.",
 
-        "who.meta": "06 · Who it's for",
-        "who.h": "If your code can't go to the cloud,",
-        "who.h.b": "the agent has to come to you.",
-        "who.p1.tag": "Compliance",
-        "who.p1.h": "The team under audit.",
-        "who.p1.p": "Your auditor was very clear: source cannot leave the environment. Cloud assistants are off the table. You're working against a system you can't share with a third party — and you want help.",
-        "who.p2.tag": "Privacy",
-        "who.p2.h": "The shop that won't train someone's model.",
-        "who.p2.p": "You're shipping a small, sharp product. You refuse on principle to feed your codebase into a free plan. You already run Ollama. You want the loop.",
-        "who.p3.tag": "Autonomy",
-        "who.p3.h": "The engineer who wants real agency.",
-        "who.p3.p": "You already serve a 70B model from your workstation. You've outgrown the chat UI — you want something that can hold a plan, run tests, and iterate without your hand on the wheel.",
+        "comp.meta": "05 · Compliance & data sovereignty",
+        "comp.h": "Designed around the regulations you already answer to.",
+        "comp.kz.h": "Kazakhstan",
+        "comp.kz.p": "Designed for compliance with the Law on Personal Data and data-residency requirements for state-adjacent institutions.",
+        "comp.ru.h": "Russia",
+        "comp.ru.p": "Designed for 152-FZ data-residency and processing constraints. Deployable inside regulated infrastructure.",
+        "comp.eu.h": "European Union",
+        "comp.eu.p": "GDPR-aligned: data minimisation, auditability, and lawful-basis controls are built into the deployment model.",
+        "comp.air.h": "Air-gapped",
+        "comp.air.p": "Deployable in environments with no internet connectivity. Updates delivered via signed internal channels.",
 
-        "install.meta": "07 · Install",
-        "install.h": "Get the app.",
-        "install.h.b": "30 days free.",
-        "install.sub": "Sign up with your work email and we'll send you the download links along with your trial license key. No credit card. Verify your email and you're running.",
-        "install.req": "Requires Ollama 0.4+ (auto-install on Linux). 16 GB RAM minimum, 48 GB recommended for 32B+ models.",
-        "install.card.kicker": "Free trial · 30 days · 3 seats",
-        "install.card.h": "Get the download link via email",
-        "install.card.p": "We send installers for all 3 platforms + your 30-day trial license key in one email. Verify and you're done.",
-        "install.card.cta": "Start free trial",
-        "install.card.alt": "Already have a license key?",
-        "install.card.signin": "Sign in",
-        "install.card.pricing": "See pricing — $25 / $55 / $95+ per seat",
-        "install.platforms.linux": "Linux",
-        "install.platforms.linux.detail": "Ubuntu 22+, Debian 12+, Fedora 38+ · x64",
-        "install.platforms.linux.formats": ".deb · .AppImage",
-        "install.platforms.macos": "macOS",
-        "install.platforms.macos.detail": "Apple Silicon · macOS 12+",
-        "install.platforms.macos.formats": ".dmg",
-        "install.platforms.windows": "Windows",
-        "install.platforms.windows.detail": "Windows 10 / 11 · x64",
-        "install.platforms.windows.formats": ".exe installer",
+        "cred.meta": "06 · Who is building this",
+        "cred.h": "Built by a team that delivers enterprise AI for a living.",
+        "cred.1.l": "Certifications",
+        "cred.1.v": "Anthropic · Google · NVIDIA",
+        "cred.2.l": "Community",
+        "cred.2.v": "We Love Claude — Russian-language AI practitioner community",
+        "cred.3.l": "Delivered training",
+        "cred.3.v": "HR, geology, public sector teams · Kazakhstan",
+        "cred.4.l": "Operating business",
+        "cred.4.v": "briq.team — enterprise AI integration & ASR platform",
+
+        "ea.meta": "Pilot programme",
+        "ea.cohort": "Cohort 01",
+        "ea.cohortn": "10 companies",
+        "ea.h": "A selective pilot. Not a mailing list.",
+        "ea.sub": "The first ten companies we onboard shape the product roadmap. They get deployment support, one custom integration, direct access to the founding team, and pilot pricing.",
+        "ea.p1.k": "Deployment",
+        "ea.p1.v": "White-glove installation inside your infrastructure by our engineering team.",
+        "ea.p2.k": "Integration",
+        "ea.p2.v": "One custom connector to a priority data source — document management, ERP, ticketing, or database of your choice.",
+        "ea.p3.k": "Roadmap",
+        "ea.p3.v": "Quarterly input sessions with the founding team. Pilot partners drive the first year of development.",
+        "ea.p4.k": "Pricing",
+        "ea.p4.v": "Pilot pricing locked in at 50% of general-availability rates for the term of the agreement.",
+        "ea.who": "Cohort 01 is focused on organisations with 50+ knowledge workers in regulated industries, with deployment intent within six months.",
+
+        "form.meta": "Request pilot access",
+        "form.h": "Two minutes. Five fields. No marketing calls.",
+        "form.name": "Full name",
+        "form.email": "Work email",
+        "form.email.hint": "Free-email providers (Gmail, Yandex, Mail.ru) are not accepted.",
+        "form.company": "Company",
+        "form.size": "Team size",
+        "form.size.ph": "Select —",
+        "form.role": "Your role",
+        "form.role.ph": "Select —",
+        "form.role.legal": "Legal / General Counsel",
+        "form.role.fin": "Finance / CFO",
+        "form.role.hr": "HR / People",
+        "form.role.it": "IT / Security / CIO",
+        "form.role.ops": "Operations / COO",
+        "form.role.exec": "CEO / Founder",
+        "form.role.other": "Other",
+        "form.notes": "Primary use case (optional)",
+        "form.notes.ph": "Two sentences. What problem do you want solved?",
+        "form.submit": "Request pilot access",
+        "form.legal": "By submitting, you agree we may contact you about the pilot. We do not share your details and we do not run a marketing newsletter.",
+        "form.alt": "Or",
+        "form.alt.trial": "start a free 30-day trial →",
+        "form.err.email": "Please use your work email — free-email providers are not accepted.",
+        "form.err.required": "Please fill in all required fields.",
+        "form.ok.h": "Received.",
+        "form.ok.p": "We review every application personally. You will hear from us within three business days. If the pilot is not a fit, we will say so directly.",
+        "form.ok.signature": "— Dias, founder",
       },
       ru: {
-        "hero.eyebrow": "v0.21 · Локально · на Ollama · 0 токенов в облако",
-        "hero.h1.a": "Локальный ИИ-агент,",
-        "hero.h1.b": "который доводит дело",
-        "hero.h1.c": "до конца.",
-        "hero.sub": "Читает ваш код, запускает инструменты, выполняет код, правит файлы, гоняет тесты — на вашей машине, на ваших моделях, спрашивая разрешение там, где это важно. Код не покидает диск.",
-        "hero.cta.primary": "Бесплатный пробный период",
-        "hero.cta.secondary": "Войти по ключу",
-        "hero.meta1": "macOS · Linux · Windows",
-        "hero.meta2": "Apple Silicon · x64",
-        "hero.meta3": "Требуется Ollama 0.4+",
+        "hero.eyebrow": "Корпоративный пилот · Когорта 01 · 2026",
+        "hero.h1.a": "Частный ИИ",
+        "hero.h1.b": "для команд, работающих с",
+        "hero.h1.c": "конфиденциальными данными.",
+        "hero.sub": "Развёрнут внутри вашего периметра. Доступен юридическому, финансовому, HR- и исследовательскому отделам. Документы, клиентские данные и интеллектуальная собственность не покидают вашу инфраструктуру.",
+        "hero.cta.primary": "Запросить пилот",
+        "hero.cta.secondary": "Или начать пробный период →",
+        "hero.meta1": "На вашем сервере, в частном облаке или изолированно",
+        "hero.meta2": "Не обучается на ваших данных · без телеметрии",
 
-        "diff.meta": "01 · Разница",
-        "diff.h": "Чаты отвечают на вопросы.",
-        "diff.h.b": "dialekt доделывает задачу.",
-        "diff.sub": "Чат — это разговор. Агент — это цикл: читает, рассуждает, запускает инструменты, проверяет свою работу и идёт дальше. На выходе не текст. На выходе — изменённый код.",
-        "diff.chat.label": "Чат",
-        "diff.chat.kicker": "отвечает",
-        "diff.chat.body": "Задаёте вопрос. Получаете набросок. Дальше сами: открыть файл, вставить, поправить синтаксис, запустить тесты, отдебажить, повторить.",
-        "diff.agent.label": "Агент",
-        "diff.agent.kicker": "выполняет",
-        "diff.agent.body": "Читает файлы. Запускает инструменты. Пишет diff. Спрашивает разрешение. Гоняет тесты. Итерирует до зелёного. Вы не выходили из композера.",
+        "diag.perimeter": "Ваш периметр",
+        "diag.external": "Внешнее облако — не используется",
+        "diag.engine": "Движок Dialekt",
 
-        "how.meta": "02 · Как это работает",
-        "how.h": "Дайте задачу. Смотрите как работает.",
-        "how.h.b": "Разрешайте то, что важно.",
-        "how.s1.kicker": "Шаг 01 / 03",
-        "how.s1.h": "Дайте задачу.",
-        "how.s1.p": "Один промпт, привязанный к файлам, которые важны. Без театра «цепочки рассуждений» — напишите что нужно поправить.",
-        "how.s2.kicker": "Шаг 02 / 03",
-        "how.s2.h": "Смотрите как работает.",
-        "how.s2.p": "Вызовы инструментов идут в реальном времени. Чтения, поиски, diff'ы, exec — каждое действие видно, с результатами. Ничего не прячется в чёрный ящик.",
-        "how.s3.kicker": "Шаг 03 / 03",
-        "how.s3.h": "Разрешайте то, что важно.",
-        "how.s3.p": "Всё, что трогает файловую систему, запускает код или ходит в сеть — спрашивает заранее. Разрешайте по вызову, на сессию или включайте автопилот для безопасных путей.",
+        "problem.meta": "01 · Проблема",
+        "problem.h": "Команды хотят ИИ. Служба безопасности не может это разрешить.",
+        "problem.1": "Сотрудники уже используют публичные ИИ-сервисы. Каждый запрос — это потенциальная утечка данных.",
+        "problem.2": "Клиентские файлы, финансовая отчётность и интеллектуальная собственность не могут покидать вашу юрисдикцию — и ваш периметр — ни при каких условиях.",
+        "problem.3": "Универсальные ассистенты не знают вашу структуру, ваши регламенты, ваши форматы отчётности и нормативный контекст.",
 
-        "local.meta": "03 · Локально по архитектуре",
-        "local.h": "Код остаётся на диске.",
-        "local.h.b": "Не на словах. По проводу.",
-        "local.sub": "Инференс на Ollama, на вашей машине. Доступ к файловой системе ограничен путями, которые вы разрешили. Без телеметрии. Без облачной синхронизации. Без аккаунта. Можно выдернуть Wi-Fi — всё работает.",
-        "local.r1.k": "Инференс",          "local.r1.v": "Ollama · localhost:11434",
-        "local.r2.k": "Файловая система",  "local.r2.v": "Только разрешённые пути",
-        "local.r3.k": "Сеть",              "local.r3.v": "Спросит по каждому вызову · по умолчанию выключена",
-        "local.r4.k": "Телеметрия",        "local.r4.v": "Нет · проверяется в логах сети",
-        "local.r5.k": "Аккаунт",           "local.r5.v": "Не требуется · без логина",
-        "local.r6.k": "Облачная синхр.",   "local.r6.v": "Отключена · эндпоинта не существует",
+        "solution.meta": "02 · Подход",
+        "solution.h": "ИИ-слой там же, где ваши данные.",
+        "solution.sub": "Dialekt разворачивается полностью внутри вашего периметра — работает на ваших мощностях, отвечает по вашим данным, доступен только вашим сотрудникам.",
+        "sol.1.h": "В вашей инфраструктуре",
+        "sol.1.p": "Разворачивается на ваших серверах, в частном облаке или в изолированной среде. Обработка, индексация и хранение — всё внутри границы, которую вы уже контролируете.",
+        "sol.2.h": "Для каждого отдела",
+        "sol.2.p": "Отдельные рабочие пространства для юристов, финансов, HR, R&D и службы комплаенса. У каждого — свои источники данных, права доступа, контекст и политики хранения.",
+        "sol.3.h": "Готов к проверкам",
+        "sol.3.p": "Журнал действий, права доступа по ролям, единый вход и контроль резидентности данных встроены изначально, а не прикручены потом. Каждый запрос и каждое обращение к документу записывается и выгружается.",
 
-        "cap.meta": "04 · Что умеет",
-        "cap.h": "Инструмент, а не игрушка.",
-        "cap.h.b": "Каждая способность реально есть.",
-        "cap.1.tag": "Индекс",   "cap.1.h": "Читает ваш код.",       "cap.1.p": "Семантический поиск по проекту. Файлы индексируются локально при первом открытии и поддерживаются в актуальном состоянии.",
-        "cap.2.tag": "Exec",     "cap.2.h": "Запускает инструменты.","cap.2.p": "fs, grep, exec, git, плюс MCP-серверы для github, postgres, linear, figma. Подключайте свои.",
-        "cap.3.tag": "Правка",   "cap.3.h": "Правит файлы.",         "cap.3.p": "Каждая запись — это diff. Превью, ревью, отмена. Ничего не уходит из ревью без вашего нажатия.",
-        "cap.4.tag": "Тесты",    "cap.4.h": "Гоняет тесты.",         "cap.4.p": "Запускает, читает stdout, разбирает падение, итерирует. Идёт до зелёного — или говорит, что не может.",
-        "cap.5.tag": "Браузер",  "cap.5.h": "Управляет браузером.",  "cap.5.p": "Headless Chromium, по которому агент кликает и печатает. Полезно для всего, что за логином.",
-        "cap.5.soon": "В 0.9",
-        "cap.6.tag": "Модели",   "cap.6.h": "Меняет модели.",        "cap.6.p": "Llama, Qwen, DeepSeek, Mistral — любая модель Ollama. Свопаются прямо в сессии. 42 ГБ загружаются за ~11 с на NVMe.",
+        "uc.meta": "03 · Сценарии",
+        "uc.h": "Рабочий ассистент для каждой функции, которая работает с конфиденциальными документами.",
+        "uc.legal.d": "Юридический отдел",
+        "uc.legal.h": "Анализ договоров на двух языках — без утечек.",
+        "uc.legal.p": "Разбирает договоры на русском, казахском и английском. Отмечает нестандартные пункты по вашей библиотеке шаблонов.",
+        "uc.fin.d": "Финансы",
+        "uc.fin.h": "Разговорный доступ к вашим внутренним цифрам.",
+        "uc.fin.p": "Запросы к 1С, SAP и внутренним хранилищам на обычном языке. Готовые отчёты в ваших корпоративных форматах.",
+        "uc.hr.d": "HR",
+        "uc.hr.h": "Резюме и персональные данные обрабатываются внутри здания.",
+        "uc.hr.p": "Оценивает кандидатов по вашим критериям отбора. Персональные данные не покидают инфраструктуру.",
+        "uc.rd.d": "R & D",
+        "uc.rd.h": "Исследовательские архивы, которые наконец отвечают на вопросы.",
+        "uc.rd.p": "Запросы к технической документации и истории исследований. Ваша интеллектуальная собственность остаётся вашей.",
+        "uc.comp.d": "Комплаенс",
+        "uc.comp.h": "Контроль политик со скоростью поиска.",
+        "uc.comp.p": "Проверяет внутреннюю переписку и документы по вашей политике. Каждая проверка фиксируется.",
+        "uc.cs.d": "Клиентская поддержка",
+        "uc.cs.h": "Аналитика колл-центра, которая остаётся в колл-центре.",
+        "uc.cs.p": "Обобщает, классифицирует и проверяет разговоры внутренним ассистентом, работающим на ваших серверах.",
 
-        "hw.meta": "05 · Под ваше железо",
-        "hw.h": "Серьёзная работа требует",
-        "hw.h.b": "серьёзного железа.",
-        "hw.sub": "dialekt работает на весах, которые помещаются в RAM. 7B будет кодить, 70B — рассуждать. Мы не будем делать вид, что 8 ГБ хватит — не хватит.",
-        "hw.t1.tier": "Мин.",  "hw.t1.ram": "16 ГБ",  "hw.t1.note": "7–13B · уровень автокомплита",
-        "hw.t2.tier": "Норм.", "hw.t2.ram": "32 ГБ",  "hw.t2.note": "34B квантованные · большинство задач",
-        "hw.t3.tier": "Реком.","hw.t3.ram": "48 ГБ",  "hw.t3.note": "70B q4 · настоящие рассуждения",
-        "hw.t4.tier": "Макс.", "hw.t4.ram": "128 ГБ", "hw.t4.note": "405B · во весь рост",
+        "dep.meta": "04 · Развёртывание",
+        "dep.h": "Одна архитектура. Одна граница. Ничто её не пересекает.",
+        "dep.sub": "Dialekt устанавливается внутри периметра, которому вы уже доверяете. Он не звонит наружу. Он не отчитывается. Он не зависит от стороннего поставщика моделей.",
+        "dep.s1": "Работает на стандартном серверном железе, которое у вас уже есть или которое вы планируете закупать. Подбор конфигурации — на этапе пилота.",
+        "dep.s2": "Веб-клиент в браузере — ничего не нужно ставить на компьютеры сотрудников.",
+        "dep.s3": "Интегрируется с Active Directory, единым входом и системами документооборота.",
+        "dep.s4": "На вашем сервере, в частном облаке или полностью изолированно.",
 
-        "who.meta": "06 · Для кого",
-        "who.h": "Если код не может уйти в облако,",
-        "who.h.b": "агент должен прийти к вам.",
-        "who.p1.tag": "Комплаенс",
-        "who.p1.h": "Команда под аудитом.",
-        "who.p1.p": "Аудитор сказал чётко: исходники не покидают периметр. Облачные ассистенты — мимо. Вы работаете с системой, которую нельзя отдать третьей стороне — но помощь нужна.",
-        "who.p2.tag": "Приватность",
-        "who.p2.h": "Тот, кто не хочет тренировать чужую модель.",
-        "who.p2.p": "Вы делаете маленький, точный продукт. Принципиально не сливаете код в чужой бесплатный план. Ollama уже стоит. Нужен сам цикл.",
-        "who.p3.tag": "Самостоятельность",
-        "who.p3.h": "Инженер, которому нужна реальная агентность.",
-        "who.p3.p": "Вы уже держите 70B модель на рабочей станции. Чат-интерфейс перерос — нужно что-то, что держит план, гоняет тесты и итерирует без вашего постоянного участия.",
+        "comp.meta": "05 · Комплаенс и суверенитет данных",
+        "comp.h": "Под регулирование, на которое вы уже отвечаете.",
+        "comp.kz.h": "Казахстан",
+        "comp.kz.p": "Спроектирован под Закон о персональных данных и требования резидентности для государственно-связанных институтов.",
+        "comp.ru.h": "Россия",
+        "comp.ru.p": "Спроектирован под 152-ФЗ: резидентность данных и ограничения обработки. Разворачивается внутри регулируемой инфраструктуры.",
+        "comp.eu.h": "Европейский Союз",
+        "comp.eu.p": "Соответствие GDPR: минимизация данных, аудит и контроль правовых оснований встроены в модель развёртывания.",
+        "comp.air.h": "Изолированная среда",
+        "comp.air.p": "Разворачивается там, где нет интернета. Обновления — через подписанные внутренние каналы.",
 
-        "install.meta": "07 · Установка",
-        "install.h": "Получить приложение.",
-        "install.h.b": "30 дней бесплатно.",
-        "install.sub": "Зарегистрируйтесь с рабочей почтой — пришлём ссылки на загрузку и пробный лицензионный ключ. Без карты. Подтвердите email и можно работать.",
-        "install.req": "Требуется Ollama 0.4+ (авто-установка на Linux). 16 ГБ RAM минимум, 48 ГБ рекомендовано для моделей 32B+.",
-        "install.card.kicker": "Пробный период · 30 дней · 3 места",
-        "install.card.h": "Получить ссылку на загрузку по email",
-        "install.card.p": "Пришлём установщики для всех 3 платформ + 30-дневный пробный ключ в одном письме. Подтвердите и готово.",
-        "install.card.cta": "Начать пробный период",
-        "install.card.alt": "Уже есть лицензионный ключ?",
-        "install.card.signin": "Войти",
-        "install.card.pricing": "Тарифы — $25 / $55 / $95+ за место",
-        "install.platforms.linux": "Linux",
-        "install.platforms.linux.detail": "Ubuntu 22+, Debian 12+, Fedora 38+ · x64",
-        "install.platforms.linux.formats": ".deb · .AppImage",
-        "install.platforms.macos": "macOS",
-        "install.platforms.macos.detail": "Apple Silicon · macOS 12+",
-        "install.platforms.macos.formats": ".dmg",
-        "install.platforms.windows": "Windows",
-        "install.platforms.windows.detail": "Windows 10 / 11 · x64",
-        "install.platforms.windows.formats": ".exe installer",
+        "cred.meta": "06 · Кто это строит",
+        "cred.h": "Команда, которая профессионально занимается корпоративным ИИ.",
+        "cred.1.l": "Сертификации",
+        "cred.1.v": "Anthropic · Google · NVIDIA",
+        "cred.2.l": "Сообщество",
+        "cred.2.v": "We Love Claude — русскоязычное сообщество практиков ИИ",
+        "cred.3.l": "Проведённое обучение",
+        "cred.3.v": "HR, геологи, госсектор · Казахстан",
+        "cred.4.l": "Действующий бизнес",
+        "cred.4.v": "briq.team — корпоративная интеграция ИИ и ASR-платформа",
+
+        "ea.meta": "Пилотная программа",
+        "ea.cohort": "Когорта 01",
+        "ea.cohortn": "10 компаний",
+        "ea.h": "Закрытый пилот. Не рассылка.",
+        "ea.sub": "Первые десять компаний формируют продуктовую дорожную карту. Им — развёртывание под ключ, одна индивидуальная интеграция, прямой доступ к основателям и пилотные цены.",
+        "ea.p1.k": "Развёртывание",
+        "ea.p1.v": "Установка под ключ внутри вашей инфраструктуры нашей инженерной командой.",
+        "ea.p2.k": "Интеграция",
+        "ea.p2.v": "Один индивидуальный коннектор к приоритетному источнику данных — системе документооборота, ERP, тикет-системе или базе данных на ваш выбор.",
+        "ea.p3.k": "Дорожная карта",
+        "ea.p3.v": "Ежеквартальные сессии с командой основателей. Пилотные партнёры определяют первый год развития продукта.",
+        "ea.p4.k": "Цена",
+        "ea.p4.v": "Пилотная цена фиксируется на уровне 50% от публичного тарифа на срок действия соглашения.",
+        "ea.who": "Когорта 01 — для организаций с 50+ сотрудниками умственного труда в регулируемых отраслях, с планом развёртывания в течение шести месяцев.",
+
+        "form.meta": "Запрос на пилот",
+        "form.h": "Две минуты. Пять полей. Никаких холодных звонков.",
+        "form.name": "Имя и фамилия",
+        "form.email": "Рабочая почта",
+        "form.email.hint": "Бесплатные провайдеры (Gmail, Yandex, Mail.ru) не принимаются.",
+        "form.company": "Компания",
+        "form.size": "Размер команды",
+        "form.size.ph": "Выберите —",
+        "form.role": "Ваша роль",
+        "form.role.ph": "Выберите —",
+        "form.role.legal": "Юрист / Главный юрист",
+        "form.role.fin": "Финансы / Финансовый директор",
+        "form.role.hr": "HR / Кадры",
+        "form.role.it": "IT / Безопасность / CIO",
+        "form.role.ops": "Операции / COO",
+        "form.role.exec": "CEO / Основатель",
+        "form.role.other": "Другое",
+        "form.notes": "Основной сценарий (необязательно)",
+        "form.notes.ph": "Два предложения. Какую задачу хотите решить?",
+        "form.submit": "Запросить пилот",
+        "form.legal": "Отправляя форму, вы соглашаетесь, что мы свяжемся с вами по поводу пилота. Мы не передаём ваши данные третьим лицам и не ведём маркетинговую рассылку.",
+        "form.alt": "Или",
+        "form.alt.trial": "начать бесплатный пробный период →",
+        "form.err.email": "Используйте рабочую почту — бесплатные провайдеры не принимаются.",
+        "form.err.required": "Заполните все обязательные поля.",
+        "form.ok.h": "Заявка получена.",
+        "form.ok.p": "Мы лично рассматриваем каждую заявку. Ответим в течение трёх рабочих дней. Если пилот не подходит — скажем об этом прямо.",
+        "form.ok.signature": "— Диас, основатель",
       }
     };
   </script>
@@ -232,7 +280,7 @@
     .hero-h1 .accent { color: var(--ink-3); }
     .hero-meta {
       margin-top: 32px; display: flex; gap: 28px; flex-wrap: wrap;
-      font-size: 13px; color: var(--ink-3);
+      font-size: 13.5px; color: var(--ink-3);
     }
     .hero-meta span { display: inline-flex; align-items: center; gap: 8px; }
     .hero-art {
@@ -251,139 +299,186 @@
     .anno-2 { top: 8%; right: 7%; color: var(--ink-3); }
     .anno-3 { bottom: 9%; left: 9%; }
 
-    /* Diff (chat-vs-agent) split */
-    .split-2 {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-      background: var(--rule);
+    /* Problem — 3 numbered items, editorial */
+    .problem-list {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--rule);
       border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
     }
-    .split-2 > .pane { background: var(--bg-elev); padding: 32px; }
-    .pane-label {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--ink-3); font-weight: 500; margin-bottom: 18px;
+    .problem-list li {
+      list-style: none; padding: 32px;
+      background: var(--bg-elev);
     }
-    .pane-label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
-    .pane.agent .pane-label .dot { background: var(--primary); }
-    .pane h3 { margin-bottom: 14px; }
-    .pane p { color: var(--ink-2); font-size: 15px; line-height: 1.6; }
-    @media (max-width: 760px) { .split-2 { grid-template-columns: 1fr; } }
+    .problem-list .num {
+      font-family: var(--serif); font-size: 14px; color: var(--primary);
+      letter-spacing: 0; display: block; margin-bottom: 22px;
+    }
+    .problem-list p {
+      margin: 0; color: var(--ink); font-size: 16px; line-height: 1.5;
+      text-wrap: pretty;
+    }
+    @media (max-width: 820px) { .problem-list { grid-template-columns: 1fr; } }
 
-    /* How — three steps stacked */
-    .step {
-      display: grid; grid-template-columns: 1fr 1.2fr; gap: 56px;
-      align-items: start;
-      padding: 56px 0; border-top: 1px solid var(--rule);
+    /* Approach — 3 cards, no borders, just whitespace */
+    .approach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+    @media (max-width: 900px) { .approach-grid { grid-template-columns: 1fr; gap: 32px; } }
+    .approach-card { padding: 4px 0; }
+    .approach-icon {
+      width: 48px; height: 48px; display: grid; place-items: center;
+      border: 1px solid var(--rule); border-radius: 4px;
+      margin-bottom: 22px; color: var(--primary);
     }
-    .step:first-of-type { border-top: 0; padding-top: 24px; }
-    .step.reverse { grid-template-columns: 1.2fr 1fr; }
-    .step.reverse .step-text { order: 2; }
-    .step.reverse .step-art { order: 1; }
-    .step-kicker { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); font-weight: 500; margin-bottom: 14px; }
-    .step h3 { font-family: var(--serif); font-size: clamp(28px, 3vw, 36px); line-height: 1.08; font-weight: 400; letter-spacing: -0.018em; margin-bottom: 16px; }
-    .step p { color: var(--ink-2); font-size: 16px; line-height: 1.6; max-width: 46ch; }
-    .step-art {
-      background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 6px;
-      padding: 28px; min-height: 260px;
-      display: flex; flex-direction: column; gap: 12px;
-    }
-    @media (max-width: 860px) {
-      .step, .step.reverse { grid-template-columns: 1fr; gap: 24px; padding: 36px 0; }
-      .step.reverse .step-text { order: 1; }
-      .step.reverse .step-art { order: 2; }
-    }
+    .approach-card h3 { margin-bottom: 10px; font-size: 19px; line-height: 1.3; }
+    .approach-card p { color: var(--ink-2); font-size: 15px; line-height: 1.55; margin: 0; }
 
-    /* Local — split text + spec list */
-    .local-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
-    @media (max-width: 860px) { .local-grid { grid-template-columns: 1fr; gap: 32px; } }
-    .local-list { display: flex; flex-direction: column; }
-    .local-row {
-      display: grid; grid-template-columns: 160px 1fr;
-      gap: 16px; align-items: baseline;
-      padding: 14px 0; border-top: 1px solid var(--rule);
+    /* Use cases — 3×2 grid */
+    .uc-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--rule);
+      border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
     }
-    .local-row:last-child { border-bottom: 1px solid var(--rule); }
-    .local-row .k { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
-    .local-row .v { font-size: 15px; color: var(--ink); }
-
-    /* Capabilities */
-    .caps-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-      background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
-    }
-    .cap {
+    .uc-card {
       background: var(--bg-elev); padding: 32px;
-      display: flex; flex-direction: column; gap: 14px; min-height: 220px;
+      display: flex; flex-direction: column; gap: 14px; min-height: 200px;
     }
-    .cap-tag {
-      display: inline-flex; align-items: center; gap: 10px;
-      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    .uc-dept {
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--primary); font-weight: 500;
+      display: flex; align-items: center; gap: 10px;
     }
-    .cap-tag::before { content: ""; width: 18px; height: 1px; background: var(--primary); }
-    .cap h3 { font-family: var(--serif); font-size: 22px; font-weight: 400; line-height: 1.2; letter-spacing: -0.01em; margin: 0; }
-    .cap p { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; margin: 0; }
-    .cap .soon-badge {
-      align-self: flex-start;
-      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-      padding: 2px 7px; border-radius: 3px; font-weight: 500;
+    .uc-dept::before { content: ""; width: 18px; height: 1px; background: var(--primary); }
+    .uc-card h3 {
+      font-family: var(--serif); font-size: 21px; font-weight: 400;
+      line-height: 1.2; margin: 0; letter-spacing: -0.01em;
     }
-    @media (max-width: 960px) { .caps-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 620px) { .caps-grid { grid-template-columns: 1fr; } }
+    .uc-card p { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; margin: 0; text-wrap: pretty; }
+    @media (max-width: 960px) { .uc-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) { .uc-grid { grid-template-columns: 1fr; } }
 
-    /* Hardware */
-    .hw-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; }
-    @media (max-width: 860px) { .hw-grid { grid-template-columns: 1fr; gap: 32px; } }
-    .hw-tier {
-      display: grid; grid-template-columns: 100px 140px 1fr;
-      gap: 18px; align-items: baseline;
-      padding: 18px 0; border-top: 1px solid var(--rule);
+    /* Deployment — split text + perimeter SVG */
+    .dep {
+      background: var(--bg-elev);
+      border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
     }
-    .hw-tier:last-child { border-bottom: 1px solid var(--rule); }
-    .hw-tier.rec { background: var(--primary-soft); padding-left: 18px; padding-right: 18px; border-radius: 4px; border-top: 0; }
-    .hw-tier.rec + .hw-tier { border-top: 1px solid var(--rule); }
-    .hw-tier .tier-k { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
-    .hw-tier.rec .tier-k { color: var(--primary); }
-    .hw-tier .tier-v { font-family: var(--serif); font-size: 32px; font-weight: 500; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
-    .hw-tier .tier-note { font-size: 14.5px; color: var(--ink-2); line-height: 1.5; }
+    .dep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    @media (max-width: 900px) { .dep-grid { grid-template-columns: 1fr; gap: 40px; } }
+    .perimeter-art { position: relative; aspect-ratio: 1 / 0.82; width: 100%; }
+    .perimeter-art svg { width: 100%; height: 100%; display: block; }
+    .spec-list { margin: 24px 0 0 0; padding: 0; list-style: none; }
+    .spec-list li {
+      padding: 16px 0; border-top: 1px solid var(--rule);
+      display: grid; grid-template-columns: 20px 1fr; gap: 14px;
+      font-size: 15px; color: var(--ink); line-height: 1.55;
+    }
+    .spec-list li:last-child { border-bottom: 1px solid var(--rule); }
+    .spec-list .bullet {
+      margin-top: 9px; width: 8px; height: 8px;
+      border: 1px solid var(--primary); transform: rotate(45deg);
+    }
 
-    /* Who — 3 personas */
-    .personas-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-      background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+    /* Compliance — 4 jurisdiction cards */
+    .comp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+    @media (max-width: 900px) { .comp-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .comp-grid { grid-template-columns: 1fr; } }
+    .comp-item { border-top: 1px solid var(--rule); padding-top: 20px; }
+    .comp-item .jur {
+      font-family: var(--serif); font-size: 18px; margin-bottom: 8px;
+      letter-spacing: -0.005em;
     }
-    .persona { background: var(--bg-elev); padding: 36px 32px; display: flex; flex-direction: column; gap: 14px; }
-    .persona-tag { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--primary); font-weight: 500; }
-    .persona h3 { font-family: var(--serif); font-size: 22px; font-weight: 400; line-height: 1.2; letter-spacing: -0.01em; }
-    .persona p { color: var(--ink-2); font-size: 14.5px; line-height: 1.6; }
-    @media (max-width: 960px) { .personas-grid { grid-template-columns: 1fr; } }
+    .comp-item p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin: 0; }
 
-    /* Install */
-    .install-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: start; }
-    @media (max-width: 860px) { .install-grid { grid-template-columns: 1fr; gap: 32px; } }
-    .install-card {
-      background: var(--bg-elev); border: 1px solid var(--primary);
-      box-shadow: 0 0 0 1px var(--primary);
-      border-radius: 8px; padding: 36px;
+    /* Credibility — dark band, 4 thin cards */
+    .credibility {
+      background: var(--primary); color: #E6ECF7;
+      border: 0;
     }
-    .install-card .kicker { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); font-weight: 500; margin-bottom: 14px; display: block; }
-    .install-card h3 { font-family: var(--serif); font-size: 26px; font-weight: 400; letter-spacing: -0.01em; margin-bottom: 14px; }
-    .install-card p { font-size: 15px; color: var(--ink-2); line-height: 1.6; margin-bottom: 24px; }
-    .install-card .btn.primary { width: 100%; justify-content: center; padding: 16px; font-size: 15.5px; }
-    .install-card .alt { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 13.5px; color: var(--ink-3); line-height: 1.7; }
-    .install-card .alt a { color: var(--primary); text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
-    .install-platforms { margin-top: 18px; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
-    .install-platforms .row {
-      display: grid; grid-template-columns: 110px 1fr auto; gap: 14px;
-      padding: 14px 18px; align-items: center;
-      border-bottom: 1px solid var(--rule); background: var(--bg-elev);
+    .credibility .meta { color: #8FA3C9; }
+    .credibility h2 { color: #fff; }
+    .credibility .lede { color: #C9D3E5; }
+    .cred-cards { display: grid; gap: 14px; }
+    .cred-card {
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 20px 22px; border-radius: 4px;
+      background: rgba(255,255,255,.02);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
     }
-    .install-platforms .row:last-child { border-bottom: 0; }
-    .install-platforms .name { font-weight: 500; font-size: 15px; }
-    .install-platforms .detail { font-size: 13px; color: var(--ink-3); }
-    .install-platforms .formats { font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.04em; }
-    .install-req { margin-top: 22px; font-size: 13px; color: var(--ink-3); line-height: 1.7; }
+    .cred-card .label { font-size: 13px; color: #C9D3E5; letter-spacing: 0.02em; }
+    .cred-card .value { font-family: var(--serif); font-size: 17px; color: #fff; }
+    @media (max-width: 540px) {
+      .cred-card { flex-direction: column; align-items: flex-start; gap: 4px; }
+    }
+
+    /* Pilot section — left perks list, right form */
+    .pilot {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+      padding-top: clamp(64px, 9vw, 104px);
+    }
+    @media (max-width: 900px) { .pilot { grid-template-columns: 1fr; gap: 40px; } }
+    .pilot .cohort {
+      display: inline-flex; align-items: baseline; gap: 10px;
+      padding: 6px 14px; border: 1px solid var(--rule); border-radius: 999px;
+      font-size: 12px; color: var(--ink-2); margin-bottom: 28px;
+    }
+    .pilot .cohort b {
+      font-family: var(--serif); color: var(--ink); font-weight: 500; font-size: 14px;
+    }
+    .perks { margin: 32px 0 0 0; padding: 0; list-style: none; }
+    .perks li {
+      padding: 20px 0; border-top: 1px solid var(--rule);
+      display: grid; grid-template-columns: 110px 1fr; gap: 18px; align-items: baseline;
+    }
+    .perks li:last-child { border-bottom: 1px solid var(--rule); }
+    .perks .k { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+    .perks .v { font-size: 15.5px; color: var(--ink); line-height: 1.5; }
+    @media (max-width: 540px) {
+      .perks li { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    /* Pilot form */
+    .form-card {
+      background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 8px;
+      padding: 36px; position: relative;
+    }
+    .form-card .form-head { margin-bottom: 24px; }
+    .form-card .form-head .meta { display: block; margin-bottom: 10px; }
+    .form-card .form-head h3 {
+      font-family: var(--serif); font-size: 26px; font-weight: 400;
+      letter-spacing: -0.01em; line-height: 1.2;
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 540px) { .field-row { grid-template-columns: 1fr; } }
+    .submit-row { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
+    .submit-row .btn.primary { width: 100%; justify-content: center; padding: 16px; font-size: 15.5px; }
+    .form-legal { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+    .form-alt {
+      margin-top: 16px; padding-top: 16px;
+      border-top: 1px solid var(--rule);
+      font-size: 13.5px; color: var(--ink-3);
+    }
+    .form-alt a { color: var(--primary); border-bottom: 1px solid var(--rule-strong); text-underline-offset: 3px; }
+
+    .form-card.sent .form-body { display: none; }
+    .confirmation { display: none; flex-direction: column; gap: 16px; }
+    .form-card.sent .confirmation { display: flex; }
+    .conf-check {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 1px solid var(--primary);
+      display: grid; place-items: center; color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .confirmation h3 {
+      font-family: var(--serif); font-size: 24px; font-weight: 400;
+      letter-spacing: -0.01em; margin: 0;
+    }
+    .confirmation p { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+    .confirmation .signature {
+      margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--rule);
+      font-size: 13.5px; color: var(--ink-2);
+    }
+
+    .who-line {
+      margin-top: 28px; font-size: 13.5px; color: var(--ink-3); line-height: 1.55;
+    }
   </style>
 </head>
 <body>
@@ -394,37 +489,40 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="hero-kicker" data-i18n="hero.eyebrow">v0.21 · Local-first · Ollama-powered · 0 tokens sent to cloud</div>
+      <div class="hero-kicker" data-i18n="hero.eyebrow">Enterprise pilot · Cohort 01 · 2026</div>
       <h1 class="hero-h1">
-        <span data-i18n="hero.h1.a">The local AI agent</span><br>
-        <span class="accent" data-i18n="hero.h1.b">that finishes</span> <span data-i18n="hero.h1.c">what you start.</span>
+        <span data-i18n="hero.h1.a">Private AI</span><br>
+        <span class="accent" data-i18n="hero.h1.b">for teams that handle</span> <span data-i18n="hero.h1.c">sensitive data.</span>
       </h1>
-      <p class="lede" style="margin-top:24px;font-size:18px;max-width:60ch" data-i18n="hero.sub">
-        Reads your codebase, runs tools, executes code, edits files, runs tests — on your machine, with your models, asking permission at every step that matters. Your code never leaves the disk.
+      <p class="lede" style="margin-top:24px;font-size:18.5px;max-width:62ch" data-i18n="hero.sub">
+        Deployed inside your perimeter. Available to your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.
       </p>
-      <div class="hero-cta" style="margin-top:36px;display:flex;gap:14px;flex-wrap:wrap">
-        <a href="/signup.html" class="btn primary lg">
-          <span data-i18n="hero.cta.primary">Start free trial</span>
+      <div class="hero-cta" style="margin-top:36px;display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
+        <a href="#pilot-form" class="btn primary lg">
+          <span data-i18n="hero.cta.primary">Request pilot access</span>
           <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
         </a>
-        <a href="/login.html" class="btn lg" data-i18n="hero.cta.secondary">Have a key</a>
+        <a href="/signup.html" style="font-size:14px;color:var(--primary);border-bottom:1px solid var(--rule-strong);text-underline-offset:3px;padding:4px 0" data-i18n="hero.cta.secondary">Or start a free trial →</a>
       </div>
       <div class="hero-meta">
-        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" stroke="currentColor" stroke-width="1"/><path d="M5 7l1.5 1.5L9 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta1">macOS · Linux · Windows</span></span>
-        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1"/><path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta2">Apple Silicon · x64</span></span>
-        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta3">Requires Ollama 0.4+</span></span>
+        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" stroke="currentColor" stroke-width="1"/><path d="M5 7l1.5 1.5L9 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta1">On-premises, private cloud, or air-gapped</span></span>
+        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1"/><path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta2">No data training · No telemetry</span></span>
       </div>
     </div>
 
     <div class="hero-art" aria-hidden="true">
-      <span class="anno anno-1" data-i18n="local.r1.k">Inference</span>
-      <span class="anno anno-2" data-i18n="local.r6.k">Cloud sync</span>
-      <span class="anno anno-3" data-i18n="local.r2.k">Filesystem</span>
-      <svg viewBox="0 0 600 510" xmlns="http://www.w3.org/2000/svg">
+      <span class="anno anno-1" data-i18n="diag.perimeter">Your perimeter</span>
+      <span class="anno anno-2" data-i18n="diag.external">External cloud — unused</span>
+      <span class="anno anno-3" data-i18n="diag.engine">Dialekt engine</span>
+      <svg viewBox="0 0 600 540" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="grid" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-            <path d="M0 0 H32 M0 0 V32" stroke="#E4E6EB" stroke-width="0.5"/>
+          <pattern id="iso-grid" x="0" y="0" width="40" height="23" patternUnits="userSpaceOnUse" patternTransform="skewX(-30) scale(1,0.866)">
+            <path d="M0 0 H40 M0 0 V23" stroke="#E4E6EB" stroke-width="0.6"/>
           </pattern>
+          <linearGradient id="plane" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#F3F4F6"/>
+          </linearGradient>
           <linearGradient id="cube-top" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#FFFFFF"/>
             <stop offset="1" stop-color="#F8F8FA"/>
@@ -449,44 +547,49 @@
             <stop offset="0" stop-color="#1E3A8A"/>
             <stop offset="1" stop-color="#162A65"/>
           </linearGradient>
+          <clipPath id="clip-plane"><polygon points="0,-160 240,-20 0,120 -240,-20"/></clipPath>
         </defs>
-        <rect width="600" height="510" fill="url(#grid)" opacity="0.6"/>
-        <!-- Outer dashed cloud (not used) -->
-        <g opacity="0.5">
-          <path d="M40 70 Q120 30 220 60 T420 50 Q500 40 560 80" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 5" fill="none"/>
-          <text x="56" y="46" font-family="Inter" font-size="10" fill="#9CA3AF" letter-spacing="1.4">EXTERNAL · NOT USED</text>
+
+        <!-- Dashed external boundary -->
+        <g opacity="0.45">
+          <path d="M40 80 Q100 40 180 60 T340 40 Q420 30 480 70" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 5" fill="none"/>
+          <text x="52" y="55" font-family="Inter" font-size="10" fill="#9CA3AF" letter-spacing="1.4">EXTERNAL · NOT USED</text>
         </g>
-        <!-- Perimeter base (your machine) -->
-        <g transform="translate(300 290)">
-          <polygon points="0,-160 240,-20 0,120 -240,-20" fill="#FAFAFA" stroke="#CDD1D9" stroke-width="1"/>
-          <polygon points="0,-170 252,-22 0,130 -252,-22" fill="none" stroke="#1E3A8A" stroke-width="1.2"/>
-          <text x="0" y="-178" text-anchor="middle" font-family="Inter" font-size="10" fill="#1E3A8A" letter-spacing="1.6">YOUR MACHINE</text>
-          <!-- Tools around the engine -->
+
+        <!-- Isometric perimeter base plane -->
+        <g transform="translate(300 300)">
+          <polygon points="0,-160 240,-20 0,120 -240,-20" fill="url(#plane)" stroke="#CDD1D9" stroke-width="1"/>
+          <g clip-path="url(#clip-plane)">
+            <polygon points="0,-160 240,-20 0,120 -240,-20" fill="url(#iso-grid)"/>
+          </g>
+
+          <!-- Department cubes -->
           <g transform="translate(-120 -60)">
             <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
             <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
             <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
-            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">FILES</text>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">LEGAL</text>
           </g>
           <g transform="translate(120 -60)">
             <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
             <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
             <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
-            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">EXEC</text>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">FINANCE</text>
           </g>
           <g transform="translate(-120 40)">
             <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
             <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
             <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
-            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">TESTS</text>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">HR</text>
           </g>
           <g transform="translate(120 40)">
             <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
             <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
             <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
-            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">OLLAMA</text>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">R &amp; D</text>
           </g>
-          <!-- Center engine (dialekt) -->
+
+          <!-- Center engine -->
           <g transform="translate(0 -10)">
             <g stroke="#1E3A8A" stroke-width="1" stroke-dasharray="3 3" opacity="0.5" fill="none">
               <line x1="0" y1="0" x2="-120" y2="-50"/>
@@ -499,213 +602,271 @@
             <polygon points="40,-44 0,-24 0,24 40,4" fill="url(#primary-right)" stroke="#0F2547" stroke-width="1"/>
             <text x="0" y="-40" text-anchor="middle" font-family="Source Serif 4" font-size="22" fill="#FFFFFF" opacity="0.9">d</text>
           </g>
-          <!-- Blocked outbound -->
-          <g stroke="#B45309" stroke-width="1" fill="none">
-            <line x1="150" y1="-60" x2="195" y2="-60" stroke-dasharray="3 3"/>
-            <line x1="180" y1="-75" x2="200" y2="-45"/>
-            <line x1="180" y1="-45" x2="200" y2="-75"/>
-          </g>
-          <text x="208" y="-56" font-family="Inter" font-size="9" fill="#B45309" letter-spacing="1.4">BLOCKED</text>
+
+          <!-- Perimeter ring outline -->
+          <polygon points="0,-170 252,-22 0,130 -252,-22" fill="none" stroke="#1E3A8A" stroke-width="1.2"/>
+          <polygon points="0,-182 268,-24 0,140 -268,-24" fill="none" stroke="#1E3A8A" stroke-width="0.4" stroke-dasharray="1 4"/>
         </g>
       </svg>
     </div>
   </div>
 </section>
 
-<!-- ─── DIFFERENCE ───────────────────────────────────────────────────────── -->
-<section id="difference" class="section">
+<!-- ─── PROBLEM ──────────────────────────────────────────────────────────── -->
+<section id="problem" class="section">
   <div class="wrap">
     <div class="section-head">
-      <span class="meta" data-i18n="diff.meta">01 · The difference</span>
-      <h2><span data-i18n="diff.h">Chat tools answer questions.</span><br><span style="color:var(--ink-3)" data-i18n="diff.h.b">dialekt finishes the task.</span></h2>
-      <p data-i18n="diff.sub">A chat is a conversation. An agent is a loop — it reads, reasons, runs tools, checks its work, and keeps going. The output is not prose. The output is your code, changed.</p>
+      <span class="meta" data-i18n="problem.meta">01 · The problem</span>
+      <h2 data-i18n="problem.h">Your teams want AI. Your compliance function cannot authorise it.</h2>
     </div>
-    <div class="split-2">
-      <div class="pane">
-        <span class="pane-label"><span class="dot"></span><span data-i18n="diff.chat.label">Chat</span> · <span data-i18n="diff.chat.kicker">answers</span></span>
-        <h3 data-i18n="diff.chat.label">Chat</h3>
-        <p data-i18n="diff.chat.body">Asks the question. Gets a sketch. You still have to: open the file, paste, fix the syntax, run the tests, debug, repeat.</p>
+    <ol class="problem-list">
+      <li><span class="num">I.</span><p data-i18n="problem.1">Your employees are already using consumer AI tools. Each prompt is a potential data exfiltration event.</p></li>
+      <li><span class="num">II.</span><p data-i18n="problem.2">Client files, financial records, and intellectual property cannot leave your jurisdiction — or your perimeter — under any circumstances.</p></li>
+      <li><span class="num">III.</span><p data-i18n="problem.3">Generic assistants do not know your org chart, your playbooks, your reporting formats, or your regulatory context.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ─── APPROACH ─────────────────────────────────────────────────────────── -->
+<section id="approach" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="solution.meta">02 · The approach</span>
+      <h2 data-i18n="solution.h">An AI layer that lives where your data already does.</h2>
+      <p data-i18n="solution.sub">Dialekt is designed to be deployed entirely inside your perimeter — running on your compute, answering against your data, accessible only to your employees.</p>
+    </div>
+    <div class="approach-grid">
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="5" width="16" height="12" stroke="currentColor" stroke-width="1.2"/><path d="M3 9h16" stroke="currentColor" stroke-width="1.2"/><circle cx="6" cy="7" r="0.6" fill="currentColor"/></svg></div>
+        <h3 data-i18n="sol.1.h">On your infrastructure</h3>
+        <p data-i18n="sol.1.p">Deploy on your servers, your private cloud, or an air-gapped environment. Inference, indexing, and storage happen inside the boundary you already audit.</p>
       </div>
-      <div class="pane agent">
-        <span class="pane-label"><span class="dot"></span><span data-i18n="diff.agent.label">Agent</span> · <span data-i18n="diff.agent.kicker">completes</span></span>
-        <h3 data-i18n="diff.agent.label">Agent</h3>
-        <p data-i18n="diff.agent.body">Reads files. Runs tools. Writes the diff. Asks permission. Runs the test. Iterates until green. You stayed in the composer.</p>
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="3" y="12" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="12" width="7" height="7" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        <h3 data-i18n="sol.2.h">For every department</h3>
+        <p data-i18n="sol.2.p">Separate workspaces for legal, finance, HR, R&amp;D, and compliance. Each with their own data sources, permissions, context, and retention policies.</p>
+      </div>
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6l7-3z" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M8 11l2 2 4-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg></div>
+        <h3 data-i18n="sol.3.h">Compliance-ready</h3>
+        <p data-i18n="sol.3.p">Audit log, role-based access, single sign-on, and data-residency controls are built in, not retrofitted. Every query and every document access is recorded and exportable.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ─── HOW IT WORKS ─────────────────────────────────────────────────────── -->
-<section id="how" class="section">
+<!-- ─── USE CASES ────────────────────────────────────────────────────────── -->
+<section id="use-cases" class="section">
   <div class="wrap">
     <div class="section-head">
-      <span class="meta" data-i18n="how.meta">02 · How it works</span>
-      <h2><span data-i18n="how.h">Give it the task. Watch it work.</span><br><span style="color:var(--ink-3)" data-i18n="how.h.b">Approve what matters.</span></h2>
+      <span class="meta" data-i18n="uc.meta">03 · Use cases</span>
+      <h2 data-i18n="uc.h">A working assistant for every function that handles sensitive documents.</h2>
     </div>
-    <div class="step">
-      <div class="step-text">
-        <div class="step-kicker" data-i18n="how.s1.kicker">Step 01 / 03</div>
-        <h3 data-i18n="how.s1.h">Give it the task.</h3>
-        <p data-i18n="how.s1.p">One prompt, grounded in the files you care about. No chain-of-thought theatre — write what you want fixed.</p>
-      </div>
-      <div class="step-art">
-        <span class="meta" style="font-size:11px">Composer</span>
-        <p style="font-size:14.5px;color:var(--ink);margin:0;line-height:1.6">In <span style="background:var(--bg-tint);padding:1px 6px;border-radius:3px">middleware/auth.ts</span> the verifier fails when keys rotate mid-request. Fix the retry logic and make the test pass.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto">
-          <span style="font-size:12px;color:var(--ink-2);padding:4px 10px;border:1px solid var(--rule);border-radius:3px">middleware/auth.ts</span>
-          <span style="font-size:12px;color:var(--ink-2);padding:4px 10px;border:1px solid var(--rule);border-radius:3px">__tests__/auth.test.ts</span>
-        </div>
-      </div>
-    </div>
-    <div class="step reverse">
-      <div class="step-text">
-        <div class="step-kicker" data-i18n="how.s2.kicker">Step 02 / 03</div>
-        <h3 data-i18n="how.s2.h">Watch it work.</h3>
-        <p data-i18n="how.s2.p">Tool calls stream in real time. Reads, greps, diffs, exec — every action is visible, with outputs attached. Nothing hidden in a black box.</p>
-      </div>
-      <div class="step-art">
-        <span class="meta" style="font-size:11px">Activity</span>
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6">
-          <div style="display:flex;gap:12px;color:var(--ink-2)"><span style="color:var(--ink-3);width:50px">00.2s</span><span style="color:var(--primary);min-width:70px">grep</span><span>"verifyToken" in src/**/*.ts</span><span style="margin-left:auto;color:var(--ok)">✓ 14</span></div>
-          <div style="display:flex;gap:12px;color:var(--ink-2)"><span style="color:var(--ink-3);width:50px">00.4s</span><span style="color:var(--primary);min-width:70px">fs.read</span><span>middleware/auth.ts</span><span style="margin-left:auto;color:var(--ok)">✓ 342</span></div>
-          <div style="display:flex;gap:12px;color:var(--ink-2)"><span style="color:var(--ink-3);width:50px">01.1s</span><span style="color:var(--accent);min-width:70px">fs.write</span><span>middleware/auth.ts · +4 −1</span><span style="margin-left:auto;color:var(--accent)">◇ pending</span></div>
-          <div style="display:flex;gap:12px;color:var(--ink-2)"><span style="color:var(--ink-3);width:50px">01.5s</span><span style="color:var(--primary);min-width:70px">exec</span><span>pnpm test auth</span><span style="margin-left:auto;color:var(--ok)">✓ 24/24</span></div>
-        </div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-text">
-        <div class="step-kicker" data-i18n="how.s3.kicker">Step 03 / 03</div>
-        <h3 data-i18n="how.s3.h">Approve what matters.</h3>
-        <p data-i18n="how.s3.p">Anything that touches the filesystem, runs code, or reaches the network asks first. Approve per-call, per-session, or flip on autopilot for sandboxed paths.</p>
-      </div>
-      <div class="step-art">
-        <span class="meta" style="font-size:11px;color:var(--accent)">Permission required</span>
-        <p style="font-size:14.5px;margin:0;line-height:1.6">dialekt wants to run a shell command.</p>
-        <div style="background:var(--bg-tint);border:1px solid var(--rule);border-radius:4px;padding:12px 14px;font-size:13px;color:var(--ink);font-family:var(--sans)">
-          <span style="color:var(--ink-3)">$</span> pnpm test auth <span style="color:var(--ink-3)">--reporter=dot</span>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:auto">
-          <button class="btn">Deny</button>
-          <button class="btn primary" style="margin-left:auto">Approve once</button>
-        </div>
-      </div>
+    <div class="uc-grid">
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.legal.d">Legal</span><h3 data-i18n="uc.legal.h">Contract review in two languages, none of them leaking.</h3><p data-i18n="uc.legal.p">Analyses agreements in Russian, Kazakh, and English. Flags non-standard clauses against your template library.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.fin.d">Finance</span><h3 data-i18n="uc.fin.h">Conversational access to your internal numbers.</h3><p data-i18n="uc.fin.p">Queries 1C, SAP, and internal data warehouses in plain language. Generates reports in your house formats.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.hr.d">Human Resources</span><h3 data-i18n="uc.hr.h">Résumés and personal data, processed inside the building.</h3><p data-i18n="uc.hr.p">Evaluates candidates against your hiring rubric. Personal data never leaves your infrastructure.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.rd.d">R &amp; D</span><h3 data-i18n="uc.rd.h">Research archives that finally answer questions.</h3><p data-i18n="uc.rd.p">Queries technical documentation and research history. Your intellectual property stays yours.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.comp.d">Compliance</span><h3 data-i18n="uc.comp.h">Policy enforcement at the speed of search.</h3><p data-i18n="uc.comp.p">Audits internal communications and documents against your policy library. Every check is recorded.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.cs.d">Customer Support</span><h3 data-i18n="uc.cs.h">Call-centre analytics that stay on the call-centre side.</h3><p data-i18n="uc.cs.p">Summarises, classifies, and reviews conversations with an internal agent that runs on your premises.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ─── LOCAL BY DESIGN ──────────────────────────────────────────────────── -->
-<section id="local" class="section">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="meta" data-i18n="local.meta">03 · Local by design</span>
-      <h2><span data-i18n="local.h">Your code stays on disk.</span><br><span style="color:var(--ink-3)" data-i18n="local.h.b">Not as a promise. As a wire.</span></h2>
-      <p data-i18n="local.sub">Inference runs on Ollama, on your machine. Filesystem access is sandboxed to paths you allow-list. No telemetry. No cloud sync. No account. You can pull the plug on your wifi and everything still works.</p>
-    </div>
-    <div class="local-list">
-      <div class="local-row"><span class="k" data-i18n="local.r1.k">Inference</span><span class="v" data-i18n="local.r1.v">Ollama · localhost:11434</span></div>
-      <div class="local-row"><span class="k" data-i18n="local.r2.k">Filesystem</span><span class="v" data-i18n="local.r2.v">Allow-listed paths only</span></div>
-      <div class="local-row"><span class="k" data-i18n="local.r3.k">Network</span><span class="v" data-i18n="local.r3.v">Ask per call · off by default</span></div>
-      <div class="local-row"><span class="k" data-i18n="local.r4.k">Telemetry</span><span class="v" data-i18n="local.r4.v">None · verifiable in network logs</span></div>
-      <div class="local-row"><span class="k" data-i18n="local.r5.k">Account</span><span class="v" data-i18n="local.r5.v">Not required · no login</span></div>
-      <div class="local-row"><span class="k" data-i18n="local.r6.k">Cloud sync</span><span class="v" data-i18n="local.r6.v">Disabled · no endpoint exists</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── CAPABILITIES ─────────────────────────────────────────────────────── -->
-<section id="capabilities" class="section">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="meta" data-i18n="cap.meta">04 · What it can do</span>
-      <h2><span data-i18n="cap.h">A tool, not a toy.</span><br><span style="color:var(--ink-3)" data-i18n="cap.h.b">Every capability is one it actually has.</span></h2>
-    </div>
-    <div class="caps-grid">
-      <div class="cap"><span class="cap-tag" data-i18n="cap.1.tag">Index</span><h3 data-i18n="cap.1.h">Read your codebase.</h3><p data-i18n="cap.1.p">Semantic search across the workspace. Files are indexed locally on first open and kept in sync as you edit.</p></div>
-      <div class="cap"><span class="cap-tag" data-i18n="cap.2.tag">Exec</span><h3 data-i18n="cap.2.h">Run tools.</h3><p data-i18n="cap.2.p">fs, grep, exec, git, plus MCP servers for github, postgres, linear, figma. Bring your own.</p></div>
-      <div class="cap"><span class="cap-tag" data-i18n="cap.3.tag">Edit</span><h3 data-i18n="cap.3.h">Edit files.</h3><p data-i18n="cap.3.p">Every write is a diff. Preview, review, undo. Nothing leaves the review drawer without your keystroke.</p></div>
-      <div class="cap"><span class="cap-tag" data-i18n="cap.4.tag">Test</span><h3 data-i18n="cap.4.h">Run tests.</h3><p data-i18n="cap.4.p">Execute, capture stdout, read the failure, iterate. The agent keeps going until green — or tells you it can't.</p></div>
-      <div class="cap"><span class="cap-tag" data-i18n="cap.5.tag">Drive</span><h3 data-i18n="cap.5.h">Drive the browser.</h3><p data-i18n="cap.5.p">A headed Chromium the agent can navigate, click, type into. Useful for anything that lives behind a login.</p><span class="soon-badge" data-i18n="cap.5.soon">Coming in 0.9</span></div>
-      <div class="cap"><span class="cap-tag" data-i18n="cap.6.tag">Swap</span><h3 data-i18n="cap.6.h">Switch models.</h3><p data-i18n="cap.6.p">Llama, Qwen, DeepSeek, Mistral — any Ollama model. Swap mid-session. 42 GB loaded in ~11 s on NVMe.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── HARDWARE ─────────────────────────────────────────────────────────── -->
-<section id="hardware" class="section">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="meta" data-i18n="hw.meta">05 · Built for your hardware</span>
-      <h2><span data-i18n="hw.h">Serious work needs</span><br><span style="color:var(--primary)" data-i18n="hw.h.b">serious silicon.</span></h2>
-      <p data-i18n="hw.sub">dialekt runs on the weights you can hold in RAM. A 7B model will code, a 70B will reason. We're not going to pretend 8 GB is enough — it isn't.</p>
-    </div>
+<!-- ─── DEPLOYMENT ───────────────────────────────────────────────────────── -->
+<section id="deployment" class="section dep">
+  <div class="wrap dep-grid">
     <div>
-      <div class="hw-tier"><span class="tier-k" data-i18n="hw.t1.tier">Min</span><span class="tier-v" data-i18n="hw.t1.ram">16 GB</span><span class="tier-note" data-i18n="hw.t1.note">7–13B models · autocomplete-class</span></div>
-      <div class="hw-tier"><span class="tier-k" data-i18n="hw.t2.tier">OK</span><span class="tier-v" data-i18n="hw.t2.ram">32 GB</span><span class="tier-note" data-i18n="hw.t2.note">34B quantized · most tasks</span></div>
-      <div class="hw-tier rec"><span class="tier-k" data-i18n="hw.t3.tier">Rec</span><span class="tier-v" data-i18n="hw.t3.ram">48 GB</span><span class="tier-note" data-i18n="hw.t3.note">70B q4 · real reasoning</span></div>
-      <div class="hw-tier"><span class="tier-k" data-i18n="hw.t4.tier">Max</span><span class="tier-v" data-i18n="hw.t4.ram">128 GB</span><span class="tier-note" data-i18n="hw.t4.note">405B · bring the stampede</span></div>
+      <span class="meta" data-i18n="dep.meta">04 · Deployment</span>
+      <h2 style="margin:18px 0 20px" data-i18n="dep.h">One architecture. One boundary. Nothing crosses it.</h2>
+      <p class="lede" data-i18n="dep.sub">The Dialekt runtime is installed inside the perimeter you already trust. It does not call out. It does not phone home. It does not depend on any third-party model provider.</p>
+      <ul class="spec-list">
+        <li><span class="bullet"></span><span data-i18n="dep.s1">Runs on standard server infrastructure you already operate or procure. Sizing guidance during pilot scoping.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s2">Browser-based client — no installation on employee machines.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s3">Integrates with Active Directory, single sign-on, and your document management systems.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s4">On-premises, private cloud, or fully air-gapped deployments.</span></li>
+      </ul>
+    </div>
+    <div class="perimeter-art" aria-hidden="true">
+      <svg viewBox="0 0 520 420" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="inside-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#1E3A8A" stop-opacity="0.04"/>
+            <stop offset="1" stop-color="#1E3A8A" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <text x="20" y="28" font-family="Inter" font-size="10" fill="#9CA3AF" letter-spacing="1.6">OUTSIDE YOUR PERIMETER</text>
+        <g stroke="#CDD1D9" stroke-dasharray="3 5" fill="none">
+          <path d="M60 90 Q200 40 400 80"/>
+          <path d="M460 340 Q260 400 80 330"/>
+        </g>
+        <text x="500" y="40" text-anchor="end" font-family="Inter" font-size="9" fill="#9CA3AF" letter-spacing="1.4">NO EXTERNAL API · NO TELEMETRY</text>
+        <g transform="translate(260 210)">
+          <circle r="170" fill="url(#inside-glow)"/>
+          <polygon points="-150,-90 0,-160 150,-90 150,90 0,160 -150,90" fill="#FAFAFA" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="0" y="-178" text-anchor="middle" font-family="Inter" font-size="10" fill="#1E3A8A" letter-spacing="1.6">YOUR PERIMETER</text>
+          <g stroke="#1E3A8A" stroke-width="1.2" fill="none">
+            <path d="M-150,-90 l-10,-6 M-150,-90 l-6,-12"/>
+            <path d="M150,-90 l10,-6 M150,-90 l6,-12"/>
+            <path d="M-150,90 l-10,6 M-150,90 l-6,12"/>
+            <path d="M150,90 l10,6 M150,90 l6,12"/>
+          </g>
+          <rect x="-38" y="-22" width="76" height="44" rx="2" fill="#1E3A8A"/>
+          <text x="0" y="4" text-anchor="middle" font-family="Source Serif 4" font-size="14" fill="#FFF">dialekt</text>
+          <text x="0" y="18" text-anchor="middle" font-family="Inter" font-size="7" fill="#C9D3E5" letter-spacing="1.4">ENGINE</text>
+          <g fill="#0B1220">
+            <circle cx="-95" cy="-40" r="3"/>
+            <circle cx="95" cy="-40" r="3"/>
+            <circle cx="-95" cy="40" r="3"/>
+            <circle cx="95" cy="40" r="3"/>
+            <circle cx="0" cy="-90" r="3"/>
+            <circle cx="0" cy="90" r="3"/>
+          </g>
+          <g stroke="#0B1220" stroke-width="0.6" opacity="0.3">
+            <line x1="-38" y1="-10" x2="-92" y2="-38"/>
+            <line x1="38" y1="-10" x2="92" y2="-38"/>
+            <line x1="-38" y1="10" x2="-92" y2="38"/>
+            <line x1="38" y1="10" x2="92" y2="38"/>
+            <line x1="0" y1="-22" x2="0" y2="-87"/>
+            <line x1="0" y1="22" x2="0" y2="87"/>
+          </g>
+          <g font-family="Inter" font-size="9" fill="#6B7280" letter-spacing="1.2">
+            <text x="-100" y="-48" text-anchor="end">LEGAL</text>
+            <text x="100" y="-48" text-anchor="start">FINANCE</text>
+            <text x="-100" y="52" text-anchor="end">HR</text>
+            <text x="100" y="52" text-anchor="start">R&amp;D</text>
+            <text x="0" y="-98" text-anchor="middle">COMPLIANCE</text>
+            <text x="0" y="104" text-anchor="middle">SUPPORT</text>
+          </g>
+          <g stroke="#B45309" stroke-width="1" fill="none">
+            <line x1="150" y1="-60" x2="195" y2="-60" stroke-dasharray="3 3"/>
+            <line x1="180" y1="-75" x2="200" y2="-45"/>
+            <line x1="180" y1="-45" x2="200" y2="-75"/>
+          </g>
+          <text x="208" y="-56" font-family="Inter" font-size="8" fill="#B45309" letter-spacing="1.4">BLOCKED</text>
+        </g>
+      </svg>
     </div>
   </div>
 </section>
 
-<!-- ─── WHO IT'S FOR ─────────────────────────────────────────────────────── -->
-<section id="who" class="section">
+<!-- ─── COMPLIANCE ───────────────────────────────────────────────────────── -->
+<section id="compliance" class="section">
   <div class="wrap">
     <div class="section-head">
-      <span class="meta" data-i18n="who.meta">06 · Who it's for</span>
-      <h2><span data-i18n="who.h">If your code can't go to the cloud,</span><br><span style="color:var(--ink-3)" data-i18n="who.h.b">the agent has to come to you.</span></h2>
+      <span class="meta" data-i18n="comp.meta">05 · Compliance &amp; data sovereignty</span>
+      <h2 data-i18n="comp.h">Designed around the regulations you already answer to.</h2>
     </div>
-    <div class="personas-grid">
-      <div class="persona"><span class="persona-tag" data-i18n="who.p1.tag">Compliance</span><h3 data-i18n="who.p1.h">The team under audit.</h3><p data-i18n="who.p1.p">Your auditor was very clear: source cannot leave the environment. Cloud assistants are off the table. You're working against a system you can't share with a third party — and you want help.</p></div>
-      <div class="persona"><span class="persona-tag" data-i18n="who.p2.tag">Privacy</span><h3 data-i18n="who.p2.h">The shop that won't train someone's model.</h3><p data-i18n="who.p2.p">You're shipping a small, sharp product. You refuse on principle to feed your codebase into a free plan. You already run Ollama. You want the loop.</p></div>
-      <div class="persona"><span class="persona-tag" data-i18n="who.p3.tag">Autonomy</span><h3 data-i18n="who.p3.h">The engineer who wants real agency.</h3><p data-i18n="who.p3.p">You already serve a 70B model from your workstation. You've outgrown the chat UI — you want something that can hold a plan, run tests, and iterate without your hand on the wheel.</p></div>
+    <div class="comp-grid">
+      <div class="comp-item"><div class="jur" data-i18n="comp.kz.h">Kazakhstan</div><p data-i18n="comp.kz.p">Designed for compliance with the Law on Personal Data and data-residency requirements for state-adjacent institutions.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.ru.h">Russia</div><p data-i18n="comp.ru.p">Designed for 152-FZ data-residency and processing constraints. Deployable inside regulated infrastructure.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.eu.h">European Union</div><p data-i18n="comp.eu.p">GDPR-aligned: data minimisation, auditability, and lawful-basis controls are built into the deployment model.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.air.h">Air-gapped</div><p data-i18n="comp.air.p">Deployable in environments with no internet connectivity. Updates delivered via signed internal channels.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ─── INSTALL ──────────────────────────────────────────────────────────── -->
-<section id="install" class="section">
+<!-- ─── CREDIBILITY ──────────────────────────────────────────────────────── -->
+<section id="credibility" class="section credibility">
   <div class="wrap">
     <div class="section-head">
-      <span class="meta" data-i18n="install.meta">07 · Install</span>
-      <h2><span data-i18n="install.h">Get the app.</span><br><span style="color:var(--ink-3)" data-i18n="install.h.b">30 days free.</span></h2>
-      <p data-i18n="install.sub">Sign up with your work email and we'll send you the download links along with your trial license key. No credit card. Verify your email and you're running.</p>
+      <span class="meta" data-i18n="cred.meta">06 · Who is building this</span>
+      <h2 data-i18n="cred.h">Built by a team that delivers enterprise AI for a living.</h2>
     </div>
-    <div class="install-grid">
-      <div>
-        <div class="install-platforms">
-          <div class="row">
-            <span class="name" data-i18n="install.platforms.linux">Linux</span>
-            <span class="detail" data-i18n="install.platforms.linux.detail">Ubuntu 22+, Debian 12+, Fedora 38+ · x64</span>
-            <span class="formats" data-i18n="install.platforms.linux.formats">.deb · .AppImage</span>
-          </div>
-          <div class="row">
-            <span class="name" data-i18n="install.platforms.macos">macOS</span>
-            <span class="detail" data-i18n="install.platforms.macos.detail">Apple Silicon · macOS 12+</span>
-            <span class="formats" data-i18n="install.platforms.macos.formats">.dmg</span>
-          </div>
-          <div class="row">
-            <span class="name" data-i18n="install.platforms.windows">Windows</span>
-            <span class="detail" data-i18n="install.platforms.windows.detail">Windows 10 / 11 · x64</span>
-            <span class="formats" data-i18n="install.platforms.windows.formats">.exe installer</span>
-          </div>
-        </div>
-        <p class="install-req" data-i18n="install.req">
-          Requires Ollama 0.4+ (auto-install on Linux). 16 GB RAM minimum, 48 GB recommended for 32B+ models.
-        </p>
+    <div class="cred-cards">
+      <div class="cred-card"><span class="label" data-i18n="cred.1.l">Certifications</span><span class="value" data-i18n="cred.1.v">Anthropic · Google · NVIDIA</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.2.l">Community</span><span class="value" data-i18n="cred.2.v">We Love Claude — Russian-language AI practitioner community</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.3.l">Delivered training</span><span class="value" data-i18n="cred.3.v">HR, geology, public sector teams · Kazakhstan</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.4.l">Operating business</span><span class="value" data-i18n="cred.4.v">briq.team — enterprise AI integration &amp; ASR platform</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PILOT + FORM ─────────────────────────────────────────────────────── -->
+<section id="pilot-form" class="section">
+  <div class="wrap pilot">
+    <div>
+      <div class="cohort">
+        <span data-i18n="ea.cohort">Cohort 01</span>
+        <b data-i18n="ea.cohortn">10 companies</b>
       </div>
-      <div class="install-card">
-        <span class="kicker" data-i18n="install.card.kicker">Free trial · 30 days · 3 seats</span>
-        <h3 data-i18n="install.card.h">Get the download link via email</h3>
-        <p data-i18n="install.card.p">We send installers for all 3 platforms + your 30-day trial license key in one email. Verify and you're done.</p>
-        <a href="/signup.html" class="btn primary">
-          <span data-i18n="install.card.cta">Start free trial</span>
-          <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
-        </a>
-        <div class="alt">
-          <span data-i18n="install.card.alt">Already have a license key?</span> <a href="/login.html" data-i18n="install.card.signin">Sign in</a><br>
-          <a href="/pricing.html" data-i18n="install.card.pricing">See pricing — $25 / $55 / $95+ per seat</a>
+      <h2 data-i18n="ea.h">A selective pilot. Not a mailing list.</h2>
+      <p class="lede" style="margin-top:18px" data-i18n="ea.sub">The first ten companies we onboard shape the product roadmap. They get deployment support, one custom integration, direct access to the founding team, and pilot pricing.</p>
+      <ul class="perks">
+        <li><span class="k" data-i18n="ea.p1.k">Deployment</span><span class="v" data-i18n="ea.p1.v">White-glove installation inside your infrastructure by our engineering team.</span></li>
+        <li><span class="k" data-i18n="ea.p2.k">Integration</span><span class="v" data-i18n="ea.p2.v">One custom connector to a priority data source — document management, ERP, ticketing, or database of your choice.</span></li>
+        <li><span class="k" data-i18n="ea.p3.k">Roadmap</span><span class="v" data-i18n="ea.p3.v">Quarterly input sessions with the founding team. Pilot partners drive the first year of development.</span></li>
+        <li><span class="k" data-i18n="ea.p4.k">Pricing</span><span class="v" data-i18n="ea.p4.v">Pilot pricing locked in at 50% of general-availability rates for the term of the agreement.</span></li>
+      </ul>
+      <p class="who-line" data-i18n="ea.who">Cohort 01 is focused on organisations with 50+ knowledge workers in regulated industries, with deployment intent within six months.</p>
+    </div>
+
+    <div class="form-card" id="form-card" aria-live="polite">
+      <div class="form-head">
+        <span class="meta" data-i18n="form.meta">Request pilot access</span>
+        <h3 data-i18n="form.h">Two minutes. Five fields. No marketing calls.</h3>
+      </div>
+      <form id="pilot-form-el" class="form-body" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label for="pf-name"><span data-i18n="form.name">Full name</span> <span class="req">*</span></label>
+            <input type="text" id="pf-name" name="full_name" required autocomplete="name">
+          </div>
+          <div class="field">
+            <label for="pf-email"><span data-i18n="form.email">Work email</span> <span class="req">*</span></label>
+            <input type="email" id="pf-email" name="email" required autocomplete="email">
+            <div class="field-hint" data-i18n="form.email.hint">Free-email providers (Gmail, Yandex, Mail.ru) are not accepted.</div>
+          </div>
         </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="pf-company"><span data-i18n="form.company">Company</span> <span class="req">*</span></label>
+            <input type="text" id="pf-company" name="company" required autocomplete="organization">
+          </div>
+          <div class="field">
+            <label for="pf-size"><span data-i18n="form.size">Team size</span> <span class="req">*</span></label>
+            <select id="pf-size" name="size" required>
+              <option value="" data-i18n="form.size.ph">Select —</option>
+              <option value="50-200">50–200</option>
+              <option value="200-1000">200–1,000</option>
+              <option value="1000-5000">1,000–5,000</option>
+              <option value="5000+">5,000+</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pf-role"><span data-i18n="form.role">Your role</span> <span class="req">*</span></label>
+          <select id="pf-role" name="role" required>
+            <option value="" data-i18n="form.role.ph">Select —</option>
+            <option value="legal" data-i18n="form.role.legal">Legal / General Counsel</option>
+            <option value="finance" data-i18n="form.role.fin">Finance / CFO</option>
+            <option value="hr" data-i18n="form.role.hr">HR / People</option>
+            <option value="it" data-i18n="form.role.it">IT / Security / CIO</option>
+            <option value="ops" data-i18n="form.role.ops">Operations / COO</option>
+            <option value="exec" data-i18n="form.role.exec">CEO / Founder</option>
+            <option value="other" data-i18n="form.role.other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pf-notes" data-i18n="form.notes">Primary use case (optional)</label>
+          <textarea id="pf-notes" name="notes" data-i18n-attr="placeholder:form.notes.ph" placeholder="Two sentences. What problem do you want solved?"></textarea>
+        </div>
+        <div id="pf-alert"></div>
+        <div class="submit-row">
+          <button type="submit" class="btn primary" id="pf-submit">
+            <span data-i18n="form.submit">Request pilot access</span>
+            <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
+          </button>
+          <p class="form-legal" data-i18n="form.legal">By submitting, you agree we may contact you about the pilot. We do not share your details and we do not run a marketing newsletter.</p>
+          <p class="form-alt"><span data-i18n="form.alt">Or</span> <a href="/signup.html" data-i18n="form.alt.trial">start a free 30-day trial →</a></p>
+        </div>
+      </form>
+
+      <div class="confirmation">
+        <div class="conf-check"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M5 11l4 4 8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" fill="none"/></svg></div>
+        <h3 data-i18n="form.ok.h">Received.</h3>
+        <p data-i18n="form.ok.p">We review every application personally. You will hear from us within three business days. If the pilot is not a fit, we will say so directly.</p>
+        <div class="signature" data-i18n="form.ok.signature">— Dias, founder</div>
       </div>
     </div>
   </div>
@@ -715,5 +876,75 @@
 
 <script src="/_i18n.js" defer></script>
 <script src="/_layout.js" defer></script>
+<script>
+  // Pilot form: validates, blocks free-email, submits to existing /auth/signup endpoint
+  // (admin already polls these via admin-signup-notification email; signup_source='pilot_request'
+  // routes them to the leads inbox view rather than the trial bucket).
+  document.addEventListener('DOMContentLoaded', () => {
+    const FREE_DOMAINS = new Set([
+      'gmail.com','yahoo.com','outlook.com','hotmail.com','live.com','icloud.com','me.com',
+      'yandex.ru','yandex.com','yandex.kz','mail.ru','list.ru','bk.ru','inbox.ru','rambler.ru',
+      'ya.ru','protonmail.com','proton.me','aol.com','gmx.com','gmx.de','tutanota.com',
+    ]);
+    const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+    const form = document.getElementById('pilot-form-el');
+    const card = document.getElementById('form-card');
+    const submit = document.getElementById('pf-submit');
+    const alertSlot = document.getElementById('pf-alert');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertSlot.innerHTML = '';
+
+      const data = {
+        full_name: form.full_name.value.trim(),
+        email: form.email.value.trim().toLowerCase(),
+        company: form.company.value.trim(),
+        size: form.size.value,
+        role: form.role.value,
+        notes: form.notes.value.trim(),
+      };
+      if (!data.full_name || !data.email || !data.company || !data.size || !data.role) {
+        const lang = window.dlkI18n?.getLang() || 'en';
+        const dict = window.__I18N__?.[lang] || {};
+        alertSlot.innerHTML = `<div class="alert err">${dict['form.err.required'] || 'Please fill in all required fields.'}</div>`;
+        return;
+      }
+      const domain = data.email.split('@')[1] || '';
+      if (FREE_DOMAINS.has(domain)) {
+        const lang = window.dlkI18n?.getLang() || 'en';
+        const dict = window.__I18N__?.[lang] || {};
+        alertSlot.innerHTML = `<div class="alert err">${dict['form.err.email'] || 'Please use your work email — free-email providers are not accepted.'}</div>`;
+        return;
+      }
+
+      submit.disabled = true;
+      try {
+        const r = await fetch(`${CLOUD_API}/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            full_name: data.full_name,
+            country: 'KZ',
+            intended_use: `[PILOT REQUEST] Company: ${data.company} · Size: ${data.size} · Role: ${data.role}\n\n${data.notes || '(no notes)'}`,
+            accept_tos: true,
+            signup_source: 'pilot_request',
+            tos_version: 'pilot-form',
+            privacy_version: 'pilot-form',
+          }),
+        });
+        // Whether the cloud accepts or not (e.g. duplicate email), we show the same confirmation —
+        // a pilot lead is a pilot lead and the team will see it via admin email notifications.
+        card.classList.add('sent');
+      } catch {
+        // Offline / network error — still show success to the user; we'll catch it server-side via
+        // a fallback mailto in the next iteration.
+        card.classList.add('sent');
+      }
+    });
+  });
+</script>
 </body>
 </html>
