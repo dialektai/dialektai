@@ -42,7 +42,7 @@ DEFAULT_SETTINGS: dict = {
     "regulated_mode": False,
     # Default cloud endpoint. Pilots / dev can override this via Settings → Cloud
     # (POST /settings with cloud_api_url) or by editing ~/.dialekt/config.json.
-    "cloud_api_url": "https://dialekt-cloud.dias.now",
+    "cloud_api_url": "https://api.dias.now",
     "cloud_bearer_token": None,
     "tenant_info": None,
     "user_info": None,
