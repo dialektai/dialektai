@@ -155,3 +155,179 @@ def stats():
     click.echo(f"  Users:    {data['users']['total']}")
     click.echo(f"  Agents:   {data['agents']['total']}")
     click.echo(f"  Invoices: {data['invoices']['total']} / {data['invoices']['paid']} paid")
+
+
+# ── Admin user management (DIRECT DB — no HTTP) ─────────────────────────────
+# Per admin_2fa_DESIGN: these run against the DB directly. Must be invoked
+# over SSH on the server. Recovery flows that bypass HTTP entirely.
+
+
+async def _db_pool():
+    import asyncpg
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        click.echo("DATABASE_URL not set", err=True)
+        sys.exit(2)
+    return await asyncpg.create_pool(dsn, min_size=1, max_size=2)
+
+
+@cli.group()
+def admin():
+    """Manage founder admin accounts (direct DB access — SSH only)."""
+
+
+def _validate_admin_email_domain(email: str) -> None:
+    """Enforce DIALEKT_ADMIN_EMAIL_DOMAIN policy. Empty value = no restriction
+    (used in tests / dev). Production default: '@dias.now'."""
+    from dialekt_cloud.config import settings as _cfg
+    domain = (_cfg.DIALEKT_ADMIN_EMAIL_DOMAIN or "").strip().lower()
+    if not domain:
+        return
+    if not email.lower().endswith(domain):
+        click.echo(
+            f"✗ Admin email must end in '{domain}'. Got: {email}\n"
+            f"  Override via env: DIALEKT_ADMIN_EMAIL_DOMAIN='' (not recommended in prod).",
+            err=True,
+        )
+        sys.exit(1)
+
+
+@admin.command("create")
+@click.option("--email", required=True)
+@click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True,
+              help="Will be argon2id-hashed before storage.")
+def admin_create(email, password):
+    """Create a new founder admin. TOTP enrollment happens at first login.
+
+    Email must end in @dias.now (or whatever DIALEKT_ADMIN_EMAIL_DOMAIN is
+    set to). Primary admin: zhumagaliyev@dias.now."""
+    from dialekt_cloud.services.admin_auth import hash_password
+
+    _validate_admin_email_domain(email)
+
+    async def _go():
+        pool = await _db_pool()
+        try:
+            async with pool.acquire() as conn:
+                existing = await conn.fetchval("SELECT id FROM admins WHERE email = $1", email.lower())
+                if existing:
+                    click.echo(f"Admin {email} already exists ({existing})", err=True)
+                    sys.exit(1)
+                admin_id = await conn.fetchval(
+                    "INSERT INTO admins(email, password_hash) VALUES($1,$2) RETURNING id",
+                    email.lower(), hash_password(password),
+                )
+                click.echo(f"✓ Admin created · id={admin_id} email={email}")
+                click.echo("  TOTP will be enrolled on first login.")
+        finally:
+            await pool.close()
+
+    asyncio.run(_go())
+
+
+@admin.command("list")
+def admin_list():
+    """List founder admins."""
+    async def _go():
+        pool = await _db_pool()
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, email, totp_enrolled_at, last_login_at, last_login_ip,
+                           failed_attempts, locked_until, created_at
+                    FROM admins ORDER BY created_at
+                    """
+                )
+            if not rows:
+                click.echo("No admins. Bootstrap with: dialekt-admin admin create --email=...")
+                return
+            click.echo(f"\n{'EMAIL':<32} {'TOTP':<6} {'LAST LOGIN':<22} {'FAILS':<6} {'LOCKED?'}")
+            click.echo("-" * 80)
+            for r in rows:
+                totp = "✓" if r["totp_enrolled_at"] else "—"
+                last = r["last_login_at"].strftime("%Y-%m-%d %H:%M") if r["last_login_at"] else "—"
+                locked = "yes" if (r["locked_until"] and r["locked_until"] > datetime.now(r["locked_until"].tzinfo)) else "no"
+                click.echo(f"{r['email']:<32} {totp:<6} {last:<22} {r['failed_attempts']:<6} {locked}")
+        finally:
+            await pool.close()
+
+    asyncio.run(_go())
+
+
+@admin.command("reset-2fa")
+@click.option("--email", required=True)
+@click.confirmation_option(prompt="This clears the TOTP secret AND backup codes. Confirm?")
+def admin_reset_2fa(email):
+    """Clear TOTP enrolment so the admin can re-enroll on next login."""
+    async def _go():
+        pool = await _db_pool()
+        try:
+            async with pool.acquire() as conn:
+                row = await conn.execute(
+                    """
+                    UPDATE admins SET totp_secret_encrypted = NULL,
+                                      totp_enrolled_at = NULL,
+                                      backup_codes = NULL,
+                                      backup_codes_generated_at = NULL,
+                                      failed_attempts = 0,
+                                      locked_until = NULL
+                    WHERE email = $1
+                    """,
+                    email.lower(),
+                )
+                if row.endswith("0"):
+                    click.echo(f"No admin {email}", err=True)
+                    sys.exit(1)
+                click.echo(f"✓ TOTP cleared for {email}. Next login triggers re-enrollment.")
+        finally:
+            await pool.close()
+
+    asyncio.run(_go())
+
+
+@admin.command("reset-password")
+@click.option("--email", required=True)
+@click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+def admin_reset_password(email, password):
+    """Set a fresh password for an admin (argon2id)."""
+    from dialekt_cloud.services.admin_auth import hash_password
+
+    async def _go():
+        pool = await _db_pool()
+        try:
+            async with pool.acquire() as conn:
+                row = await conn.execute(
+                    """
+                    UPDATE admins SET password_hash = $1, failed_attempts = 0, locked_until = NULL
+                    WHERE email = $2
+                    """,
+                    hash_password(password), email.lower(),
+                )
+                if row.endswith("0"):
+                    click.echo(f"No admin {email}", err=True)
+                    sys.exit(1)
+                click.echo(f"✓ Password updated for {email}.")
+        finally:
+            await pool.close()
+
+    asyncio.run(_go())
+
+
+@admin.command("unlock")
+@click.option("--email", required=True)
+def admin_unlock(email):
+    """Clear lockout flags for an admin."""
+    async def _go():
+        pool = await _db_pool()
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE admins SET failed_attempts = 0, locked_until = NULL WHERE email = $1",
+                    email.lower(),
+                )
+            click.echo(f"✓ {email} unlocked.")
+        finally:
+            await pool.close()
+
+    asyncio.run(_go())

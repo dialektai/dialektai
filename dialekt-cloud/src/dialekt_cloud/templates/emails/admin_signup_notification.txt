@@ -1,0 +1,13 @@
+[lead] new trial signup
+
+  Name      {{ full_name }}
+  Email     {{ signup_email }}
+  Country   {{ country }}
+  Source    {{ signup_source }}
+  IP        {{ ip }}
+  Tenant ID {{ tenant_id }}
+
+INTENDED USE:
+{{ intended_use }}
+
+Open admin: https://api.dias.now/admin/ui/

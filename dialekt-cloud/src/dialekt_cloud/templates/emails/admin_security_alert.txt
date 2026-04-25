@@ -1,0 +1,27 @@
+[security] dialekt.ai admin alert — {{ kind }}
+
+{% if kind == "password_changed" %}
+Hi {{ full_name }} — the password on your dialekt.ai admin account was changed.
+
+If this WAS NOT you: someone has access. Run SSH:
+  dialekt-admin admin reset-password --email=<your-email>
+{% elif kind == "backup_codes_regenerated" %}
+Hi {{ full_name }} — fresh backup codes were generated. Previous codes are now invalid.
+
+If this WAS NOT you: someone has access. Run SSH:
+  dialekt-admin admin reset-2fa --email=<your-email>
+{% elif kind == "account_locked" %}{% if extra.broadcast %}Admin account locked: {{ extra.affected_email }} — too many failed logins. Heads-up to the team.{% else %}Hi {{ full_name }} — your admin account is locked due to failed logins (~{{ extra.locked_minutes }} min).
+
+To unlock manually: ssh + dialekt-admin admin unlock --email=<your-email>{% endif %}
+{% elif kind == "totp_enrolled" %}
+Hi {{ full_name }} — a new authenticator was enrolled on your account. Usually follows a CLI reset-2fa.
+
+If this WAS NOT you: investigate via audit log + revoke unknown SSH key.
+{% endif %}
+
+  Event:      {{ kind }}
+  When:       {{ when_human }}
+  IP:         {{ ip }}
+  User-agent: {{ user_agent[:100] }}
+
+— dialekt.ai security · security@dias.now

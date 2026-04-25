@@ -1,0 +1,25 @@
+dialekt.ai — your 30-day trial is ready
+
+Hi {{ full_name }},
+
+Your trial is created. Three quick steps:
+
+① DOWNLOAD DIALEKT
+{% for d in downloads %}
+  {{ d.platform }} ({{ d.ext }}) — {{ d.url }}
+{% endfor %}
+All releases: {{ releases_page }}
+
+② YOUR LICENSE KEY (paste in the desktop app's License screen)
+{{ license_key }}
+Plan: Trial · Seats: {{ seats }} · Expires: {{ expires_at_human }}
+
+③ VERIFY YOUR EMAIL TO ACTIVATE THE LICENSE
+{{ verify_url }}
+
+(Without verification, the license won't validate. Link expires in 7 days.)
+
+Questions or trial extensions: hello@dialekt.ai
+{{ landing_url }}
+
+You received this because you signed up for a 30-day trial at {{ landing_url }}/signup.html. We do not send marketing emails.

@@ -1,0 +1,13 @@
+dialekt.ai — your license was extended
+
+Hi {{ full_name }},
+
+We've added {{ days_added }} days to your dialekt.ai license. Your existing key keeps working — no action needed.
+
+  Plan       {{ plan }}
+  Seats      {{ seats_limit }}
+  New expiry {{ new_expires_at_human }}
+
+Reply to this email for early renewal, plan change, or questions.
+
+— dialekt.ai · hello@dias.now · {{ landing_url }}

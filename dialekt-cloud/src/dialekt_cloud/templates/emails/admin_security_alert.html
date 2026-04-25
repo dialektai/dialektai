@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Security alert — dialekt.ai admin</title>
+<style>
+  body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #0a0e14; color: #cdd6f4; margin: 0; padding: 30px 20px; }
+  .card { max-width: 560px; margin: 0 auto; background: #13181f; border: 1px solid #ef4444; padding: 32px; }
+  .logo { font-family: 'JetBrains Mono', monospace; font-size: 16px; color: #ef4444; letter-spacing: 0.06em; margin-bottom: 18px; }
+  h1 { font-size: 18px; color: #cdd6f4; margin: 0 0 14px; letter-spacing: -0.01em; }
+  p { color: #94a3b8; line-height: 1.65; margin: 0 0 14px; font-size: 13px; }
+  .meta { background: #0a0e14; border: 1px solid #2a3244; padding: 14px 16px; margin: 14px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .meta div { padding: 4px 0; display: flex; }
+  .meta span:first-child { color: #64748b; min-width: 120px; letter-spacing: .08em; }
+  .meta span:last-child { color: #cdd6f4; word-break: break-all; }
+  .alert-amber { background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; padding: 12px 14px; color: #f59e0b; font-size: 12px; margin: 14px 0; line-height: 1.6; }
+  .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #2a3244; font-size: 11px; color: #64748b; line-height: 1.7; }
+  .footer a { color: #00d4ff; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🛡 SECURITY ALERT</div>
+
+  {% if kind == "password_changed" %}
+    <h1>Your admin password was changed</h1>
+    <p>Hi {{ full_name }} — the password on your dialekt.ai admin account was changed just now. If this was you, no action needed.</p>
+    <div class="alert-amber"><strong>If this wasn't you:</strong> someone has access to your account. Reset immediately via SSH: <code>dialekt-admin admin reset-password --email=&lt;your-email&gt;</code> and revoke all sessions.</div>
+  {% elif kind == "backup_codes_regenerated" %}
+    <h1>Your backup codes were regenerated</h1>
+    <p>Hi {{ full_name }} — fresh 10 backup codes were generated for your dialekt.ai admin account. The previous codes are no longer valid.</p>
+    <div class="alert-amber"><strong>If this wasn't you:</strong> someone has access to your account or session. Run <code>dialekt-admin admin reset-2fa --email=&lt;your-email&gt;</code> immediately and reset your password.</div>
+  {% elif kind == "account_locked" %}
+    {% if extra.broadcast %}
+      <h1>Admin account locked: {{ extra.affected_email }}</h1>
+      <p>One of the dialekt.ai admin accounts was locked due to too many failed login attempts. Sharing this so the team can react if there's a real attack underway.</p>
+    {% else %}
+      <h1>Your admin account was just locked</h1>
+      <p>Hi {{ full_name }} — too many failed password attempts on your dialekt.ai admin account. Locked for ~{{ extra.locked_minutes }} minutes.</p>
+      <div class="alert-amber"><strong>If you tried logging in and forgot your password:</strong> wait the cooldown or use SSH <code>dialekt-admin admin unlock --email=&lt;your-email&gt;</code>. <strong>If this wasn't you:</strong> someone is trying to brute-force your account.</div>
+    {% endif %}
+  {% elif kind == "totp_enrolled" %}
+    <h1>A new authenticator was enrolled</h1>
+    <p>Hi {{ full_name }} — a new TOTP authenticator (Google Authenticator / 1Password / Authy) was enrolled on your dialekt.ai admin account. This usually follows a CLI <code>reset-2fa</code> recovery.</p>
+    <div class="alert-amber"><strong>If this wasn't you:</strong> someone with SSH access to the cloud host reset your 2FA. Investigate via the audit log + revoke their SSH key.</div>
+  {% endif %}
+
+  <div class="meta">
+    <div><span>EVENT</span><span>{{ kind }}</span></div>
+    <div><span>WHEN</span><span>{{ when_human }}</span></div>
+    <div><span>IP</span><span>{{ ip }}</span></div>
+    <div><span>USER AGENT</span><span style="font-size:10px">{{ user_agent[:100] }}</span></div>
+  </div>
+
+  <div class="footer">
+    <strong style="color:#cdd6f4">dialekt.ai security</strong><br>
+    Direct contact for incidents: <a href="mailto:security@dias.now">security@dias.now</a>
+  </div>
+</div>
+</body>
+</html>
