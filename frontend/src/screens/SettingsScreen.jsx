@@ -3,6 +3,7 @@ import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
+import { getCloudApi } from '../lib/cloud.js';
 
 const API = 'http://localhost:8765';
 
@@ -1818,6 +1819,302 @@ function PrivacySection() {
   );
 }
 
+// ── Section: License & Account ───────────────────────────────────────────────
+//
+// Re-entry surface for the license key + 30-day trial + onboarding restart.
+// Pilot feedback in 04-2026: users couldn't find where to enter their key
+// after the first-launch LicenseScreen was dismissed and had no way to
+// re-trigger the onboarding flow. This section is the durable home.
+
+function fmtMaskedKey(key) {
+  if (!key) return '—';
+  if (key.length <= 8) return '••••' + key.slice(-2);
+  return key.slice(0, 4) + '••••••••' + key.slice(-4);
+}
+
+function fmtExpiry(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString();
+  } catch { return iso; }
+}
+
+function fmtTrialDaysLeft(trialStartedAt) {
+  if (!trialStartedAt) return null;
+  const started = typeof trialStartedAt === 'number' ? trialStartedAt * 1000 : new Date(trialStartedAt).getTime();
+  if (!Number.isFinite(started)) return null;
+  const elapsedDays = (Date.now() - started) / 86400000;
+  return Math.max(0, Math.ceil(30 - elapsedDays));
+}
+
+function LicenseSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [key, setKey] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/license/status`).then(r => r.json());
+      setStatus(r);
+    } catch (e) {
+      addToast('Failed to load license status', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const submitKey = async () => {
+    const trimmed = key.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      // Match LicenseScreen.jsx validation flow exactly: cloud-validate
+      // first, fall through to local cache if cloud is unreachable.
+      let data;
+      try {
+        const cloudApi = await getCloudApi();
+        const r = await fetch(`${cloudApi}/auth/validate-license`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ license_key: trimmed }),
+        });
+        data = await r.json();
+      } catch {
+        addToast('Cloud unreachable. Check your internet connection.', 'error');
+        return;
+      }
+      if (!data?.valid) {
+        addToast(data?.message || 'License key not found or expired. Contact hello@dialekt.ai', 'error');
+        return;
+      }
+      const tenant = {
+        company_name: data.company_name || null,
+        plan: data.plan,
+        seats_limit: data.seats_limit,
+        expires_at: data.expires_at,
+      };
+      await fetch(`${API}/license/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: trimmed, tenant, bearer_token: data.bearer_token }),
+      });
+      fetch(`${API}/sync/pull`, { method: 'POST' }).catch(() => {});
+      addToast('License activated', 'ok');
+      setKey('');
+      setEditing(false);
+      await refresh();
+    } catch (e) {
+      addToast(`Validation failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startTrial = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/license/trial`, { method: 'POST' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      addToast('Trial started — 30 days', 'ok');
+      await refresh();
+    } catch (e) {
+      addToast(`Trial start failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshFromCloud = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/license/refresh`, { method: 'POST' });
+      const data = await r.json().catch(() => ({}));
+      if (data?.status === 'ok' || data?.valid) {
+        addToast('License revalidated', 'ok');
+      } else {
+        addToast(data?.reason || 'Revalidation failed', 'error');
+      }
+      await refresh();
+    } catch (e) {
+      addToast(`Revalidation failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restartOnboarding = () => {
+    showConfirm({
+      title: 'Restart onboarding?',
+      body: 'The first-launch flow (license check, mode pick, Ollama install, model download, permissions) will be shown again on next reload. Your data is not touched.',
+      confirmLabel: 'Restart',
+      onConfirm: async () => {
+        try {
+          await fetch(`${API}/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ onboarding_completed: false }),
+          });
+          window.location.reload();
+        } catch (e) {
+          addToast(`Failed: ${e}`, 'error');
+        }
+      },
+    });
+  };
+
+  const trialDaysLeft = status?.trial ? fmtTrialDaysLeft(status?.trial_started || status?.last_validated_at) : null;
+
+  return (
+    <BodyShell crumb="03 / SYSTEM → LICENSE" title="License & account"
+      desc="Enter or change your dialekt license key, start a trial, or restart the first-launch onboarding flow.">
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : (
+        <>
+          {/* Current state ─────────────────────────────────────── */}
+          <Card title="Current state" n="01">
+            <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: '160px 1fr', gap: '10px 18px', fontSize: 12 }}>
+              <span style={{ color: T.dim }}>Status</span>
+              <span className="mono" style={{ color: status?.valid ? T.green : T.amber }}>
+                {status?.valid ? (status?.trial ? '● TRIAL' : '● ACTIVE') : '○ NO LICENSE'}
+              </span>
+
+              <span style={{ color: T.dim }}>License key</span>
+              <span className="mono" style={{ color: T.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {status?.license_key ? (reveal ? status.license_key : fmtMaskedKey(status.license_key)) : '—'}
+                {status?.license_key && (
+                  <button onClick={() => setReveal(v => !v)} style={{
+                    background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                    padding: '2px 8px', fontSize: 10, cursor: 'pointer',
+                  }}>{reveal ? 'HIDE' : 'REVEAL'}</button>
+                )}
+              </span>
+
+              <span style={{ color: T.dim }}>Plan</span>
+              <span className="mono" style={{ color: T.text }}>{status?.tenant?.plan || (status?.trial ? 'trial' : '—')}</span>
+
+              <span style={{ color: T.dim }}>Company</span>
+              <span style={{ color: T.text }}>{status?.tenant?.company_name || '—'}</span>
+
+              <span style={{ color: T.dim }}>Seats</span>
+              <span className="mono" style={{ color: T.text }}>{status?.tenant?.seats_limit || '—'}</span>
+
+              <span style={{ color: T.dim }}>Expires</span>
+              <span className="mono" style={{ color: T.text }}>
+                {status?.trial ? `trial · ${trialDaysLeft ?? '?'} day${trialDaysLeft === 1 ? '' : 's'} left` : fmtExpiry(status?.tenant?.expires_at)}
+              </span>
+
+              <span style={{ color: T.dim }}>Last revalidated</span>
+              <span className="mono" style={{ color: T.dim, fontSize: 11 }}>
+                {status?.last_validated_at ? new Date(status.last_validated_at * 1000).toLocaleString() : 'never'}
+              </span>
+
+              {status?.revocation_reason && (
+                <>
+                  <span style={{ color: T.red }}>Revocation</span>
+                  <span style={{ color: T.red, fontSize: 11 }}>{status.revocation_reason}</span>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
+              {status?.license_key && (
+                <button onClick={refreshFromCloud} disabled={busy} style={{
+                  background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                  padding: '6px 14px', fontSize: 11, cursor: busy ? 'default' : 'pointer',
+                }}>{busy ? '…' : 'REVALIDATE'}</button>
+              )}
+            </div>
+          </Card>
+
+          {/* Enter / change key ───────────────────────────────── */}
+          <Card title={status?.license_key ? 'Replace license key' : 'Enter license key'} n="02">
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {status?.license_key && !editing ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12, color: T.muted }}>
+                  <span>A key is currently set.</span>
+                  <button onClick={() => setEditing(true)} style={{
+                    background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                    padding: '5px 14px', fontSize: 11, cursor: 'pointer',
+                  }}>REPLACE KEY</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type={reveal ? 'text' : 'password'}
+                    value={key}
+                    onChange={e => setKey(e.target.value)}
+                    placeholder="lic_…"
+                    style={{
+                      background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                      padding: '8px 12px', fontSize: 13, fontFamily: 'var(--code-font, monospace)',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: T.dim }}>
+                    Validated against <span className="mono">api.dialekt.ai</span>. License + bearer token are stored in your OS keychain.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={submitKey} disabled={busy || !key.trim()} style={{
+                      background: T.cyan, color: '#000', border: 'none', padding: '7px 18px',
+                      fontSize: 12, fontWeight: 600, cursor: busy || !key.trim() ? 'default' : 'pointer', letterSpacing: '.04em',
+                    }}>{busy ? 'CHECKING…' : 'ACTIVATE'}</button>
+                    {editing && (
+                      <button onClick={() => { setEditing(false); setKey(''); }} disabled={busy} style={{
+                        background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                        padding: '7px 18px', fontSize: 12, cursor: 'pointer',
+                      }}>CANCEL</button>
+                    )}
+                  </div>
+                </>
+              )}
+              {!status?.license_key && !status?.trial_valid && (
+                <div style={{ paddingTop: 12, borderTop: `1px solid ${T.border}`, marginTop: 4, fontSize: 12, color: T.muted, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span>No key yet?</span>
+                  <button onClick={startTrial} disabled={busy} style={{
+                    background: 'transparent', border: `1px solid ${T.cyan}66`, color: T.cyan,
+                    padding: '5px 14px', fontSize: 11, cursor: busy ? 'default' : 'pointer', letterSpacing: '.04em',
+                  }}>START 30-DAY TRIAL</button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Restart onboarding ────────────────────────────────── */}
+          <Card title="Onboarding" n="03">
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
+              <div style={{ color: T.muted }}>
+                Replay the first-launch flow: license check → mode pick → Ollama install → model download → permissions.
+              </div>
+              <div style={{ color: T.dim, fontSize: 11 }}>
+                Your data, agents, and connections are not affected.
+              </div>
+              <div>
+                <button onClick={restartOnboarding} style={{
+                  background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                  padding: '7px 18px', fontSize: 12, cursor: 'pointer', letterSpacing: '.04em',
+                }}>RESTART ONBOARDING</button>
+              </div>
+            </div>
+          </Card>
+
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
+            Need a license key? Email <span className="mono" style={{ color: T.muted }}>hello@dialekt.ai</span> with your company name and seat count.
+          </div>
+        </>
+      )}
+    </BodyShell>
+  );
+}
+
 // ── Section: About ────────────────────────────────────────────────────────────
 
 function AboutSection() {
@@ -2665,6 +2962,7 @@ const NAV_GROUPS = [
     { k: 'Storage & memory',   icon: 'file'   },
     { k: 'Performance',        icon: 'cpu'    },
     { k: 'Privacy & telemetry',icon: 'shield' },
+    { k: 'License',            icon: 'shield' },
     { k: 'Admin',              icon: 'cog'    },
     { k: 'About',              icon: 'diamond'},
   ]},
@@ -2687,6 +2985,7 @@ function renderSection(s) {
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;
+    case 'License':            return <LicenseSection />;
     case 'Admin':              return <AdminSection />;
     case 'About':              return <AboutSection />;
     default:                   return <PermissionsSection />;
