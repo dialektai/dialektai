@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "dialekt"
-version = "0.11.1"
+version = "0.24.2"
 dependencies = [
  "serde",
  "serde_json",
