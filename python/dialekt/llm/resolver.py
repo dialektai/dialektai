@@ -10,6 +10,7 @@ selection silently reverts to ``ollama_chat/<model>`` after each save.
 """
 from __future__ import annotations
 
+import time
 from typing import TypedDict
 
 from dialekt.llm.catalog import get_provider, CLOUD_PROVIDERS
@@ -18,6 +19,34 @@ from dialekt.secrets import get_secret
 
 OLLAMA_LOCAL_BASE = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "gemma3:12b"
+
+# Cache of installed Ollama models (5s TTL). Used by _ollama_canonical to
+# prefer the user's literal model name over the legacy mangle when the
+# literal exists in Ollama.
+_OLLAMA_TAGS_CACHE: dict = {"ts": 0.0, "names": frozenset()}
+_OLLAMA_TAGS_TTL = 5.0
+
+
+def _installed_ollama_tags() -> frozenset:
+    """Best-effort sync fetch of /api/tags. On any failure returns the
+    last-known set (so the legacy canonical mangle still applies — the
+    fallback path remains intact for cold start / offline pilots)."""
+    now = time.monotonic()
+    if now - _OLLAMA_TAGS_CACHE["ts"] < _OLLAMA_TAGS_TTL:
+        return _OLLAMA_TAGS_CACHE["names"]
+    try:
+        import httpx
+        r = httpx.get(f"{OLLAMA_LOCAL_BASE}/api/tags", timeout=0.4)
+        if r.status_code == 200:
+            data = r.json()
+            names = {m.get("name", "") for m in data.get("models", [])}
+            names |= {n.split(":", 1)[0] for n in names if ":" in n}
+            _OLLAMA_TAGS_CACHE["names"] = frozenset(n for n in names if n)
+            _OLLAMA_TAGS_CACHE["ts"] = now
+            return _OLLAMA_TAGS_CACHE["names"]
+    except Exception:
+        pass
+    return _OLLAMA_TAGS_CACHE["names"]
 
 
 class ResolvedModel(TypedDict):
@@ -34,8 +63,19 @@ def _provider_secret(provider_id: str, field: str) -> str | None:
 
 
 def _ollama_canonical(model: str) -> str:
-    """Map old-style ``gemma3-12b`` to ``gemma3:12b`` for litellm."""
+    """Map old-style ``gemma3-12b`` to ``gemma3:12b`` for litellm.
+
+    Bug-fix v0.26.x: prefer the user's literal model name if Ollama has it
+    installed (e.g. ``gemma3-12b:latest`` from a custom pull). Mangling only
+    applies when the literal isn't present — preserves migration safety
+    while not breaking pilots with non-canonical local installs.
+    """
     if ":" in model:
+        return model
+    installed = _installed_ollama_tags()
+    if f"{model}:latest" in installed:
+        return f"{model}:latest"
+    if model in installed:
         return model
     if "-" in model:
         head, tail = model.rsplit("-", 1)
