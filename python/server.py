@@ -18,6 +18,7 @@ import os
 import re
 import threading
 import uuid
+from datetime import datetime
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -123,7 +124,7 @@ def save_settings(data: dict) -> None:
 
 
 import aiosqlite
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -937,7 +938,6 @@ async def audit_log_endpoint(body: dict):
     action = body.get("action")
     result = body.get("result")
     if not kind or not action or not result:
-        from fastapi import HTTPException
 
         raise HTTPException(
             status_code=422,
@@ -991,7 +991,6 @@ async def sync_status():
 
 @app.post("/sync/configure")
 async def sync_configure(body: dict):
-    from fastapi import HTTPException
     key = (body.get("api_key") or "").strip()
     if not key:
         raise HTTPException(400, "api_key is required")
@@ -1005,7 +1004,6 @@ async def sync_configure(body: dict):
 async def sync_push():
     s = load_settings()
     if not s.get("cloud_api_key"):
-        from fastapi import HTTPException
         raise HTTPException(402, "Cloud sync not configured. Add API key via POST /sync/configure.")
     return {"ok": True, "pushed": 0, "message": "Cloud sync push — not yet implemented in this build."}
 
@@ -1013,7 +1011,6 @@ async def sync_push():
 @app.post("/sync/pull")
 async def sync_pull():
     import httpx
-    from fastapi import HTTPException
     s = load_settings()
     token = s.get("cloud_bearer_token")
     if not token:
@@ -1145,7 +1142,6 @@ async def list_agents_endpoint():
 
 @app.post("/agents", status_code=201)
 async def create_agent_endpoint(body: dict):
-    from fastapi import HTTPException
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(400, "name is required")
@@ -1161,7 +1157,6 @@ async def create_agent_endpoint(body: dict):
 
 @app.get("/agents/{agent_id}")
 async def get_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1170,7 +1165,6 @@ async def get_agent_endpoint(agent_id: str):
 
 @app.patch("/agents/{agent_id}")
 async def update_agent_endpoint(agent_id: str, body: dict):
-    from fastapi import HTTPException
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_update_agent(agent_id, **body)
@@ -1179,7 +1173,6 @@ async def update_agent_endpoint(agent_id: str, body: dict):
 
 @app.delete("/agents/{agent_id}")
 async def delete_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_delete_agent(agent_id)
@@ -1188,7 +1181,6 @@ async def delete_agent_endpoint(agent_id: str):
 
 @app.post("/agents/import")
 async def import_agent_endpoint(file: UploadFile = File(...)):
-    from fastapi import HTTPException
     from dialekt_manifest import ManifestValidator
     yaml_str = (await file.read()).decode("utf-8")
     result = ManifestValidator().validate_string(yaml_str)
@@ -1215,7 +1207,6 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
 @app.post("/agents/import-yaml", status_code=201)
 async def import_agent_yaml_endpoint(body: dict):
     """Import agent from YAML string (used by the builder wizard)."""
-    from fastapi import HTTPException
     from dialekt_manifest import ManifestValidator
     yaml_str = (body.get("manifest_yaml") or "").strip()
     if not yaml_str:
@@ -1243,7 +1234,6 @@ async def import_agent_yaml_endpoint(body: dict):
 
 @app.get("/agents/{agent_id}/export")
 async def export_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     from fastapi.responses import Response
     agent = await db_get_agent(agent_id)
     if not agent:
@@ -1261,7 +1251,6 @@ async def export_agent_endpoint(agent_id: str):
 
 @app.get("/agents/{agent_id}/binding")
 async def get_agent_binding(agent_id: str):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1277,7 +1266,6 @@ async def get_agent_binding(agent_id: str):
 
 @app.post("/agents/{agent_id}/binding")
 async def set_agent_binding(agent_id: str, body: dict):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1311,7 +1299,6 @@ async def get_mode():
 
 @app.post("/config/mode")
 async def set_mode(body: dict):
-    from fastapi import HTTPException
     mode = body.get("mode", "builder")
     if mode not in ("builder", "user"):
         raise HTTPException(400, "mode must be 'builder' or 'user'")
@@ -1462,6 +1449,46 @@ def _migrate_keyring_rename(old_name: str, new_name: str, refs: list[str]) -> No
             pass
 
 
+# ── MCP Templates catalog (Phase 2 v0.21 commit 1) ──────────────────────────
+# Curated list of pre-configured MCP servers (stdio + http) shown as
+# "Quick Add" tiles in Settings. The catalog is a static JSON file in
+# the repo at python/dialekt/mcp_templates/catalog.json — pure data,
+# no template vocabulary leaks into Pydantic. Substitution of
+# ${prompt:<key>} placeholders happens frontend-side immediately
+# before submitting the resolved payload to POST /mcp-servers.
+
+_MCP_TEMPLATES_CACHE: dict | None = None
+
+
+def _load_mcp_templates_catalog() -> dict:
+    """Read + memoize the bundled templates catalog. Idempotent.
+
+    Catalog is immutable per release; reload-on-change is intentionally
+    not supported (would invite cache-staleness bugs for marginal
+    devloop benefit). Restart the backend to pick up edits.
+    """
+    global _MCP_TEMPLATES_CACHE
+    if _MCP_TEMPLATES_CACHE is not None:
+        return _MCP_TEMPLATES_CACHE
+    catalog_path = (
+        Path(__file__).parent / "dialekt" / "mcp_templates" / "catalog.json"
+    )
+    try:
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        log.warning("MCP templates catalog unreadable at %s: %s", catalog_path, e)
+        data = {"version": 1, "templates": []}
+    _MCP_TEMPLATES_CACHE = data
+    return data
+
+
+@app.get("/mcp-templates")
+async def list_mcp_templates_endpoint():
+    """Return the Quick Add catalog. Read by Settings → MCP Servers."""
+    return _load_mcp_templates_catalog()
+
+
 @app.get("/mcp-servers")
 async def list_mcp_servers_endpoint():
     cur = await db.execute(
@@ -1471,9 +1498,219 @@ async def list_mcp_servers_endpoint():
     return [_mcp_row_to_response(dict(r)) for r in rows]
 
 
+# ── Bulk export / import (Phase 2 v0.21 commit 3) ──────────────────────────
+# Admin → seats onboarding flow. Admin configures one or more MCP
+# servers locally, exports JSON, ships file via Slack/email/onboarding
+# doc. Each seat imports in one click and only fills in credentials.
+# Critical: export NEVER includes secret values, only the env_var → ref
+# name mapping. Secrets stay in the OS keychain on each seat.
+#
+# Routes registered BEFORE the parametric `/mcp-servers/{server_id}`
+# get/patch/delete handlers — FastAPI resolves routes in registration
+# order, and otherwise `/mcp-servers/export` would match the
+# {server_id} route and 404 looking for a server named "export".
+
+@app.get("/mcp-servers/export")
+async def export_mcp_servers_endpoint():
+    """Return a JSON bundle of every configured MCP server, WITHOUT
+    secret values. Browser-friendly: includes Content-Disposition so a
+    direct GET downloads `dialekt-mcp-servers.json`.
+    """
+    cur = await db.execute(
+        "SELECT * FROM mcp_servers ORDER BY name ASC"
+    )
+    rows = await cur.fetchall()
+    servers = []
+    for r in rows:
+        d = dict(r)
+        # Per-entry schema_version per mentor P1 (forward-compat with M3
+        # cloud-synced templates). Envelope `version` on the wrapper is
+        # separate — bumps when bundle shape changes.
+        servers.append({
+            "schema_version": 1,
+            "name": d["name"],
+            "transport": d["transport"],
+            "command": json.loads(d["command_json"]) if d["command_json"] else None,
+            "env_refs": json.loads(d["env_refs_json"] or "{}"),
+            "cwd": d["cwd"],
+            "url": d["url"],
+            "auth_type": d["auth_type"],
+            "auth_ref": d["auth_ref"],
+            "timeout_seconds": d["timeout_seconds"],
+        })
+    bundle = {
+        "version": 1,
+        "exported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "servers": servers,
+    }
+    return Response(
+        content=json.dumps(bundle, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": 'attachment; filename="dialekt-mcp-servers.json"',
+        },
+    )
+
+
+@app.post("/mcp-servers/import")
+async def import_mcp_servers_endpoint(body: dict):
+    """Bulk-insert MCP server configs. Atomic semantics (mentor ruling
+    §7.4): any single Pydantic validation failure aborts the whole
+    import. Names already in use are reported as `skipped`, not
+    failures. Secrets are NEVER in the import — response surfaces a
+    `secrets_needed` list so the pilot knows what credentials they
+    still owe each imported server.
+    """
+    if not isinstance(body, dict):
+        raise HTTPException(400, "import body must be a JSON object")
+    raw_servers = body.get("servers")
+    if not isinstance(raw_servers, list):
+        raise HTTPException(400, "missing or non-list `servers` field")
+    bundle_version = body.get("version", 1)
+    if bundle_version != 1:
+        raise HTTPException(
+            422, f"unsupported bundle version {bundle_version!r}; expected 1"
+        )
+
+    # Validate every entry. Imports bypass MCPServerCreate's
+    # "auth_type=bearer requires auth_token" guard — secrets are by
+    # definition absent on import, the pilot fills them in via Edit
+    # afterwards. We still enforce the structural invariants (name
+    # pattern, transport, command/url-required-by-transport, timeout
+    # bounds). Atomic: any failure aborts before ANY row is inserted.
+    name_re = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
+    parsed: list[dict] = []
+    for idx, entry in enumerate(raw_servers):
+        if not isinstance(entry, dict):
+            raise HTTPException(422, f"servers[{idx}] is not an object")
+        entry_v = entry.get("schema_version", 1)
+        if entry_v != 1:
+            raise HTTPException(
+                422,
+                f"servers[{idx}]: schema_version {entry_v!r} not supported "
+                f"by this dialekt build (expected 1)",
+            )
+        name = entry.get("name", "")
+        transport = entry.get("transport")
+        if not isinstance(name, str) or not name_re.match(name):
+            raise HTTPException(
+                422,
+                f"servers[{idx}]: invalid name {name!r} (kebab-case required)",
+            )
+        if transport not in ("stdio", "http"):
+            raise HTTPException(
+                422,
+                f"servers[{idx}] ({name!r}): transport must be 'stdio' or 'http'",
+            )
+        command = entry.get("command")
+        if transport == "stdio":
+            if not isinstance(command, list) or not command:
+                raise HTTPException(
+                    422,
+                    f"servers[{idx}] ({name!r}): stdio transport requires command",
+                )
+        url = entry.get("url")
+        if transport == "http":
+            if not isinstance(url, str) or not url:
+                raise HTTPException(
+                    422,
+                    f"servers[{idx}] ({name!r}): http transport requires url",
+                )
+        timeout = entry.get("timeout_seconds", 30.0)
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                422,
+                f"servers[{idx}] ({name!r}): timeout_seconds must be numeric",
+            )
+        if not (5.0 <= timeout <= 300.0):
+            raise HTTPException(
+                422,
+                f"servers[{idx}] ({name!r}): timeout_seconds must be 5..300",
+            )
+        env_refs = entry.get("env_refs") or {}
+        if not isinstance(env_refs, dict):
+            raise HTTPException(
+                422,
+                f"servers[{idx}] ({name!r}): env_refs must be an object",
+            )
+        auth_type = entry.get("auth_type")
+        if auth_type is not None and auth_type != "bearer":
+            raise HTTPException(
+                422,
+                f"servers[{idx}] ({name!r}): auth_type must be 'bearer' or null",
+            )
+        # Defense in depth: refuse to propagate any plaintext
+        # env_secrets / auth_token a bundle might smuggle in. Pilots
+        # fill secrets in Edit; the import path never moves plaintext.
+        parsed.append({
+            "name": name,
+            "transport": transport,
+            "command": list(command) if transport == "stdio" else None,
+            "env_refs": dict(env_refs),
+            "cwd": entry.get("cwd"),
+            "url": url if transport == "http" else None,
+            "auth_type": auth_type,
+            "auth_ref": entry.get("auth_ref"),
+            "timeout_seconds": timeout,
+        })
+
+    # Insert phase — collisions skip rather than fail.
+    imported: list[dict] = []
+    skipped: list[str] = []
+    secrets_needed: list[dict] = []
+
+    for spec in parsed:
+        cur = await db.execute(
+            "SELECT 1 FROM mcp_servers WHERE name = ?", (spec["name"],)
+        )
+        if await cur.fetchone():
+            skipped.append(spec["name"])
+            continue
+        server_id = uuid.uuid4().hex
+        try:
+            await db.execute(
+                """
+                INSERT INTO mcp_servers (
+                    id, name, transport, command_json, env_refs_json,
+                    cwd, url, auth_type, auth_ref, timeout_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    server_id, spec["name"], spec["transport"],
+                    json.dumps(spec["command"]) if spec["command"] else None,
+                    json.dumps(spec["env_refs"]),
+                    spec["cwd"], spec["url"],
+                    spec["auth_type"], spec["auth_ref"],
+                    spec["timeout_seconds"],
+                ),
+            )
+        except aiosqlite.IntegrityError:
+            skipped.append(spec["name"])
+            continue
+        imported.append({"id": server_id, "name": spec["name"]})
+        for env_var, ref in spec["env_refs"].items():
+            secrets_needed.append({
+                "server": spec["name"], "env_var": env_var, "ref": ref,
+            })
+        if spec["auth_type"] == "bearer" and spec["auth_ref"]:
+            secrets_needed.append({
+                "server": spec["name"],
+                "env_var": "(http bearer)",
+                "ref": spec["auth_ref"],
+            })
+
+    await db.commit()
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "secrets_needed": secrets_needed,
+    }
+
+
 @app.get("/mcp-servers/{server_id}")
 async def get_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1483,8 +1720,6 @@ async def get_mcp_server_endpoint(server_id: str):
 
 @app.post("/mcp-servers", status_code=201)
 async def create_mcp_server_endpoint(body: MCPServerCreate):
-    from fastapi import HTTPException
-    import aiosqlite as _aiosqlite
     cur = await db.execute("SELECT 1 FROM mcp_servers WHERE name = ?", (body.name,))
     if await cur.fetchone():
         raise HTTPException(409, f"MCP server named {body.name!r} already exists")
@@ -1519,7 +1754,7 @@ async def create_mcp_server_endpoint(body: MCPServerCreate):
             ),
         )
         await db.commit()
-    except _aiosqlite.IntegrityError as e:
+    except aiosqlite.IntegrityError as e:
         raise HTTPException(409, f"MCP server named {body.name!r} already exists") from e
 
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
@@ -1529,7 +1764,6 @@ async def create_mcp_server_endpoint(body: MCPServerCreate):
 
 @app.patch("/mcp-servers/{server_id}")
 async def update_mcp_server_endpoint(server_id: str, body: MCPServerUpdate):
-    from fastapi import HTTPException
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1589,7 +1823,6 @@ async def update_mcp_server_endpoint(server_id: str, body: MCPServerUpdate):
 
 @app.delete("/mcp-servers/{server_id}", status_code=204)
 async def delete_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException, Response
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1607,7 +1840,6 @@ async def delete_mcp_server_endpoint(server_id: str):
 
 @app.post("/mcp-servers/{server_id}/test")
 async def test_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException
     from dialekt.mcp import (
         BearerAuth,
         EnvVarsAuth,
@@ -1790,7 +2022,6 @@ async def delete_session(session_id: str):
 async def rename_session(session_id: str, body: dict):
     title = (body.get("title") or "").strip()
     if not title:
-        from fastapi import HTTPException
         raise HTTPException(400, "title required")
     await db.execute(
         "UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?",
@@ -1824,7 +2055,6 @@ COMFY_OUTPUT = Path(_comfy_output_env) if _comfy_output_env else _HOME / "projec
 
 @app.get("/files")
 async def serve_file(path: str):
-    from fastapi import HTTPException
     from fastapi.responses import FileResponse
     p = Path(path).resolve()
     allowed = [
