@@ -124,7 +124,7 @@ def save_settings(data: dict) -> None:
 
 
 import aiosqlite
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -938,7 +938,6 @@ async def audit_log_endpoint(body: dict):
     action = body.get("action")
     result = body.get("result")
     if not kind or not action or not result:
-        from fastapi import HTTPException
 
         raise HTTPException(
             status_code=422,
@@ -992,7 +991,6 @@ async def sync_status():
 
 @app.post("/sync/configure")
 async def sync_configure(body: dict):
-    from fastapi import HTTPException
     key = (body.get("api_key") or "").strip()
     if not key:
         raise HTTPException(400, "api_key is required")
@@ -1006,7 +1004,6 @@ async def sync_configure(body: dict):
 async def sync_push():
     s = load_settings()
     if not s.get("cloud_api_key"):
-        from fastapi import HTTPException
         raise HTTPException(402, "Cloud sync not configured. Add API key via POST /sync/configure.")
     return {"ok": True, "pushed": 0, "message": "Cloud sync push — not yet implemented in this build."}
 
@@ -1014,7 +1011,6 @@ async def sync_push():
 @app.post("/sync/pull")
 async def sync_pull():
     import httpx
-    from fastapi import HTTPException
     s = load_settings()
     token = s.get("cloud_bearer_token")
     if not token:
@@ -1146,7 +1142,6 @@ async def list_agents_endpoint():
 
 @app.post("/agents", status_code=201)
 async def create_agent_endpoint(body: dict):
-    from fastapi import HTTPException
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(400, "name is required")
@@ -1162,7 +1157,6 @@ async def create_agent_endpoint(body: dict):
 
 @app.get("/agents/{agent_id}")
 async def get_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1171,7 +1165,6 @@ async def get_agent_endpoint(agent_id: str):
 
 @app.patch("/agents/{agent_id}")
 async def update_agent_endpoint(agent_id: str, body: dict):
-    from fastapi import HTTPException
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_update_agent(agent_id, **body)
@@ -1180,7 +1173,6 @@ async def update_agent_endpoint(agent_id: str, body: dict):
 
 @app.delete("/agents/{agent_id}")
 async def delete_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_delete_agent(agent_id)
@@ -1189,7 +1181,6 @@ async def delete_agent_endpoint(agent_id: str):
 
 @app.post("/agents/import")
 async def import_agent_endpoint(file: UploadFile = File(...)):
-    from fastapi import HTTPException
     from dialekt_manifest import ManifestValidator
     yaml_str = (await file.read()).decode("utf-8")
     result = ManifestValidator().validate_string(yaml_str)
@@ -1216,7 +1207,6 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
 @app.post("/agents/import-yaml", status_code=201)
 async def import_agent_yaml_endpoint(body: dict):
     """Import agent from YAML string (used by the builder wizard)."""
-    from fastapi import HTTPException
     from dialekt_manifest import ManifestValidator
     yaml_str = (body.get("manifest_yaml") or "").strip()
     if not yaml_str:
@@ -1244,7 +1234,6 @@ async def import_agent_yaml_endpoint(body: dict):
 
 @app.get("/agents/{agent_id}/export")
 async def export_agent_endpoint(agent_id: str):
-    from fastapi import HTTPException
     from fastapi.responses import Response
     agent = await db_get_agent(agent_id)
     if not agent:
@@ -1262,7 +1251,6 @@ async def export_agent_endpoint(agent_id: str):
 
 @app.get("/agents/{agent_id}/binding")
 async def get_agent_binding(agent_id: str):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1278,7 +1266,6 @@ async def get_agent_binding(agent_id: str):
 
 @app.post("/agents/{agent_id}/binding")
 async def set_agent_binding(agent_id: str, body: dict):
-    from fastapi import HTTPException
     agent = await db_get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found")
@@ -1312,7 +1299,6 @@ async def get_mode():
 
 @app.post("/config/mode")
 async def set_mode(body: dict):
-    from fastapi import HTTPException
     mode = body.get("mode", "builder")
     if mode not in ("builder", "user"):
         raise HTTPException(400, "mode must be 'builder' or 'user'")
@@ -1557,8 +1543,7 @@ async def export_mcp_servers_endpoint():
         "exported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "servers": servers,
     }
-    from fastapi import Response as _Response
-    return _Response(
+    return Response(
         content=json.dumps(bundle, indent=2, ensure_ascii=False),
         media_type="application/json",
         headers={
@@ -1576,7 +1561,6 @@ async def import_mcp_servers_endpoint(body: dict):
     `secrets_needed` list so the pilot knows what credentials they
     still owe each imported server.
     """
-    from fastapi import HTTPException
     if not isinstance(body, dict):
         raise HTTPException(400, "import body must be a JSON object")
     raw_servers = body.get("servers")
@@ -1594,8 +1578,7 @@ async def import_mcp_servers_endpoint(body: dict):
     # afterwards. We still enforce the structural invariants (name
     # pattern, transport, command/url-required-by-transport, timeout
     # bounds). Atomic: any failure aborts before ANY row is inserted.
-    import re as _re
-    name_re = _re.compile(r"^[a-z][a-z0-9-]{0,63}$")
+    name_re = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
     parsed: list[dict] = []
     for idx, entry in enumerate(raw_servers):
         if not isinstance(entry, dict):
@@ -1674,7 +1657,6 @@ async def import_mcp_servers_endpoint(body: dict):
         })
 
     # Insert phase — collisions skip rather than fail.
-    import aiosqlite as _aiosqlite
     imported: list[dict] = []
     skipped: list[str] = []
     secrets_needed: list[dict] = []
@@ -1704,7 +1686,7 @@ async def import_mcp_servers_endpoint(body: dict):
                     spec["timeout_seconds"],
                 ),
             )
-        except _aiosqlite.IntegrityError:
+        except aiosqlite.IntegrityError:
             skipped.append(spec["name"])
             continue
         imported.append({"id": server_id, "name": spec["name"]})
@@ -1729,7 +1711,6 @@ async def import_mcp_servers_endpoint(body: dict):
 
 @app.get("/mcp-servers/{server_id}")
 async def get_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1739,8 +1720,6 @@ async def get_mcp_server_endpoint(server_id: str):
 
 @app.post("/mcp-servers", status_code=201)
 async def create_mcp_server_endpoint(body: MCPServerCreate):
-    from fastapi import HTTPException
-    import aiosqlite as _aiosqlite
     cur = await db.execute("SELECT 1 FROM mcp_servers WHERE name = ?", (body.name,))
     if await cur.fetchone():
         raise HTTPException(409, f"MCP server named {body.name!r} already exists")
@@ -1775,7 +1754,7 @@ async def create_mcp_server_endpoint(body: MCPServerCreate):
             ),
         )
         await db.commit()
-    except _aiosqlite.IntegrityError as e:
+    except aiosqlite.IntegrityError as e:
         raise HTTPException(409, f"MCP server named {body.name!r} already exists") from e
 
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
@@ -1785,7 +1764,6 @@ async def create_mcp_server_endpoint(body: MCPServerCreate):
 
 @app.patch("/mcp-servers/{server_id}")
 async def update_mcp_server_endpoint(server_id: str, body: MCPServerUpdate):
-    from fastapi import HTTPException
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1845,7 +1823,6 @@ async def update_mcp_server_endpoint(server_id: str, body: MCPServerUpdate):
 
 @app.delete("/mcp-servers/{server_id}", status_code=204)
 async def delete_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException, Response
     cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
     row = await cur.fetchone()
     if row is None:
@@ -1863,7 +1840,6 @@ async def delete_mcp_server_endpoint(server_id: str):
 
 @app.post("/mcp-servers/{server_id}/test")
 async def test_mcp_server_endpoint(server_id: str):
-    from fastapi import HTTPException
     from dialekt.mcp import (
         BearerAuth,
         EnvVarsAuth,
@@ -2046,7 +2022,6 @@ async def delete_session(session_id: str):
 async def rename_session(session_id: str, body: dict):
     title = (body.get("title") or "").strip()
     if not title:
-        from fastapi import HTTPException
         raise HTTPException(400, "title required")
     await db.execute(
         "UPDATE sessions SET title=?, updated_at=datetime('now') WHERE id=?",
@@ -2080,7 +2055,6 @@ COMFY_OUTPUT = Path(_comfy_output_env) if _comfy_output_env else _HOME / "projec
 
 @app.get("/files")
 async def serve_file(path: str):
-    from fastapi import HTTPException
     from fastapi.responses import FileResponse
     p = Path(path).resolve()
     allowed = [
