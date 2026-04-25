@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
+import McpToolList from '../components/McpToolList.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -186,6 +187,23 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
         }
         if (s.timeout_seconds && s.timeout_seconds !== 30) {
           yaml += `    timeout_seconds: ${s.timeout_seconds}\n`;
+        }
+        // v0.22 per-tool scoping. mode='all' → no fields emitted
+        // (= "all tools allowed" by runtime). mode='allow' → allow_tools
+        // list. mode='deny' → deny_tools list. Empty tool list is
+        // semantically equivalent to mode='all', so we skip emission
+        // in that edge case.
+        const scope = (data.mcp_server_scopes || {})[s.name];
+        if (scope && scope.mode === 'allow' && scope.tools.length > 0) {
+          yaml += `    allow_tools:\n`;
+          scope.tools.forEach(t => {
+            yaml += `      - "${String(t).replace(/"/g, '\\"')}"\n`;
+          });
+        } else if (scope && scope.mode === 'deny' && scope.tools.length > 0) {
+          yaml += `    deny_tools:\n`;
+          scope.tools.forEach(t => {
+            yaml += `      - "${String(t).replace(/"/g, '\\"')}"\n`;
+          });
         }
       });
     }
@@ -574,6 +592,10 @@ function StepMcpServers({ data, setData }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [testingId, setTestingId] = useState(null);
+  // v0.22: per-server expander UI state (local — ephemera, not persisted).
+  // toolsByServer keyed by server.id. Each: {loading, tools[], error}.
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [toolsByServer, setToolsByServer] = useState({});
 
   const refresh = useCallback(async () => {
     setError('');
@@ -582,11 +604,23 @@ function StepMcpServers({ data, setData }) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const list = await r.json();
       setServers(Array.isArray(list) ? list : []);
-      // Drop selections for servers that no longer exist.
+      // Drop selections + scope entries for servers that no longer
+      // exist (mentor P2: orphan cleanup spans both name list and
+      // scope dict in case server was deleted in another tab).
       const existing = new Set((list || []).map(s => s.name));
-      const cleaned = (data.mcp_server_names || []).filter(n => existing.has(n));
-      if (cleaned.length !== (data.mcp_server_names || []).length) {
-        setData(d => ({ ...d, mcp_server_names: cleaned }));
+      const cleanedNames = (data.mcp_server_names || []).filter(n => existing.has(n));
+      const cleanedScopes = Object.fromEntries(
+        Object.entries(data.mcp_server_scopes || {}).filter(([n]) => existing.has(n))
+      );
+      const namesChanged = cleanedNames.length !== (data.mcp_server_names || []).length;
+      const scopesChanged = Object.keys(cleanedScopes).length
+        !== Object.keys(data.mcp_server_scopes || {}).length;
+      if (namesChanged || scopesChanged) {
+        setData(d => ({
+          ...d,
+          mcp_server_names: cleanedNames,
+          mcp_server_scopes: cleanedScopes,
+        }));
       }
     } catch (e) {
       setError(String(e.message || e));
@@ -602,7 +636,76 @@ function StepMcpServers({ data, setData }) {
     setData(d => {
       const set = new Set(d.mcp_server_names || []);
       if (on) set.add(name); else set.delete(name);
-      return { ...d, mcp_server_names: Array.from(set) };
+      const nextScopes = { ...(d.mcp_server_scopes || {}) };
+      // mentor ruling D: drop scope on uncheck so re-check restarts at
+      // "All tools" default rather than silently re-applying old policy
+      if (!on) delete nextScopes[name];
+      return {
+        ...d,
+        mcp_server_names: Array.from(set),
+        mcp_server_scopes: nextScopes,
+      };
+    });
+  };
+
+  const fetchToolsFor = async (s) => {
+    setToolsByServer(prev => ({
+      ...prev, [s.id]: { ...(prev[s.id] || {}), loading: true, error: '' }
+    }));
+    try {
+      const r = await fetch(`${API}/mcp-servers/${s.id}/tools`);
+      const body = await r.json();
+      setToolsByServer(prev => ({
+        ...prev,
+        [s.id]: { loading: false, tools: body.tools || [], error: body.error || '' }
+      }));
+    } catch (e) {
+      setToolsByServer(prev => ({
+        ...prev, [s.id]: { loading: false, tools: [], error: String(e) }
+      }));
+    }
+  };
+
+  const toggleExpander = (s) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(s.id)) {
+        next.delete(s.id);
+      } else {
+        next.add(s.id);
+        if (!toolsByServer[s.id]) fetchToolsFor(s);
+      }
+      return next;
+    });
+  };
+
+  const setMode = (s, mode) => {
+    setData(d => {
+      const cur = d.mcp_server_scopes?.[s.name] || { mode: 'all', tools: [] };
+      // Mentor ruling Q4: reset checklist on mode flip. For "allow"
+      // mode the subtractive default is "all pre-checked"; the actual
+      // default tool list is filled in once the tool catalog arrives.
+      const allTools = (toolsByServer[s.id]?.tools || []).map(t => t.name);
+      const tools = mode === 'allow' ? allTools : mode === 'deny' ? [] : [];
+      return {
+        ...d,
+        mcp_server_scopes: { ...d.mcp_server_scopes, [s.name]: { mode, tools } },
+      };
+    });
+  };
+
+  const toggleToolInScope = (s, toolName, on) => {
+    setData(d => {
+      const cur = d.mcp_server_scopes?.[s.name] || { mode: 'all', tools: [] };
+      const set = new Set(cur.tools || []);
+      if (on) set.add(toolName); else set.delete(toolName);
+      return {
+        ...d,
+        mcp_server_scopes: {
+          ...d.mcp_server_scopes,
+          [s.name]: { ...cur, tools: Array.from(set) },
+        },
+      };
     });
   };
 
@@ -652,33 +755,91 @@ function StepMcpServers({ data, setData }) {
             const statusLabel = ready ? `${s.tool_count || 0} tools`
               : untested ? 'untested'
               : 'error';
+            const expanded = expandedIds.has(s.id);
+            const toolState = toolsByServer[s.id];
+            const scope = data.mcp_server_scopes?.[s.name] || { mode: 'all', tools: [] };
             return (
               <div key={s.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                border: `1px solid ${T.border}`, padding: '10px 14px', background: T.bg1,
+                border: `1px solid ${T.border}`, background: T.bg1,
               }}>
-                <input type="checkbox" checked={checked} disabled={!ready}
-                  onChange={e => toggle(s.name, e.target.checked)}
-                  style={{ cursor: ready ? 'pointer' : 'not-allowed' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: T.text }}>{s.name}</div>
-                  <div className="mono" style={{ fontSize: 10, color: T.dim }}>
-                    {s.transport === 'stdio'
-                      ? `stdio · ${(s.command || []).slice(0, 2).join(' ')}${(s.command || []).length > 2 ? ' …' : ''}`
-                      : `http · ${s.url}`}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px',
+                }}>
+                  <input type="checkbox" checked={checked} disabled={!ready}
+                    onChange={e => toggle(s.name, e.target.checked)}
+                    style={{ cursor: ready ? 'pointer' : 'not-allowed' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: T.text }}>{s.name}</div>
+                    <div className="mono" style={{ fontSize: 10, color: T.dim }}>
+                      {s.transport === 'stdio'
+                        ? `stdio · ${(s.command || []).slice(0, 2).join(' ')}${(s.command || []).length > 2 ? ' …' : ''}`
+                        : `http · ${s.url}`}
+                    </div>
+                    {failed && s.last_test_error && (
+                      <div style={{ fontSize: 10, color: T.red, marginTop: 4 }}>{s.last_test_error}</div>
+                    )}
                   </div>
-                  {failed && s.last_test_error && (
-                    <div style={{ fontSize: 10, color: T.red, marginTop: 4 }}>{s.last_test_error}</div>
+                  <span className="mono" style={{ fontSize: 11, color: dotColor }} title={s.last_test_error || ''}>
+                    ● {statusLabel}
+                  </span>
+                  {checked && ready && (
+                    <button onClick={() => toggleExpander(s)} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.muted,
+                      padding: '4px 10px', fontSize: 10, cursor: 'pointer',
+                    }}>{expanded ? '▴ tools' : '▾ tools'}{scope.mode !== 'all' ? ` · ${scope.mode}` : ''}</button>
+                  )}
+                  {!ready && (
+                    <button onClick={() => runTest(s)} disabled={testingId === s.id} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                      padding: '4px 10px', fontSize: 10, cursor: testingId === s.id ? 'default' : 'pointer',
+                    }}>{testingId === s.id ? 'TESTING…' : (untested ? 'TEST FIRST' : 'RETEST')}</button>
                   )}
                 </div>
-                <span className="mono" style={{ fontSize: 11, color: dotColor }} title={s.last_test_error || ''}>
-                  ● {statusLabel}
-                </span>
-                {!ready && (
-                  <button onClick={() => runTest(s)} disabled={testingId === s.id} style={{
-                    background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
-                    padding: '4px 10px', fontSize: 10, cursor: testingId === s.id ? 'default' : 'pointer',
-                  }}>{testingId === s.id ? 'TESTING…' : (untested ? 'TEST FIRST' : 'RETEST')}</button>
+
+                {expanded && checked && (
+                  <div style={{
+                    padding: '10px 14px 14px',
+                    borderTop: `1px solid ${T.border}`,
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                  }}>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
+                      <span style={{ color: T.dim }}>Mode:</span>
+                      {[
+                        { v: 'all', l: 'All tools' },
+                        { v: 'allow', l: 'Pick specific' },
+                        { v: 'deny', l: 'Block some' },
+                      ].map(opt => (
+                        <label key={opt.v} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                          <input type="radio" name={`scope-${s.id}`}
+                            checked={scope.mode === opt.v}
+                            disabled={!!toolState?.error}
+                            onChange={() => setMode(s, opt.v)} />
+                          <span style={{ color: scope.mode === opt.v ? T.text : T.muted }}>{opt.l}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {scope.mode !== 'all' && (
+                      <McpToolList
+                        tools={toolState?.tools || []}
+                        loading={toolState?.loading}
+                        error={toolState?.error}
+                        mode="checklist"
+                        selectedNames={scope.tools}
+                        onToggle={(name, on) => toggleToolInScope(s, name, on)}
+                      />
+                    )}
+                    {scope.mode === 'all' && toolState && !toolState.error && (
+                      <div style={{ fontSize: 11, color: T.dim }}>
+                        All {(toolState.tools || []).length} tools available — destructive calls still prompt for consent at runtime.
+                      </div>
+                    )}
+                    {toolState?.error && scope.mode !== 'all' && (
+                      <div style={{ fontSize: 11, color: T.amber }}>
+                        Per-tool scoping disabled — fix server connection first.
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -1329,6 +1490,10 @@ export default function AgentWizardScreen({ onNav }) {
       screen_capture: false,
     },
     mcp_server_names: [],
+    // v0.22 per-server tool scope: { mode: "all"|"allow"|"deny", tools: string[] }.
+    // Only servers with explicit scoping appear here; anything else
+    // implies mode="all" (= no allow_tools/deny_tools in manifest).
+    mcp_server_scopes: {},
     connection_type: 'none',
     connection_id: '',
     connection_role: 'readonly',

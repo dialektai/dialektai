@@ -210,6 +210,59 @@ def test_ctx_mcp_resolves_inside_raw_thread_via_copy_context():
     asyncio.run(run())
 
 
+def test_build_threads_manifest_allow_tools_into_runtime_policies():
+    """v0.22: when manifest declares mcp_servers[].allow_tools or
+    deny_tools, _build_session_mcp_runtime must construct a
+    ToolPolicy and thread it into MCPRuntime so policy-blocked calls
+    fast-fail at the gate. No real MCP subprocess needed — we
+    inspect the runtime's _tool_policies dict directly."""
+    from dialekt.mcp.runtime import ToolPolicy
+
+    async def run():
+        srv._active_mcp_runtimes.clear()
+        ws = FakeWS()
+        manifest = {
+            "autonomy": {"recommended": "autonomous"},
+            "mcp_servers": [
+                {
+                    "name": "github",
+                    "transport": "stdio",
+                    "command": ["echo"],
+                    "allow_tools": ["search_repositories"],
+                    "deny_tools": ["delete_repository"],
+                    "timeout_seconds": 30,
+                },
+                {
+                    "name": "no-scope",
+                    "transport": "stdio",
+                    "command": ["echo"],
+                    "timeout_seconds": 30,
+                },
+            ],
+        }
+        built = await srv._build_session_mcp_runtime(
+            manifest=manifest, ws=ws, ws_id="t-policy",
+            loop=asyncio.get_event_loop(), agent_id="agent-policy",
+        )
+        assert built is not None
+        runtime, _adapter, manager, _bind_token = built
+        try:
+            policies = runtime._tool_policies
+            # Server WITH scoping → policy entry
+            assert "github" in policies
+            assert isinstance(policies["github"], ToolPolicy)
+            assert policies["github"].allow == frozenset({"search_repositories"})
+            assert policies["github"].deny == frozenset({"delete_repository"})
+            # Server WITHOUT scoping → no entry (= "all tools allowed",
+            # mentor backwards-compat)
+            assert "no-scope" not in policies
+        finally:
+            srv._active_mcp_runtimes["t-policy"] = built
+            await srv._shutdown_session_mcp_runtime("t-policy")
+
+    asyncio.run(run())
+
+
 @pytest.mark.skipif(NPX is None, reason=SKIP_REASON)
 def test_build_happy_path_with_filesystem_mcp_and_shutdown_clears_registry():
     """Real npx-spawned filesystem MCP. Helper returns a 4-tuple

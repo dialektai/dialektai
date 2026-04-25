@@ -326,6 +326,24 @@ async def _build_session_mcp_runtime(
         prompt_fn = _build_consent_prompt_fn(ws, ws_id, loop)
         consent_provider = provider_for_autonomy(autonomy, prompt_fn)
 
+        # Build per-server ToolPolicy from the manifest's allow_tools
+        # / deny_tools fields (v0.22). When a manifest has no scoping
+        # fields, the dict stays empty and MCPRuntime treats every
+        # call as "all tools allowed" — backwards-compat with v0.20/
+        # v0.21 manifests preserved.
+        from dialekt.mcp.runtime import ToolPolicy
+        tool_policies: dict = {}
+        for entry in servers:
+            name = entry.get("name") or ""
+            allow_raw = entry.get("allow_tools")
+            deny_raw = entry.get("deny_tools") or []
+            if allow_raw is None and not deny_raw:
+                continue  # no scoping → leave server out of policies
+            tool_policies[name] = ToolPolicy(
+                allow=frozenset(allow_raw) if allow_raw is not None else None,
+                deny=frozenset(deny_raw),
+            )
+
         # Use the existing PluginContext audit callback. It already POSTs
         # to /audit/log with the **payload kwargs the runtime emits
         # (kind, action, result, agent_id, binding_id, target,
@@ -340,6 +358,7 @@ async def _build_session_mcp_runtime(
             audit_callback=audit_cb,
             autonomy=autonomy,
             agent_id=agent_id,
+            tool_policies=tool_policies,
         )
         sync_adapter = create_sync_mcp(runtime)
         bind_token = bind_mcp_runtime(sync_adapter)
@@ -1836,6 +1855,126 @@ async def delete_mcp_server_endpoint(server_id: str):
     await db.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))
     await db.commit()
     return Response(status_code=204)
+
+
+# ── /mcp-servers/{id}/tools — Quick Add expander + Settings inspector source
+# (v0.22 commit 2) ──────────────────────────────────────────────────────────
+# Returns the full list of tool names + destructive flags + descriptions
+# for a configured MCP server. Cached per (server_name, config_hash) for
+# 60s — Wizard expander + Settings inspector both read this. Cache is
+# SEPARATE from /test (mentor P1: /test is a user-triggered live probe,
+# admins clicking [Test] expect a real round-trip; sharing the cache
+# would silently hide editing-credentials feedback).
+
+# in-memory cache. Keys: "<server_name>:<config_hash[:16]>"; values:
+# {"fetched_at": iso, "tools": [...], "expires": monotonic_ts}
+_tools_cache: dict = {}
+_TOOLS_CACHE_TTL_SECONDS = 60.0
+
+
+def _config_hash_for_tools_cache(row: dict) -> str:
+    """SHA-256 over the non-secret spec fields. Editing config in
+    Settings busts the cache automatically."""
+    import hashlib
+    parts = [
+        row.get("transport") or "",
+        row.get("command_json") or "",
+        row.get("env_refs_json") or "",
+        row.get("cwd") or "",
+        row.get("url") or "",
+        row.get("auth_type") or "",
+        row.get("auth_ref") or "",
+        str(row.get("timeout_seconds") or ""),
+    ]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+@app.get("/mcp-servers/{server_id}/tools")
+async def list_mcp_server_tools_endpoint(server_id: str):
+    """Return the tool catalog advertised by this MCP server, with a
+    destructive flag per tool. Cached 60s. On any failure (unreachable,
+    bad credentials), returns 200 with {error, tools: []} so the UI
+    renders an inline expander error rather than a global toast."""
+    import time as _time
+    from dialekt.mcp import (
+        BearerAuth, EnvVarsAuth, HttpTransportSpec,
+        MCPClient, NoAuth, StdioTransportSpec,
+    )
+    from dialekt.mcp.consent import is_destructive_tool
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(404, "MCP server not found")
+    r = dict(row)
+    cfg_hash = _config_hash_for_tools_cache(r)
+    cache_key = f"{r['name']}:{cfg_hash}"
+    now = _time.monotonic()
+    cached = _tools_cache.get(cache_key)
+    if cached and cached["expires"] > now:
+        return {
+            "tools": cached["tools"],
+            "fetched_at": cached["fetched_at"],
+            "from_cache": True,
+        }
+
+    try:
+        if r["transport"] == "stdio":
+            command = json.loads(r["command_json"] or "[]")
+            if not command:
+                raise ValueError("missing command for stdio transport")
+            env_refs = json.loads(r["env_refs_json"] or "{}")
+            resolved_env: dict[str, str] = {}
+            for env_name, ref in env_refs.items():
+                val = get_secret(keyring_key(r["name"], ref))
+                if val is None:
+                    raise ValueError(
+                        f"env var {env_name!r} references unresolved secret "
+                        f"${{secrets.{ref}}}"
+                    )
+                resolved_env[env_name] = val
+            spec = StdioTransportSpec(
+                command=list(command), env=resolved_env, cwd=r["cwd"],
+                timeout_seconds=float(r["timeout_seconds"]),
+            )
+            creds = EnvVarsAuth(vars=resolved_env) if resolved_env else NoAuth()
+        else:
+            spec = HttpTransportSpec(
+                url=r["url"], timeout_seconds=float(r["timeout_seconds"]),
+            )
+            if r["auth_ref"]:
+                token = get_secret(keyring_key(r["name"], r["auth_ref"]))
+                if token is None:
+                    raise ValueError(
+                        f"auth token ${{secrets.{r['auth_ref']}}} is unresolved"
+                    )
+                creds = BearerAuth(token=token)
+            else:
+                creds = NoAuth()
+
+        client = MCPClient(transport=spec, credentials=creds)
+        async with asyncio.timeout(float(r["timeout_seconds"])):
+            async with client:
+                result = await client.list_tools()
+        tools = []
+        for t in result.tools:
+            destructive, source = is_destructive_tool(t)
+            tools.append({
+                "name": t.name,
+                "description": getattr(t, "description", None) or "",
+                "destructive": destructive,
+                "destructive_source": source,
+            })
+        from datetime import datetime as _dt
+        fetched_at = _dt.now().astimezone().isoformat(timespec="seconds")
+        _tools_cache[cache_key] = {
+            "tools": tools, "fetched_at": fetched_at,
+            "expires": now + _TOOLS_CACHE_TTL_SECONDS,
+        }
+        return {"tools": tools, "fetched_at": fetched_at, "from_cache": False}
+    except Exception as e:
+        # Mirror /test UX: 200 with inline error + empty tools list.
+        # No cache-on-failure — next call retries fresh.
+        return {"tools": [], "error": str(e)[:500], "from_cache": False}
 
 
 @app.post("/mcp-servers/{server_id}/test")
