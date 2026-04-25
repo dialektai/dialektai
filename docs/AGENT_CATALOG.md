@@ -1,7 +1,7 @@
 # dialekt Agent Catalog — Production-Ready Configurations
 
-**Generated:** 2026-04-24
-**Validated against:** dialekt v0.10.0 (PR #2 merge — 47 commits merged 2026-04-24)
+**Generated:** 2026-04-24, refreshed 2026-04-25 for v0.20.0 RC
+**Validated against:** dialekt v0.11.1 (last shipped); v0.20.0 RC on `feat/m2-mcp-production-complete` adds the MCP-enabled agent class (Category 5.5, real-server validation pending — see that section)
 **Test environment:** Ubuntu 22.04, local Ollama (qwen2.5-coder:7b, gemma3-12b, gemma2:2b, nomic-embed-text:v1.5)
 **Evidence:** `scripts/pilot_verify/evidence.json` — every agent here was actually run end-to-end with a real chat turn. No simulations.
 
@@ -20,6 +20,7 @@ For pilots: any agent in this catalog can be created through Builder Wizard or `
 3. [Document Processing Agents](#category-3-document-processing-agents) (2)
 4. [Conversation Agents](#category-4-conversation-agents) (2)
 5. [Multi-tool Agents](#category-5-multi-tool-agents) (1)
+5.5. [MCP-enabled Agents](#category-55-mcp-enabled-agents) (3 blueprints — v0.20.0 RC, validation pending)
 6. [Coming in M2 — NOT available today](#category-6-coming-in-m2--not-available-today)
 
 **Verified total:** 10 agent configurations · **Status:** 10/10 ok (harness 2026-04-24 15:58 UTC+05:00)
@@ -336,6 +337,129 @@ Then bind via Settings → Agents.
 
 ---
 
+## Category 5.5: MCP-enabled Agents
+
+**Status:** ⚠️ v0.20.0 RC — schema, runtime, UI, and consent flow all wired and unit-tested. Real-server end-to-end validation against `@modelcontextprotocol/server-github` and a Slack MCP is the last gate before v0.20.0 ships. Pilots: do not promise these as production-ready until the validation pass lands and this section flips to ✅.
+
+**What's in:**
+- `Settings → MCP Servers`: full CRUD UI (add stdio or HTTP transport, env→secret mapping, bearer-token entry with masked storage in OS keychain, `[Test]` button that spawns the server briefly and reports tool count)
+- `Builder Wizard` step 5 "MCP Tools": tick-box selection of pre-configured servers; auto-injects the `mcp_tools` capability; bumps the manifest's `spec_version` to `1.1.0` and `minimum_dialekt_version` to `0.20.0` when MCP is selected
+- `ConsentModal` overlay in chat: three-button decision (Approve once / Approve for session / Deny), keyboard shortcuts (Enter / Shift+Enter / Esc), queue indicator for concurrent calls, timeout banner. Maps directly to `dialekt.mcp.consent.ConsentDecision`
+- Per-session `MCPRuntime` constructed in `ws_chat`, bound through a `ContextVar` that's explicitly carried into the OI worker thread via `contextvars.copy_context()` so `ctx.mcp.<server>.<tool>(...)` resolves from sync Python blocks
+- Soft-fail on bad config: missing secrets / invalid transport spec emit an `mcp_setup_error` toast in the chat — the session keeps going without MCP, the agent's `ctx.mcp` raises `MCPConfigError` on first use which surfaces as a normal tool error
+- LeftPanel agent rows show a plug icon when the manifest declares `mcp_servers`; hover/screen-reader tooltip lists the server names
+
+### 5.5.1 GitHub Operations Agent — blueprint
+
+**Recommended for:** engineering teams that want a chat surface for repo housekeeping (issue triage, PR review, branch cleanup) without granting GitHub access to a cloud LLM provider.
+
+**Manifest sketch** (paste-ready for the Builder Wizard's import path or YAML editor):
+
+```yaml
+spec_version: "1.1.0"
+minimum_dialekt_version: "0.20.0"
+metadata:
+  id: "<uuid4 here>"
+  name: "GitHub Operations Agent"
+  description: "Issue triage, PR review, repo housekeeping via GitHub MCP."
+  version: "1.0.0"
+  language: "en"
+  author: { name: "<your team>", email: "<contact>" }
+  created_at: "2026-04-25T00:00:00+00:00"
+  updated_at: "2026-04-25T00:00:00+00:00"
+mcp_servers:
+  - name: "github"
+    transport: "stdio"
+    command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${secrets.github_token}"
+    timeout_seconds: 30
+capabilities:
+  groups: ["mcp_tools"]
+autonomy:
+  recommended: "ask-before-write"
+  max_allowed: "ask-before-write"
+```
+
+**Setup** (5 min): Settings → MCP Servers → Add → Name `github`, Transport `stdio`, Command `npx -y @modelcontextprotocol/server-github`, Environment variable `GITHUB_TOKEN` mapped to credential ref `github_token`, paste your PAT. Click `[Test]` — should show `N tools discovered`. Builder Wizard → MCP Tools → tick `github`. Publish.
+
+**Sample queries** (LLM-generated tool calls; consent prompt fires on the destructive ones):
+- "List my recent repos" → `dialekt_mcp_github_list_repositories` (read, auto)
+- "Find issues in dialektai/dialektai labelled bug" → `search_issues` (read, auto)
+- "Create an issue on dialektai/dialektai titled 'X' with body 'Y'" → `create_issue` (destructive → consent)
+- "Close issue #42" → `update_issue` (destructive → consent)
+
+**Known limitations** (pre-validation):
+- Tool names depend on the MCP server build; the wizard's preview is "N tools discovered" only (full list deferred — see post-1.6 hardening backlog)
+- Per-tool allow/deny scoping not yet exposed in the UI (manifest schema 1.1.0 supports `mcp_servers[].allow_tools` / `deny_tools`; deferred to M2 Month 2)
+- Rate limit headers from GitHub are not surfaced as a chat toast yet — agent sees them as a tool error and decides how to recover
+
+### 5.5.2 Slack Automation Agent — blueprint
+
+**Recommended for:** ops teams that want chat-driven Slack actions (status posts, channel triage). HTTP transport with bearer-token auth; targets community Slack MCP servers (e.g. `mcp-slack`).
+
+**Manifest sketch:**
+
+```yaml
+spec_version: "1.1.0"
+minimum_dialekt_version: "0.20.0"
+metadata: { ... }
+mcp_servers:
+  - name: "slack"
+    transport: "http"
+    url: "https://your-slack-mcp.example.com/mcp"
+    auth:
+      type: "bearer"
+      token: "${secrets.auth_token}"
+    timeout_seconds: 30
+capabilities:
+  groups: ["mcp_tools"]
+autonomy:
+  recommended: "ask-before-write"
+  max_allowed: "ask-before-write"
+```
+
+**Setup**: Settings → MCP Servers → Add → Name `slack`, Transport `http`, URL of the Slack MCP, Auth `Bearer token`, paste token. `[Test]` should report tool count. Wizard → MCP Tools → tick `slack`. Publish.
+
+**Status flag:** Slack MCP server quality varies in the wild. Validation pass MAY downgrade this entry to "Coming later" if no maintained Slack MCP passes the [Test] gate reliably — pilots should not pre-commit to this until the pass lands.
+
+### 5.5.3 Multi-tool Research Agent — blueprint (composition)
+
+Demonstrates manifest-level composition: filesystem MCP + GitHub MCP + read-only PostgreSQL connection in the same agent. Compares the company's README against three peer repos pulled by the agent.
+
+```yaml
+spec_version: "1.1.0"
+minimum_dialekt_version: "0.20.0"
+metadata: { ... }
+mcp_servers:
+  - name: "fs"
+    transport: "stdio"
+    command: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/repo"]
+    timeout_seconds: 60
+  - name: "github"
+    transport: "stdio"
+    command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${secrets.github_token}"
+capabilities:
+  groups: ["mcp_tools", "filesystem_read"]
+```
+
+**Sample query:** "Read our README and compare it with the top 3 repos that match the same description on GitHub. Summarize the gaps." Agent issues fs MCP `read_file` (auto), then GitHub MCP `search_repositories` (auto), then `get_repository_content` for each (auto). No destructive calls — no consent prompts.
+
+### Pre-pilot validation pass — DEFERRED
+
+Real-server end-to-end runs against:
+1. `@modelcontextprotocol/server-github` with a live GitHub PAT — verify all of: connection test, tool discovery, read tool call (no consent), write tool call (consent prompt fires, decision honored, audit row written), audit linkage between `consent_requested` row and the subsequent `tool_call` row.
+2. A maintained Slack MCP — same flow.
+3. Multi-tool composition agent — verify both servers come up in the same session, ContextVar carries through OI thread, no cross-server interference.
+
+**Why deferred:** these require live external credentials. Run by a pilot or by Dias on a controlled host before flipping this section's status to ✅. Document outcomes in `docs/MCP_PRODUCTION_VALIDATION.md` (not yet created — added in the validation commit).
+
+The unit + integration test suite for everything **above** the external API boundary (manifest parsing, transport spec construction, secret resolution, runtime construction, soft-fail paths, cross-thread contextvars, /mcp-servers CRUD, /test endpoint shapes, consent modal protocol, agent serializer with `mcp_server_names`) passes 602 / 30 skipped / 0 regressions on this branch.
+
+---
+
 ## Category 6: Coming in M2 — NOT available today
 
 These configurations are **NOT** available on v0.10.0. Do not promise them to pilots.
@@ -368,9 +492,8 @@ These configurations are **NOT** available on v0.10.0. Do not promise them to pi
 **Why blocked.** One agent per WebSocket session. No dispatcher, no agent-to-agent call primitive.
 **ETA.** Q4 2026 (M3)
 
-### Per-agent secrets injection
-**Why blocked.** `secrets_required` in manifest is advisory. No UI prompts for secrets. Runtime does not substitute them.
-**ETA.** Q3 2026 (M2)
+### ~~Per-agent secrets injection~~ — RESOLVED in v0.20.0 RC
+Manifest `${secrets.<ref>}` interpolation now resolves through the OS keychain via `dialekt.secrets` + `dialekt.mcp.secrets_resolver.keyring_key()`. Settings → MCP Servers writes secrets at create/edit time; the `_build_session_mcp_runtime` helper resolves them at chat-session join. `MCPConfigError` with the missing ref name surfaces as an `mcp_setup_error` toast when a referenced secret isn't set.
 
 ### Custom output destinations (filesystem, webhook, email)
 **Why blocked.** Schema-valid, no delivery runtime. Only `notification` (chat column) works.
