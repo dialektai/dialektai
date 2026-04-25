@@ -7,21 +7,76 @@
   <meta name="description" content="Have a license key? Paste it here to sign in to dialekt.ai.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/_shared.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "login.kicker": "Sign in · License key",
+        "login.h1": "Have a license key?",
+        "login.sub": "Paste it below to verify your tenant. Or use it directly in the desktop app — that works too.",
+        "login.key": "License key",
+        "login.key.hint": "From the email we sent when you signed up.",
+        "login.submit": "Verify license →",
+        "login.active": "Active license",
+        "login.row.plan": "Plan",
+        "login.row.seats": "Seats",
+        "login.row.expires": "Expires",
+        "login.row.role": "Role",
+        "login.download": "Download desktop app →",
+        "login.lost.h": "Lost your key?",
+        "login.lost.p.a": "Email",
+        "login.lost.p.b": "from the address you signed up with — we'll resend it.",
+        "login.foot.alt": "No license yet?",
+        "login.foot.signup": "Start a free trial →",
+      },
+      ru: {
+        "login.kicker": "Вход · лицензионный ключ",
+        "login.h1": "У вас есть лицензионный ключ?",
+        "login.sub": "Вставьте ниже, чтобы проверить тенант. Или используйте его прямо в десктопном приложении — тоже работает.",
+        "login.key": "Лицензионный ключ",
+        "login.key.hint": "Из письма, которое мы отправили при регистрации.",
+        "login.submit": "Проверить лицензию →",
+        "login.active": "Активная лицензия",
+        "login.row.plan": "Тариф",
+        "login.row.seats": "Места",
+        "login.row.expires": "Действует до",
+        "login.row.role": "Роль",
+        "login.download": "Скачать приложение →",
+        "login.lost.h": "Потеряли ключ?",
+        "login.lost.p.a": "Напишите на",
+        "login.lost.p.b": "с того же адреса, с которого регистрировались — пришлём ещё раз.",
+        "login.foot.alt": "Ещё нет лицензии?",
+        "login.foot.signup": "Начать пробный период →",
+      }
+    };
+  </script>
   <style>
-    .login-wrap { min-height: calc(100vh - 200px); display: flex; align-items: center; justify-content: center; padding: 60px 24px; }
-    .login-card { width: 100%; max-width: 460px; }
-    .login-card h1 { font-size: 28px; margin-bottom: 8px; }
-    .login-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
-    .key-info {
-      background: var(--bg1); border: 1px solid var(--border); padding: 20px;
-      margin-top: 28px;
+    .login-wrap {
+      min-height: calc(100vh - 200px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 60px 24px;
     }
-    .tenant-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
-    .tenant-row .k { color: var(--dim); font-family: var(--mono); letter-spacing: 0.06em; }
-    .tenant-row .v { color: var(--text); font-family: var(--mono); }
+    .login-card { width: 100%; max-width: 480px; }
+    .login-card .kicker { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); font-weight: 500; margin-bottom: 14px; }
+    .login-card h1 { font-family: var(--serif); font-size: 32px; line-height: 1.1; letter-spacing: -0.018em; margin-bottom: 12px; font-weight: 400; }
+    .login-card .sub { color: var(--ink-2); font-size: 15.5px; margin-bottom: 28px; line-height: 1.6; }
+    .key-info {
+      background: var(--bg-tint); border: 1px solid var(--rule);
+      border-radius: 4px; padding: 22px; margin-top: 28px;
+    }
+    .tenant-row {
+      display: flex; justify-content: space-between;
+      padding: 8px 0; font-size: 13.5px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .tenant-row:last-child { border-bottom: 0; }
+    .tenant-row .k { color: var(--ink-3); letter-spacing: 0.04em; }
+    .tenant-row .v { color: var(--ink); font-weight: 500; }
+    .lost-row {
+      margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--rule);
+    }
+    .lost-row a { color: var(--primary); border-bottom: 1px solid var(--rule-strong); text-underline-offset: 3px; }
+    .signup-row { text-align: center; margin-top: 22px; font-size: 14px; color: var(--ink-2); }
+    .signup-row a { color: var(--primary); border-bottom: 1px solid var(--rule-strong); text-underline-offset: 3px; }
   </style>
 </head>
 <body>
@@ -30,56 +85,58 @@
   <div class="login-wrap">
     <div class="login-card">
       <div class="card card-pad-lg">
-        <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:14px">SIGN IN · LICENSE KEY</div>
-        <h1>Have a license key?</h1>
-        <p class="sub">Paste it below to verify your tenant. Or use it directly in the desktop app — that works too.</p>
+        <div class="kicker" data-i18n="login.kicker">Sign in · License key</div>
+        <h1 data-i18n="login.h1">Have a license key?</h1>
+        <p class="sub" data-i18n="login.sub">Paste it below to verify your tenant. Or use it directly in the desktop app — that works too.</p>
 
         <form id="login-form" novalidate>
           <div class="field">
-            <label for="license_key">License key</label>
+            <label for="license_key" data-i18n="login.key">License key</label>
             <input type="text" id="license_key" name="license_key" required
               placeholder="dialekt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               autocomplete="off"
-              style="font-size:12px">
-            <div class="field-hint">From the email we sent when you signed up.</div>
+              style="font-size:13px;letter-spacing:0.02em">
+            <div class="field-hint" data-i18n="login.key.hint">From the email we sent when you signed up.</div>
           </div>
 
           <div id="alert-slot"></div>
 
-          <button type="submit" class="btn primary lg full" id="submit-btn">
-            VERIFY LICENSE →
+          <button type="submit" class="btn primary lg full" id="submit-btn" data-i18n="login.submit">
+            Verify license →
           </button>
         </form>
 
         <!-- Result -->
         <div id="result" style="display:none">
           <div class="key-info">
-            <div class="upper" style="color:var(--cyan);margin-bottom:10px">ACTIVE LICENSE</div>
-            <div class="tenant-row"><span class="k">Plan</span><span class="v" id="r-plan">—</span></div>
-            <div class="tenant-row"><span class="k">Seats</span><span class="v" id="r-seats">—</span></div>
-            <div class="tenant-row"><span class="k">Expires</span><span class="v" id="r-expires">—</span></div>
-            <div class="tenant-row"><span class="k">Role</span><span class="v" id="r-role">—</span></div>
+            <div class="meta" style="color:var(--primary);margin-bottom:10px;display:block" data-i18n="login.active">Active license</div>
+            <div class="tenant-row"><span class="k" data-i18n="login.row.plan">Plan</span><span class="v" id="r-plan">—</span></div>
+            <div class="tenant-row"><span class="k" data-i18n="login.row.seats">Seats</span><span class="v" id="r-seats">—</span></div>
+            <div class="tenant-row"><span class="k" data-i18n="login.row.expires">Expires</span><span class="v" id="r-expires">—</span></div>
+            <div class="tenant-row"><span class="k" data-i18n="login.row.role">Role</span><span class="v" id="r-role">—</span></div>
           </div>
-          <a href="/#install" class="btn primary lg full mt-16">DOWNLOAD DESKTOP APP →</a>
+          <a href="/#install" class="btn primary lg full mt-16" data-i18n="login.download">Download desktop app →</a>
         </div>
 
-        <div class="mt-32" style="padding-top:24px;border-top:1px solid var(--border)">
-          <p class="text-muted" style="font-size:13px;margin-bottom:8px">Lost your key?</p>
-          <p style="font-size:12px;color:var(--dim);line-height:1.6">
-            Email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a> from the address you signed up with — we'll resend it.
+        <div class="lost-row">
+          <p style="font-size:14px;color:var(--ink-2);margin-bottom:8px" data-i18n="login.lost.h">Lost your key?</p>
+          <p style="font-size:13px;color:var(--ink-3);line-height:1.65">
+            <span data-i18n="login.lost.p.a">Email</span>
+            <a href="mailto:hello@dialekt.ai">hello@dialekt.ai</a>
+            <span data-i18n="login.lost.p.b">from the address you signed up with — we'll resend it.</span>
           </p>
         </div>
 
-        <div class="text-center mt-24">
-          <p class="text-muted" style="font-size:13px">
-            No license yet? <a href="/signup.html" style="color:var(--cyan)">Start a free trial →</a>
-          </p>
+        <div class="signup-row">
+          <span data-i18n="login.foot.alt">No license yet?</span>
+          <a href="/signup.html" data-i18n="login.foot.signup">Start a free trial →</a>
         </div>
       </div>
     </div>
   </div>
 
   <div data-layout="footer"></div>
+  <script src="/_i18n.js" defer></script>
   <script src="/_layout.js" defer></script>
   <script>
     const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
@@ -88,12 +145,14 @@
       const form = document.getElementById('login-form');
       const submitBtn = document.getElementById('submit-btn');
       const alertSlot = document.getElementById('alert-slot');
+      const submitDefault = () => (window.dlkI18n?.getLang() === 'ru') ? 'Проверить лицензию →' : 'Verify license →';
+      const submitWorking = () => (window.dlkI18n?.getLang() === 'ru') ? 'Проверяем…' : 'Verifying…';
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         alertSlot.innerHTML = '';
         submitBtn.disabled = true;
-        submitBtn.textContent = 'VERIFYING…';
+        submitBtn.textContent = submitWorking();
 
         const key = form.license_key.value.trim();
         try {
@@ -104,25 +163,31 @@
           });
           const body = await r.json();
           if (!r.ok || !body.valid) {
-            alertSlot.innerHTML = `<div class="alert err">License key not found or expired. If you just signed up, check your email and click the verification link first.</div>`;
+            const msg = (window.dlkI18n?.getLang() === 'ru')
+              ? 'Ключ не найден или истёк. Если только что зарегистрировались — проверьте почту и подтвердите ссылку.'
+              : 'License key not found or expired. If you just signed up, check your email and click the verification link first.';
+            alertSlot.innerHTML = `<div class="alert err">${msg}</div>`;
             submitBtn.disabled = false;
-            submitBtn.textContent = 'VERIFY LICENSE →';
+            submitBtn.textContent = submitDefault();
             return;
           }
 
-          // Show details
           form.style.display = 'none';
           document.getElementById('result').style.display = 'block';
           document.getElementById('r-plan').textContent = body.plan || '—';
           document.getElementById('r-seats').textContent = body.seats_limit || '—';
+          const lang = window.dlkI18n?.getLang() || 'en';
           document.getElementById('r-expires').textContent = body.expires_at
-            ? new Date(body.expires_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+            ? new Date(body.expires_at).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
             : '—';
           document.getElementById('r-role').textContent = body.user_role || '—';
         } catch (err) {
-          alertSlot.innerHTML = `<div class="alert err">Network error: ${err.message}. Try again.</div>`;
+          const msg = (window.dlkI18n?.getLang() === 'ru')
+            ? `Сетевая ошибка: ${err.message}. Попробуйте ещё раз.`
+            : `Network error: ${err.message}. Try again.`;
+          alertSlot.innerHTML = `<div class="alert err">${msg}</div>`;
           submitBtn.disabled = false;
-          submitBtn.textContent = 'VERIFY LICENSE →';
+          submitBtn.textContent = submitDefault();
         }
       });
     });

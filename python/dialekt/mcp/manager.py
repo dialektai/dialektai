@@ -37,6 +37,7 @@ from typing import Any, Awaitable, Callable, Optional
 from dialekt.mcp.auth import Credentials, NoAuth
 from dialekt.mcp.client import MCPClient
 from dialekt.mcp.error_classify import classify_sdk_error
+from dialekt.mcp.health import MCPHealthRegistry
 from dialekt.mcp.errors import (
     MCPError,
     MCPRateLimitError,
@@ -74,11 +75,13 @@ class MCPClientManager:
         audit_callback: Optional[AuditCallback] = None,
         rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
         clock: Callable[[], float] = time.monotonic,
+        health_registry: Optional["MCPHealthRegistry"] = None,
     ) -> None:
         self.agent_id = agent_id
         self._audit_callback = audit_callback
         self._rate_limit = rate_limit_per_minute
         self._clock = clock
+        self._health = health_registry
 
         self._clients: dict[str, MCPClient] = {}
         self._specs: dict[str, tuple[TransportSpec, Credentials]] = {}
@@ -197,6 +200,14 @@ class MCPClientManager:
             error_kind=error_kind,
             extra=extra,
         )
+
+        # v0.26 process-health observer (sibling registry, never raises
+        # — _fire_persist swallows callback failures internally).
+        if self._health is not None:
+            if result_kind == "server_unavailable":
+                await self._health.mark_crashed(server_name, error_kind or "unknown")
+            elif result_kind == "success":
+                await self._health.mark_healthy(server_name)
 
         if exception_to_raise is not None:
             raise exception_to_raise
