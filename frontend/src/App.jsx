@@ -33,16 +33,20 @@ export default function App() {
       try {
         const s = await fetch(`${API}/settings`).then(r => r.json());
 
-        // Already completed onboarding — do nothing
-        if (s.onboarding_completed) return;
-
-        // Check license first (Builder mode flow)
-        // Trial or license accepted → proceed; no license → show LicenseScreen
+        // License gate runs UNCONDITIONALLY — even if a previous session
+        // marked onboarding_completed, a missing license must still route
+        // to the LicenseScreen. Pilots with corrupted/preseeded settings
+        // (no key + onboarding_completed=true) used to fall through to
+        // MainScreen → OfflineScreen and have no way to reach the
+        // license entry surface.
         const hasLicense = !!s.license_key || !!s.trial_started;
         if (!hasLicense) {
           nav('license');
           return;
         }
+
+        // Already completed onboarding past the license gate — done.
+        if (s.onboarding_completed) return;
 
         // Mode not set → show mode selection
         if (!('mode' in s)) {
