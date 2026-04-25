@@ -1462,6 +1462,46 @@ def _migrate_keyring_rename(old_name: str, new_name: str, refs: list[str]) -> No
             pass
 
 
+# ── MCP Templates catalog (Phase 2 v0.21 commit 1) ──────────────────────────
+# Curated list of pre-configured MCP servers (stdio + http) shown as
+# "Quick Add" tiles in Settings. The catalog is a static JSON file in
+# the repo at python/dialekt/mcp_templates/catalog.json — pure data,
+# no template vocabulary leaks into Pydantic. Substitution of
+# ${prompt:<key>} placeholders happens frontend-side immediately
+# before submitting the resolved payload to POST /mcp-servers.
+
+_MCP_TEMPLATES_CACHE: dict | None = None
+
+
+def _load_mcp_templates_catalog() -> dict:
+    """Read + memoize the bundled templates catalog. Idempotent.
+
+    Catalog is immutable per release; reload-on-change is intentionally
+    not supported (would invite cache-staleness bugs for marginal
+    devloop benefit). Restart the backend to pick up edits.
+    """
+    global _MCP_TEMPLATES_CACHE
+    if _MCP_TEMPLATES_CACHE is not None:
+        return _MCP_TEMPLATES_CACHE
+    catalog_path = (
+        Path(__file__).parent / "dialekt" / "mcp_templates" / "catalog.json"
+    )
+    try:
+        with open(catalog_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        log.warning("MCP templates catalog unreadable at %s: %s", catalog_path, e)
+        data = {"version": 1, "templates": []}
+    _MCP_TEMPLATES_CACHE = data
+    return data
+
+
+@app.get("/mcp-templates")
+async def list_mcp_templates_endpoint():
+    """Return the Quick Add catalog. Read by Settings → MCP Servers."""
+    return _load_mcp_templates_catalog()
+
+
 @app.get("/mcp-servers")
 async def list_mcp_servers_endpoint():
     cur = await db.execute(

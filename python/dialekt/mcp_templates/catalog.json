@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "github",
+      "label": "GitHub",
+      "icon": "diamond",
+      "description": "Issue triage, PR review, repo housekeeping. Needs a GitHub Personal Access Token with repo scope.",
+      "transport": "stdio",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "env_refs": {"GITHUB_PERSONAL_ACCESS_TOKEN": "github_token"},
+      "secret_prompts": [
+        {
+          "ref": "github_token",
+          "label": "GitHub Personal Access Token",
+          "placeholder": "ghp_...",
+          "help_url": "https://github.com/settings/tokens?type=beta",
+          "help_text": "Fine-grained token, repo scope (read for triage; write to create issues/PRs)."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": true,
+      "validation_notes": "Validated 2026-04-25 against @modelcontextprotocol/server-github 2025.4.8. See docs/MCP_PRODUCTION_VALIDATION.md.",
+      "upstream_status_warning": "@modelcontextprotocol/server-github is marked deprecated by upstream (npm warning at install). Still functional. M2 Month 2 candidate to switch to github.com/github/github-mcp-server (Go binary, official)."
+    },
+    {
+      "id": "filesystem",
+      "label": "Filesystem",
+      "icon": "folder",
+      "description": "Bounded filesystem access (read/write within an explicit sandbox path). No credentials.",
+      "transport": "stdio",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "${prompt:sandbox_path}"],
+      "env_refs": {},
+      "secret_prompts": [],
+      "string_prompts": [
+        {
+          "ref": "sandbox_path",
+          "label": "Sandbox directory path",
+          "placeholder": "/home/<user>/safe-workspace",
+          "help_text": "Filesystem MCP can only touch paths under this directory. Use an explicit subdir, never your home root."
+        }
+      ],
+      "default_timeout_seconds": 60,
+      "validated": true,
+      "validation_notes": "Used as the canonical reference MCP in unit tests + cross-thread regression suite (test_ws_chat_mcp_integration.py)."
+    },
+    {
+      "id": "slack-byos",
+      "label": "Slack (bring your own server)",
+      "icon": "chat",
+      "description": "Connects dialekt to a Slack-aware HTTP MCP gateway YOU run. dialekt does NOT bundle a Slack MCP — pick a maintained one or run your own (e.g. an internal HTTP wrapper around the Slack Web API).",
+      "transport": "http",
+      "url_placeholder": "https://your-slack-mcp.example.com/mcp",
+      "auth_type": "bearer",
+      "secret_prompts": [
+        {
+          "ref": "auth_token",
+          "label": "Bearer token",
+          "placeholder": "...",
+          "help_text": "Your Slack MCP gateway's auth token, NOT a Slack bot token directly. The gateway handles Slack auth on its side."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": false,
+      "validation_notes": "Slack MCP server quality varies. v0.21.0 ships this template as a starting point only — bring your own MCP server."
+    },
+    {
+      "id": "linear",
+      "label": "Linear",
+      "icon": "diamond",
+      "description": "Issue tracking via a Linear MCP server. Community package — bring your own API key.",
+      "transport": "stdio",
+      "command": ["npx", "-y", "@hatcloud/linear-mcp@1.2.2"],
+      "env_refs": {"LINEAR_API_KEY": "linear_api_key"},
+      "secret_prompts": [
+        {
+          "ref": "linear_api_key",
+          "label": "Linear API key",
+          "placeholder": "lin_api_...",
+          "help_url": "https://linear.app/settings/api",
+          "help_text": "Personal API key from Linear settings → API → Create new key."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": false,
+      "validation_notes": "Pinned to @hatcloud/linear-mcp@1.2.2 (latest as of 2026-04-25). Single-maintainer community package; no public source repo linked from npm metadata. Verify with [Test] before committing pilots."
+    },
+    {
+      "id": "notion",
+      "label": "Notion",
+      "icon": "file",
+      "description": "Notion read/write via a maintained community fork of the official Notion MCP server. Needs a Notion integration token.",
+      "transport": "stdio",
+      "command": ["npx", "-y", "@mieubrisse/notion-mcp-server@2.1.2"],
+      "env_refs": {"NOTION_API_KEY": "notion_api_key"},
+      "secret_prompts": [
+        {
+          "ref": "notion_api_key",
+          "label": "Notion integration token",
+          "placeholder": "secret_...",
+          "help_url": "https://www.notion.so/my-integrations",
+          "help_text": "Create a Notion integration, copy its secret, share specific pages with the integration so the MCP server can see them."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": false,
+      "validation_notes": "Pinned to @mieubrisse/notion-mcp-server@2.1.2 — explicitly described as a maintained fork of the official server. Verify with [Test] before pilot rollout."
+    },
+    {
+      "id": "figma",
+      "label": "Figma",
+      "icon": "sparkle",
+      "description": "Read Figma files / inspect frames via a community Claude-Desktop-oriented MCP. Needs a Figma personal access token.",
+      "transport": "stdio",
+      "command": ["npx", "-y", "claude-talk-to-figma-mcp@1.0.0"],
+      "env_refs": {"FIGMA_TOKEN": "figma_token"},
+      "secret_prompts": [
+        {
+          "ref": "figma_token",
+          "label": "Figma personal access token",
+          "placeholder": "figd_...",
+          "help_url": "https://www.figma.com/developers/api#access-tokens",
+          "help_text": "Settings → Personal access tokens. Read scope is enough for inspection-only agents."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": false,
+      "validation_notes": "Pinned to claude-talk-to-figma-mcp@1.0.0. Community package — verify with [Test] before pilot rollout."
+    },
+    {
+      "id": "custom-http",
+      "label": "Custom HTTP gateway",
+      "icon": "globe",
+      "description": "Connects to your company's HTTP MCP gateway behind a VPN. Use this when you have ONE gateway aggregating multiple tool sources for the whole company.",
+      "transport": "http",
+      "url_placeholder": "https://mcp.<your-org>.internal/",
+      "auth_type": "bearer",
+      "secret_prompts": [
+        {
+          "ref": "auth_token",
+          "label": "Bearer token",
+          "placeholder": "...",
+          "help_text": "Seat-specific token from your gateway. The gateway holds the actual upstream credentials, not dialekt."
+        }
+      ],
+      "string_prompts": [],
+      "default_timeout_seconds": 30,
+      "validated": false,
+      "validation_notes": "Generic template — pilots fill in their own gateway URL."
+    }
+  ]
+}
