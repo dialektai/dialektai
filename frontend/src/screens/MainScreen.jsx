@@ -151,6 +151,7 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
         queueLength={consentQueue.length}
         onApprove={() => respondConsent('approved')}
         onApproveSession={() => respondConsent('approved_session')}
+        onApproveAll={() => respondConsent('approved_all')}
         onDeny={() => respondConsent('denied')}
         onTimeoutAck={ackConsentTimeout}
       />
