@@ -6,6 +6,7 @@ import LeftPanel from '../components/LeftPanel.jsx';
 import { getCloudApi } from '../lib/cloud.js';
 import McpTemplateModal from '../components/McpTemplateModal.jsx';
 import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
+import McpToolList from '../components/McpToolList.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -1164,6 +1165,37 @@ function MCPSection() {
   const [templates, setTemplates] = useState([]);
   const [openTemplate, setOpenTemplate] = useState(null);
   const [openImport, setOpenImport] = useState(false);
+  // v0.22: per-row tool inspector. inspectIds = which rows are
+  // expanded; toolsByServer = {[server.id]: {loading, tools, error}}.
+  // Read-only — allow/deny scoping is per-agent, not per-server.
+  const [inspectIds, setInspectIds] = useState(new Set());
+  const [toolsByServer, setToolsByServer] = useState({});
+
+  const inspectTools = async (s) => {
+    setInspectIds(prev => {
+      const next = new Set(prev);
+      if (next.has(s.id)) {
+        next.delete(s.id);
+        return next;
+      }
+      next.add(s.id);
+      return next;
+    });
+    if (toolsByServer[s.id]) return; // already fetched
+    setToolsByServer(prev => ({ ...prev, [s.id]: { loading: true } }));
+    try {
+      const r = await fetch(`${API}/mcp-servers/${s.id}/tools`);
+      const body = await r.json();
+      setToolsByServer(prev => ({
+        ...prev,
+        [s.id]: { loading: false, tools: body.tools || [], error: body.error || '' },
+      }));
+    } catch (e) {
+      setToolsByServer(prev => ({
+        ...prev, [s.id]: { loading: false, tools: [], error: String(e) },
+      }));
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -1383,6 +1415,12 @@ function MCPSection() {
               background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
               padding: '5px 12px', fontSize: 11, cursor: st?.phase === 'testing' ? 'default' : 'pointer',
             }}>{st?.phase === 'testing' ? 'TESTING…' : 'TEST'}</button>
+            <button onClick={() => inspectTools(s)} disabled={s.last_test_ok !== true} style={{
+              background: 'transparent', border: `1px solid ${T.border}`,
+              color: s.last_test_ok === true ? T.text : T.dim,
+              padding: '5px 12px', fontSize: 11,
+              cursor: s.last_test_ok === true ? 'pointer' : 'not-allowed',
+            }}>{inspectIds.has(s.id) ? 'HIDE TOOLS' : 'INSPECT TOOLS ▾'}</button>
             <button onClick={() => beginEdit(s)} style={{
               background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
               padding: '5px 12px', fontSize: 11, cursor: 'pointer',
@@ -1392,6 +1430,26 @@ function MCPSection() {
               padding: '5px 12px', fontSize: 11, cursor: 'pointer',
             }}>DELETE</button>
           </div>
+          {inspectIds.has(s.id) && (() => {
+            const ts = toolsByServer[s.id] || { loading: true };
+            const destCount = (ts.tools || []).filter(t => t.destructive).length;
+            return (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {!ts.loading && !ts.error && destCount > 0 && (
+                  <div style={{ fontSize: 11, color: T.muted, padding: '6px 10px',
+                    border: `1px solid ${T.border}`, background: T.bg2 }}>
+                    This server exposes {destCount} destructive tool{destCount === 1 ? '' : 's'}. Per-agent scoping in agent settings.
+                  </div>
+                )}
+                <McpToolList
+                  tools={ts.tools}
+                  loading={ts.loading}
+                  error={ts.error}
+                  mode="readonly"
+                />
+              </div>
+            );
+          })()}
         </div>
       </Card>
     );
