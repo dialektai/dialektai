@@ -43,13 +43,47 @@ from dialekt.mcp.consent import (
     ConsentRequest,
     is_destructive_tool,
 )
+from dataclasses import dataclass, field
 from dialekt.mcp.errors import (
     MCPConfigError,
     MCPConsentDenied,
+    MCPToolNotAllowed,
     MCPToolNotFoundError,
 )
 from dialekt.mcp.manager import AuditCallback, MCPClientManager
 from dialekt.mcp.transport import TransportSpec
+
+
+@dataclass(frozen=True)
+class ToolPolicy:
+    """Static per-server allow/deny policy for tool dispatch.
+
+    Built from the manifest's ``mcp_servers[].allow_tools`` and
+    ``mcp_servers[].deny_tools`` fields by ws_chat at session start
+    and threaded into ``MCPRuntime`` via ``tool_policies``.
+
+    Semantics (per v0.22 design + mentor ruling §10.A):
+        - ``allow is None`` → all tools advertised by the server allowed.
+        - ``allow is not None`` → ONLY those tool names allowed.
+        - ``deny`` is always subtracted: a tool name in both lists is
+          denied (deny wins). This matches POSIX firewall conventions
+          and lets admins say "allow the github_* family but blacklist
+          github_delete_branch".
+    """
+
+    allow: Optional[frozenset[str]] = None
+    deny: frozenset[str] = field(default_factory=frozenset)
+
+    def permits(self, tool_name: str) -> bool:
+        """Return True iff ``tool_name`` is dispatch-allowed under this
+        policy. False means the runtime must raise
+        :class:`MCPToolNotAllowed` and never reach consent or dispatch.
+        """
+        if tool_name in self.deny:
+            return False
+        if self.allow is not None and tool_name not in self.allow:
+            return False
+        return True
 
 
 log = logging.getLogger("dialekt.mcp.runtime")
@@ -101,6 +135,7 @@ class MCPRuntime:
         agent_id: str = "",
         binding_id: Optional[str] = None,
         clock: Callable[[], float] = time.monotonic,
+        tool_policies: Optional[dict[str, ToolPolicy]] = None,
     ) -> None:
         self._manager = manager
         self._server_specs = dict(server_specs)
@@ -110,6 +145,10 @@ class MCPRuntime:
         self._agent_id = agent_id
         self._binding_id = binding_id
         self._clock = clock
+        # Per-server tool allow/deny policies. Empty dict / None → no
+        # policy → all tools dispatch through consent + manager
+        # normally (v0.20/v0.21 backwards-compat).
+        self._tool_policies: dict[str, ToolPolicy] = dict(tool_policies or {})
 
         self._tool_cache: dict[str, dict[str, Any]] = {}
         self._shutdown = False
@@ -188,6 +227,31 @@ class MCPRuntime:
                 f"MCP server {server_name!r} not configured on runtime"
             )
         transport, credentials, timeout_seconds = spec
+
+        # Per-tool allow/deny gate (v0.22). Fast-fails before tool
+        # metadata fetch so a denied call never spawns the MCP server
+        # subprocess. Counts the attempt toward the manager's 60/min
+        # rate limit so a runaway agent looping on a blocked tool
+        # hits MCPRateLimitError at the ceiling and stops emitting
+        # mcp_tool_blocked rows.
+        policy = self._tool_policies.get(server_name)
+        if policy is not None and not policy.permits(tool_name):
+            self._manager._check_rate_limit()
+            reason = (
+                "denied by deny_tools" if tool_name in policy.deny
+                else "not in allow_tools"
+            )
+            await self._emit_audit(
+                kind="mcp_tool_blocked",
+                action=tool_name,
+                result="blocked",
+                target=server_name,
+                error_kind="MCPToolNotAllowed",
+                extra={"reason": reason},
+            )
+            raise MCPToolNotAllowed(
+                f"{server_name}.{tool_name}: {reason}"
+            )
 
         tool = await self.tool_metadata(server_name, tool_name)
         destructive, source = is_destructive_tool(tool)

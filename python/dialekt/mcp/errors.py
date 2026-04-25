@@ -98,3 +98,14 @@ class MCPConsentDenied(MCPError):
     ``result='denied'``; there is NO ``error_kind`` attached to
     such audit rows because denial is the system working as designed.
     """
+
+
+class MCPToolNotAllowed(MCPError):
+    """Tool blocked by per-server allow_tools/deny_tools policy.
+
+    Distinct from :class:`MCPConsentDenied`: that's a per-call user
+    decision; this is a manifest-level static policy block declared
+    via ``mcp_servers[].allow_tools`` / ``deny_tools``. The user is
+    never prompted; the call fast-fails before consent or dispatch.
+    Audited under ``kind='mcp_tool_blocked'``.
+    """
