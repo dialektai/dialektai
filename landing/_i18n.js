@@ -32,25 +32,21 @@
       "footer.resources.security": "Security",
       "footer.company": "Company",
       "footer.company.contact": "Contact",
-      "footer.company.privacy": "Privacy policy",
-      "footer.company.privacy_ru": "Конфиденциальность (RU)",
-      "footer.company.terms": "Terms",
-      "footer.company.terms_ru": "Условия (RU)",
-      "footer.company.offer_ru": "Public offer (KZ, RU)",
-      "footer.company.dpa": "DPA template",
-      "footer.company.consent": "Consent & UI texts",
-      "footer.company.signin": "Sign in",
+      "footer.legal": "Legal",
+      "footer.legal.privacy": "Privacy",
+      "footer.legal.terms": "Terms",
+      "footer.legal.dpa": "DPA",
       "footer.copy": "© 2026 dialekt.ai",
-      "footer.principle": "Local-first · No telemetry · No account required for local use",
+      "footer.principle": "Local-first · No telemetry · No account required",
     },
     ru: {
       "nav.product": "Продукт",
       "nav.pricing": "Тарифы",
-      "nav.docs": "Документация",
-      "nav.changelog": "История версий",
+      "nav.docs": "Доки",
+      "nav.changelog": "Версии",
       "nav.security": "Безопасность",
-      "nav.signin": "Войти по ключу",
-      "nav.trial": "Бесплатный пробный период",
+      "nav.signin": "Войти",
+      "nav.trial": "Пробный период",
 
       "footer.tag": "Локальный ИИ-агент. Запросы, код и файлы по умолчанию не покидают вашу машину.",
       "footer.product": "Продукт",
@@ -65,16 +61,12 @@
       "footer.resources.security": "Безопасность",
       "footer.company": "Компания",
       "footer.company.contact": "Связаться",
-      "footer.company.privacy": "Privacy policy (EN)",
-      "footer.company.privacy_ru": "Конфиденциальность",
-      "footer.company.terms": "Terms (EN)",
-      "footer.company.terms_ru": "Условия",
-      "footer.company.offer_ru": "Публичная оферта (KZ)",
-      "footer.company.dpa": "DPA-шаблон",
-      "footer.company.consent": "Согласия и UI-тексты",
-      "footer.company.signin": "Войти",
+      "footer.legal": "Юридическое",
+      "footer.legal.privacy": "Конфиденциальность",
+      "footer.legal.terms": "Условия",
+      "footer.legal.dpa": "DPA",
       "footer.copy": "© 2026 dialekt.ai",
-      "footer.principle": "Локально · без телеметрии · аккаунт не требуется для локального использования",
+      "footer.principle": "Локально · без телеметрии · без аккаунта",
     },
   };
 
@@ -123,6 +115,11 @@
         const [attr, key] = pair.split(':').map(s => s.trim());
         if (attr && key && dict[key] != null) el.setAttribute(attr, dict[key]);
       });
+    });
+    // Lang-aware href swap: <a data-href-en="/privacy.html" data-href-ru="/privacy-ru.html">
+    document.querySelectorAll('[data-href-en],[data-href-ru]').forEach(el => {
+      const target = el.getAttribute('data-href-' + lang) || el.getAttribute('data-href-en');
+      if (target) el.setAttribute('href', target);
     });
   }
 

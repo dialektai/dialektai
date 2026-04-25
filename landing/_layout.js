@@ -41,46 +41,29 @@
           <p style="font-size:14px;line-height:1.6;margin-top:14px;max-width:380px;color:var(--ink-2)" data-i18n="footer.tag">
             Local-first AI agent. Your prompts, code, and files never leave your machine by default.
           </p>
-          <p style="font-size:12px;color:var(--ink-3);margin-top:18px;letter-spacing:0.04em;line-height:1.7" data-i18n="footer.principle">
-            Local-first · No telemetry · No account required for local use
-          </p>
         </div>
         <div>
           <h4 data-i18n="footer.product">Product</h4>
           <div class="footer-links">
-            <a href="/" data-i18n="footer.product.overview">Overview</a>
             <a href="/pricing.html" data-i18n="footer.product.pricing">Pricing</a>
-            <a href="/signup.html" data-i18n="footer.product.trial">Free trial</a>
+            <a href="/docs.html" data-i18n="footer.resources.docs">Docs</a>
+            <a href="/security.html" data-i18n="footer.resources.security">Security</a>
             <a href="/changelog.html" data-i18n="footer.product.changelog">Changelog</a>
           </div>
         </div>
         <div>
-          <h4 data-i18n="footer.resources">Resources</h4>
+          <h4 data-i18n="footer.legal">Legal</h4>
           <div class="footer-links">
-            <a href="/docs.html" data-i18n="footer.resources.docs">Docs</a>
-            <a href="/#install" data-i18n="footer.resources.install">Install</a>
-            <a href="/#capabilities" data-i18n="footer.resources.tools">Tools</a>
-            <a href="/security.html" data-i18n="footer.resources.security">Security</a>
-          </div>
-        </div>
-        <div>
-          <h4 data-i18n="footer.company">Company</h4>
-          <div class="footer-links">
+            <a data-href-en="/privacy.html" data-href-ru="/privacy-ru.html" data-i18n="footer.legal.privacy">Privacy</a>
+            <a data-href-en="/terms.html" data-href-ru="/terms-ru.html" data-i18n="footer.legal.terms">Terms</a>
+            <a href="/dpa.html" data-i18n="footer.legal.dpa">DPA</a>
             <a href="mailto:hello@dialekt.ai" data-i18n="footer.company.contact">Contact</a>
-            <a href="/privacy.html" data-i18n="footer.company.privacy">Privacy policy</a>
-            <a href="/privacy-ru.html" lang="ru" data-i18n="footer.company.privacy_ru">Конфиденциальность</a>
-            <a href="/terms.html" data-i18n="footer.company.terms">Terms</a>
-            <a href="/terms-ru.html" lang="ru" data-i18n="footer.company.terms_ru">Условия</a>
-            <a href="/public-offer.html" lang="ru" data-i18n="footer.company.offer_ru">Публичная оферта (KZ)</a>
-            <a href="/dpa.html" data-i18n="footer.company.dpa">DPA template</a>
-            <a href="/cross-border-consent.html" data-i18n="footer.company.consent">Consent &amp; UI texts</a>
-            <a href="/login.html" data-i18n="footer.company.signin">Sign in</a>
           </div>
         </div>
       </div>
       <div class="footer-bottom">
         <span data-i18n="footer.copy">© 2026 dialekt.ai</span>
-        <span data-i18n="footer.principle">Local-first · No telemetry · No account required for local use</span>
+        <span data-i18n="footer.principle">Local-first · No telemetry · No account required</span>
       </div>
     </footer>
   `;
