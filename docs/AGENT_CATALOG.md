@@ -339,7 +339,7 @@ Then bind via Settings → Agents.
 
 ## Category 5.5: MCP-enabled Agents
 
-**Status:** ⚠️ v0.20.0 RC — schema, runtime, UI, and consent flow all wired and unit-tested. Real-server end-to-end validation against `@modelcontextprotocol/server-github` and a Slack MCP is the last gate before v0.20.0 ships. Pilots: do not promise these as production-ready until the validation pass lands and this section flips to ✅.
+**Status:** ✅ GitHub blueprint validated · ⚠️ Slack blueprint deferred · ⚠️ Multi-tool composition partially validated. v0.20.0 ships with the GitHub Operations Agent (5.5.1) ready for pilot use. See `docs/MCP_PRODUCTION_VALIDATION.md` for the live-credentials run report (10/10 stages green, including consent prompt firing on `create_issue`, audit chain linkage, and full keyring lifecycle).
 
 **What's in:**
 - `Settings → MCP Servers`: full CRUD UI (add stdio or HTTP transport, env→secret mapping, bearer-token entry with masked storage in OS keychain, `[Test]` button that spawns the server briefly and reports tool count)
@@ -349,7 +349,9 @@ Then bind via Settings → Agents.
 - Soft-fail on bad config: missing secrets / invalid transport spec emit an `mcp_setup_error` toast in the chat — the session keeps going without MCP, the agent's `ctx.mcp` raises `MCPConfigError` on first use which surfaces as a normal tool error
 - LeftPanel agent rows show a plug icon when the manifest declares `mcp_servers`; hover/screen-reader tooltip lists the server names
 
-### 5.5.1 GitHub Operations Agent — blueprint
+### 5.5.1 GitHub Operations Agent — blueprint ✅
+
+**Status:** validated end-to-end against `@modelcontextprotocol/server-github` `2025.4.8` on 2026-04-25. See `docs/MCP_PRODUCTION_VALIDATION.md` — all 10 stages passed including real-API issue creation, consent prompt firing, full audit chain (`mcp_consent_requested` → `mcp_consent_decision` → `mcp_tool_call`), and OS-keychain lifecycle.
 
 **Recommended for:** engineering teams that want a chat surface for repo housekeeping (issue triage, PR review, branch cleanup) without granting GitHub access to a cloud LLM provider.
 
@@ -389,8 +391,9 @@ autonomy:
 - "Create an issue on dialektai/dialektai titled 'X' with body 'Y'" → `create_issue` (destructive → consent)
 - "Close issue #42" → `update_issue` (destructive → consent)
 
-**Known limitations** (pre-validation):
-- Tool names depend on the MCP server build; the wizard's preview is "N tools discovered" only (full list deferred — see [`M2_POST_RC_BACKLOG.md`](M2_POST_RC_BACKLOG.md) F2)
+**Known limitations** (post-validation):
+- The npm package `@modelcontextprotocol/server-github` is marked deprecated by upstream (see `MCP_PRODUCTION_VALIDATION.md` Findings). Still functional today; pilots should expect a switch to `github.com/github/github-mcp-server` (Go binary, official) in M2 Month 2 — change is a single command-array edit in the manifest.
+- Tool names depend on the MCP server build; the wizard's preview is "N tools discovered" only (full list deferred — see [`M2_POST_RC_BACKLOG.md`](M2_POST_RC_BACKLOG.md) F2). Validation harness saw 26 tools.
 - Per-tool allow/deny scoping not yet exposed in the UI (manifest schema 1.1.0 supports `mcp_servers[].allow_tools` / `deny_tools`; see [`M2_POST_RC_BACKLOG.md`](M2_POST_RC_BACKLOG.md) F1)
 - Rate limit headers from GitHub are not surfaced as a chat toast yet — agent sees them as a tool error and decides how to recover
 
@@ -447,16 +450,15 @@ capabilities:
 
 **Sample query:** "Read our README and compare it with the top 3 repos that match the same description on GitHub. Summarize the gaps." Agent issues fs MCP `read_file` (auto), then GitHub MCP `search_repositories` (auto), then `get_repository_content` for each (auto). No destructive calls — no consent prompts.
 
-### Pre-pilot validation pass — DEFERRED
+### Pre-pilot validation pass — STATUS
 
-Real-server end-to-end runs against:
-1. `@modelcontextprotocol/server-github` with a live GitHub PAT — verify all of: connection test, tool discovery, read tool call (no consent), write tool call (consent prompt fires, decision honored, audit row written), audit linkage between `consent_requested` row and the subsequent `tool_call` row.
-2. A maintained Slack MCP — same flow.
-3. Multi-tool composition agent — verify both servers come up in the same session, ContextVar carries through OI thread, no cross-server interference.
+| Validation                                | Status      | Date       | Evidence                                       |
+|-------------------------------------------|-------------|------------|------------------------------------------------|
+| GitHub MCP — full E2E                     | ✅ passed   | 2026-04-25 | `docs/MCP_PRODUCTION_VALIDATION.md` (10/10)    |
+| Slack MCP — full E2E                      | ⚠️ deferred | —          | No maintained server with reliable [Test] gate at validation time. Re-evaluated when one becomes available; 5.5.2 status flag unchanged. |
+| Multi-tool composition (filesystem + GitHub + PG) | ⚠️ partial | 2026-04-25 | GitHub + filesystem MCPs each pass independently; the composition is a manifest-level remix and adds no new code path. PG read-only side already validated in pre-MCP catalog. The Slack-bearing variant in 5.5.3 stays ⚠️ until 5.5.2 lands. |
 
-**Why deferred:** these require live external credentials. Run by a pilot or by Dias on a controlled host before flipping this section's status to ✅. Document outcomes in `docs/MCP_PRODUCTION_VALIDATION.md` (not yet created — added in the validation commit).
-
-The unit + integration test suite for everything **above** the external API boundary (manifest parsing, transport spec construction, secret resolution, runtime construction, soft-fail paths, cross-thread contextvars, /mcp-servers CRUD, /test endpoint shapes, consent modal protocol, agent serializer with `mcp_server_names`) passes 602 / 30 skipped / 0 regressions on this branch.
+The unit + integration test suite for everything **above** the external API boundary (manifest parsing, transport spec construction, secret resolution, runtime construction, soft-fail paths, cross-thread contextvars, /mcp-servers CRUD, /test endpoint shapes, consent modal protocol, agent serializer with `mcp_server_names`) passes 602 / 30 skipped / 0 regressions on this branch. Real-server validation is captured in the table above.
 
 ---
 
