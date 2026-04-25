@@ -4,30 +4,141 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Start free 30-day trial — dialekt.ai</title>
-  <meta name="description" content="Get a 30-day free trial license for dialekt.ai. No credit card. Local-first AI agent for developers.">
+  <meta name="description" content="Get a 30-day free trial license for dialekt.ai. No credit card. Local-first AI agent.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/_shared.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "signup.kicker": "02 · Start",
+        "signup.h1.a": "30 days free.",
+        "signup.h1.b": "No credit card.",
+        "signup.sub": "Get a real cloud-issued license you can extend later. Verify your email, paste the key into the desktop app, and you're running.",
+        "signup.email": "Work email",
+        "signup.email.ph": "you@company.com",
+        "signup.email.hint": "We send your license key here. Use a real address you can check now.",
+        "signup.name": "Full name",
+        "signup.name.ph": "Aigerim Bekova",
+        "signup.country": "Country",
+        "signup.country.hint": "Used for compliance routing (KZ ПДн / GDPR) and tax invoicing.",
+        "signup.use": "What will you use dialekt for?",
+        "signup.use.ph": "e.g.: my team writes Go services and we want a local agent that can read our codebase, run tests, and propose patches without sending code to OpenAI.",
+        "signup.use.hint": "Two sentences are fine. Helps us help you better at the demo call.",
+        "signup.tos.a": "I agree to the",
+        "signup.tos.terms": "Terms of Service",
+        "signup.tos.and": "and",
+        "signup.tos.privacy": "Privacy Policy",
+        "signup.tos.b": ". I understand that prompts to local Ollama stay on my machine; cloud-LLM providers (if I add any) are governed by their own terms.",
+        "signup.tos.hint": "Your acceptance is logged with timestamp, IP, and the exact policy versions shown above (KZ ПДн §6 / GDPR Art. 7 evidence).",
+        "signup.submit": "Create my 30-day trial →",
+        "signup.principle": "no credit card · no telemetry · no auto-renewal",
+        "signup.success.h": "Trial created",
+        "signup.success.p1": "We've sent a verification link to",
+        "signup.success.p2": ". Click it, then paste the license key below into the desktop app.",
+        "signup.success.key": "Your license key",
+        "signup.success.expires": "Expires",
+        "signup.success.download": "Download desktop app →",
+        "signup.success.resend": "Resend verification email",
+        "signup.perks.get.h": "What you get",
+        "signup.perks.get.1": "30 days, all features",
+        "signup.perks.get.2": "3 seats — invite your team",
+        "signup.perks.get.3": "All 18 cloud LLM providers",
+        "signup.perks.get.4": "Full local Ollama (33 models)",
+        "signup.perks.get.5": "MCP servers, agent manifests",
+        "signup.perks.get.6": "Audit log, regulated mode",
+        "signup.perks.after.h": "After 30 days",
+        "signup.perks.after.1": "Pay $25/seat/mo (Starter) or up",
+        "signup.perks.after.2": "Or extend free — write us",
+        "signup.perks.after.3": "No data deleted for 12 months",
+        "signup.perks.after.4": "Full export at any time",
+        "signup.foot.alt": "Already have a license key?",
+        "signup.foot.signin": "Sign in here →",
+      },
+      ru: {
+        "signup.kicker": "02 · Начало",
+        "signup.h1.a": "30 дней бесплатно.",
+        "signup.h1.b": "Без карты.",
+        "signup.sub": "Настоящая облачная лицензия, которую потом можно продлить. Подтвердите почту, вставьте ключ в десктопное приложение — и можно работать.",
+        "signup.email": "Рабочая почта",
+        "signup.email.ph": "you@company.com",
+        "signup.email.hint": "Сюда придёт лицензионный ключ. Укажите реальный адрес, к которому есть доступ прямо сейчас.",
+        "signup.name": "Имя и фамилия",
+        "signup.name.ph": "Айгерим Бекова",
+        "signup.country": "Страна",
+        "signup.country.hint": "Нужна для маршрутизации по комплаенсу (KZ ПДн / GDPR) и налогового счёта.",
+        "signup.use": "Для чего будете использовать dialekt?",
+        "signup.use.ph": "например: команда пишет Go-сервисы, нужен локальный агент, который читает код, гоняет тесты и предлагает патчи — без отправки кода в OpenAI.",
+        "signup.use.hint": "Двух предложений достаточно. Поможет лучше подготовиться к демо-звонку.",
+        "signup.tos.a": "Я согласен с",
+        "signup.tos.terms": "Условиями",
+        "signup.tos.and": "и",
+        "signup.tos.privacy": "Политикой конфиденциальности",
+        "signup.tos.b": ". Понимаю, что запросы к локальной Ollama остаются на моей машине; облачные LLM-провайдеры (если подключу) регулируются их собственными условиями.",
+        "signup.tos.hint": "Ваше согласие фиксируется с меткой времени, IP и точными версиями политик, показанными выше (KZ ПДн §6 / GDPR Ст. 7).",
+        "signup.submit": "Создать пробный период →",
+        "signup.principle": "без карты · без телеметрии · без авто-продления",
+        "signup.success.h": "Пробный период создан",
+        "signup.success.p1": "Ссылка для подтверждения отправлена на",
+        "signup.success.p2": ". Перейдите по ней и вставьте ключ ниже в десктопное приложение.",
+        "signup.success.key": "Ваш лицензионный ключ",
+        "signup.success.expires": "Действует до",
+        "signup.success.download": "Скачать приложение →",
+        "signup.success.resend": "Отправить письмо повторно",
+        "signup.perks.get.h": "Что входит",
+        "signup.perks.get.1": "30 дней, все функции",
+        "signup.perks.get.2": "3 места — пригласите команду",
+        "signup.perks.get.3": "18 облачных LLM-провайдеров",
+        "signup.perks.get.4": "Полный локальный Ollama (33 модели)",
+        "signup.perks.get.5": "MCP-серверы, манифесты агентов",
+        "signup.perks.get.6": "Аудит-лог, регулируемый режим",
+        "signup.perks.after.h": "После 30 дней",
+        "signup.perks.after.1": "$25/место/мес (Starter) или выше",
+        "signup.perks.after.2": "Или продлить бесплатно — напишите",
+        "signup.perks.after.3": "Данные не удаляются 12 месяцев",
+        "signup.perks.after.4": "Полный экспорт в любой момент",
+        "signup.foot.alt": "Уже есть лицензионный ключ?",
+        "signup.foot.signin": "Войти →",
+      }
+    };
+  </script>
   <style>
-    .signup-hero { padding: 60px 0 40px; }
-    .signup-hero h1 { font-size: clamp(28px, 5vw, 48px); line-height: 1.1; margin-bottom: 12px; }
-    .signup-hero p { font-size: 15px; color: var(--muted); line-height: 1.65; max-width: 580px; }
-    .signup-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }
-    @media (max-width: 760px) { .signup-grid { grid-template-columns: 1fr; } }
-    .perks { background: var(--bg1); border: 1px solid var(--border); padding: 24px; }
-    .perks h3 { font-size: 13px; font-family: var(--mono); color: var(--cyan); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 14px; }
-    .perks ul { list-style: none; padding: 0; margin: 0; }
-    .perks li { font-size: 12px; color: var(--text); line-height: 1.55; padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 8px; }
-    .perks li::before { content: "◆"; color: var(--cyan); font-size: 9px; margin-top: 4px; flex-shrink: 0; }
-    .perks li:last-child { border-bottom: none; }
-    .success-card { padding: 32px; }
-    .key-display {
-      background: var(--bg0); border: 1px dashed var(--cyan);
-      padding: 18px; font-family: var(--mono); font-size: 13px;
-      word-break: break-all; color: var(--cyan); margin: 16px 0;
+    .signup-hero { padding: clamp(48px, 7vw, 80px) 0 32px; }
+    .signup-hero .kicker { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); font-weight: 500; margin-bottom: 14px; }
+    .signup-hero h1 { font-family: var(--serif); font-size: clamp(32px, 5vw, 52px); line-height: 1.05; letter-spacing: -0.022em; margin-bottom: 14px; font-weight: 400; }
+    .signup-hero h1 .accent { color: var(--ink-3); }
+    .signup-hero p { font-size: 17px; color: var(--ink-2); line-height: 1.6; max-width: 60ch; }
+    .signup-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; margin-bottom: 56px; }
+    @media (max-width: 800px) { .signup-grid { grid-template-columns: 1fr; } }
+    .perks {
+      background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 6px;
+      padding: 24px;
     }
+    .perks h3 {
+      font-family: var(--sans); font-size: 12px; color: var(--primary);
+      letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500;
+      margin: 0 0 14px;
+    }
+    .perks ul { list-style: none; padding: 0; margin: 0; }
+    .perks li {
+      font-size: 13.5px; color: var(--ink); line-height: 1.55;
+      padding: 9px 0; border-bottom: 1px solid var(--rule);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .perks li::before {
+      content: ""; width: 6px; height: 6px;
+      border: 1px solid var(--primary); transform: rotate(45deg);
+      flex-shrink: 0; margin-top: 7px;
+    }
+    .perks li:last-child { border-bottom: none; }
+    .key-display {
+      background: var(--bg-tint); border: 1px dashed var(--primary);
+      border-radius: 4px; padding: 18px;
+      font-family: var(--sans); font-size: 14px;
+      word-break: break-all; color: var(--primary); margin: 16px 0;
+      font-weight: 500;
+    }
+    .signup-foot { text-align: center; padding-bottom: 60px; }
+    .signup-foot a { color: var(--primary); border-bottom: 1px solid var(--rule-strong); text-underline-offset: 3px; }
   </style>
 </head>
 <body>
@@ -35,111 +146,112 @@
 
   <div class="wrap">
     <div class="signup-hero">
-      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">02 · START</div>
-      <h1>30 days free.<br><span class="text-muted">No credit card.</span></h1>
-      <p>Get a real cloud-issued license you can extend later. Verify your email, paste the key into the desktop app, and you're running.</p>
+      <div class="kicker" data-i18n="signup.kicker">02 · Start</div>
+      <h1><span data-i18n="signup.h1.a">30 days free.</span><br><span class="accent" data-i18n="signup.h1.b">No credit card.</span></h1>
+      <p data-i18n="signup.sub">Get a real cloud-issued license you can extend later. Verify your email, paste the key into the desktop app, and you're running.</p>
     </div>
 
     <div class="signup-grid">
       <div class="card card-pad-lg" id="signup-card">
         <form id="signup-form" novalidate>
           <div class="field">
-            <label for="email">Work email <span class="req">*</span></label>
-            <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com">
-            <div class="field-hint">We send your license key here. Use a real address you can check now.</div>
+            <label for="email"><span data-i18n="signup.email">Work email</span> <span class="req">*</span></label>
+            <input type="email" id="email" name="email" required autocomplete="email" data-i18n-attr="placeholder:signup.email.ph" placeholder="you@company.com">
+            <div class="field-hint" data-i18n="signup.email.hint">We send your license key here. Use a real address you can check now.</div>
           </div>
 
           <div class="field">
-            <label for="full_name">Full name <span class="req">*</span></label>
-            <input type="text" id="full_name" name="full_name" required autocomplete="name" placeholder="Aigerim Bekova" minlength="2">
+            <label for="full_name"><span data-i18n="signup.name">Full name</span> <span class="req">*</span></label>
+            <input type="text" id="full_name" name="full_name" required autocomplete="name" data-i18n-attr="placeholder:signup.name.ph" placeholder="Aigerim Bekova" minlength="2">
           </div>
 
           <div class="field">
-            <label for="country">Country <span class="req">*</span></label>
+            <label for="country"><span data-i18n="signup.country">Country</span> <span class="req">*</span></label>
             <select id="country" name="country" required></select>
-            <div class="field-hint">Used for compliance routing (KZ ПДн / GDPR) and tax invoicing.</div>
+            <div class="field-hint" data-i18n="signup.country.hint">Used for compliance routing (KZ ПДн / GDPR) and tax invoicing.</div>
           </div>
 
           <div class="field">
-            <label for="intended_use">What will you use dialekt for? <span class="req">*</span></label>
+            <label for="intended_use"><span data-i18n="signup.use">What will you use dialekt for?</span> <span class="req">*</span></label>
             <textarea id="intended_use" name="intended_use" required minlength="10" maxlength="500"
+              data-i18n-attr="placeholder:signup.use.ph"
               placeholder="e.g.: my team writes Go services and we want a local agent that can read our codebase, run tests, and propose patches without sending code to OpenAI."></textarea>
-            <div class="field-hint">Two sentences are fine. Helps us help you better at the demo call.</div>
+            <div class="field-hint" data-i18n="signup.use.hint">Two sentences are fine. Helps us help you better at the demo call.</div>
           </div>
 
           <div class="field">
             <label class="checkbox">
               <input type="checkbox" id="accept_tos" name="accept_tos" required>
               <span>
-                I agree to the
-                <a href="/terms.html" target="_blank">Terms of Service</a>
-                <span class="mono" id="tos-version-label" style="font-size:10px;color:var(--dim);margin:0 4px">v…</span>
-                and
-                <a href="/privacy.html" target="_blank">Privacy Policy</a>
-                <span class="mono" id="privacy-version-label" style="font-size:10px;color:var(--dim);margin:0 4px">v…</span>.
-                I understand that prompts to local Ollama stay on my machine; cloud-LLM providers (if I add any) are governed by their own terms.
+                <span data-i18n="signup.tos.a">I agree to the</span>
+                <a data-href-en="/terms.html" data-href-ru="/terms-ru.html" href="/terms.html" target="_blank" data-i18n="signup.tos.terms">Terms of Service</a>
+                <span class="mono" id="tos-version-label" style="font-size:10px;color:var(--ink-3);margin:0 4px;letter-spacing:0.04em">v…</span>
+                <span data-i18n="signup.tos.and">and</span>
+                <a data-href-en="/privacy.html" data-href-ru="/privacy-ru.html" href="/privacy.html" target="_blank" data-i18n="signup.tos.privacy">Privacy Policy</a>
+                <span class="mono" id="privacy-version-label" style="font-size:10px;color:var(--ink-3);margin:0 4px;letter-spacing:0.04em">v…</span><span data-i18n="signup.tos.b">. I understand that prompts to local Ollama stay on my machine; cloud-LLM providers (if I add any) are governed by their own terms.</span>
               </span>
             </label>
-            <div class="field-hint" style="margin-top:8px">
+            <div class="field-hint" style="margin-top:8px" data-i18n="signup.tos.hint">
               Your acceptance is logged with timestamp, IP, and the exact policy versions shown above (KZ ПДн §6 / GDPR Art. 7 evidence).
             </div>
           </div>
 
           <div id="alert-slot"></div>
 
-          <button type="submit" class="btn primary lg full" id="submit-btn">
-            CREATE MY 30-DAY TRIAL →
+          <button type="submit" class="btn primary lg full" id="submit-btn" data-i18n="signup.submit">
+            Create my 30-day trial →
           </button>
 
-          <p class="mono" style="font-size:10px;color:var(--dim);margin-top:18px;text-align:center;letter-spacing:.1em">
+          <p style="font-size:12px;color:var(--ink-3);margin-top:18px;text-align:center;letter-spacing:0.04em" data-i18n="signup.principle">
             no credit card · no telemetry · no auto-renewal
           </p>
         </form>
 
         <!-- Success state -->
         <div id="success-state" style="display:none">
-          <div style="font-size:32px;color:var(--green);margin-bottom:12px">✓</div>
-          <h2 style="font-size:24px;margin-bottom:12px">Trial created</h2>
-          <p class="text-muted" style="margin-bottom:18px">
-            We've sent a verification link to <strong id="success-email" style="color:var(--text)"></strong>.
-            Click it, then paste the license key below into the desktop app.
+          <div style="font-size:36px;color:var(--ok);margin-bottom:12px">✓</div>
+          <h2 style="font-family:var(--serif);font-size:28px;font-weight:400;letter-spacing:-0.012em;margin-bottom:14px" data-i18n="signup.success.h">Trial created</h2>
+          <p style="color:var(--ink-2);margin-bottom:18px;font-size:15px;line-height:1.6">
+            <span data-i18n="signup.success.p1">We've sent a verification link to</span>
+            <strong id="success-email" style="color:var(--ink)"></strong><span data-i18n="signup.success.p2">. Click it, then paste the license key below into the desktop app.</span>
           </p>
-          <div class="upper" style="color:var(--dim);margin-top:24px;margin-bottom:6px">YOUR LICENSE KEY</div>
+          <div class="meta" style="margin-top:24px;margin-bottom:6px;display:block" data-i18n="signup.success.key">Your license key</div>
           <div class="key-display" id="success-key">…</div>
-          <div class="upper" style="color:var(--dim);margin-bottom:6px">EXPIRES</div>
-          <div class="mono text-cyan" id="success-expires" style="font-size:14px;margin-bottom:24px">…</div>
-          <a href="/#install" class="btn primary lg full">DOWNLOAD DESKTOP APP →</a>
-          <button type="button" class="btn full mt-16" id="resend-btn">Resend verification email</button>
+          <div class="meta" style="margin-bottom:6px;display:block" data-i18n="signup.success.expires">Expires</div>
+          <div style="font-size:15px;color:var(--primary);font-weight:500;margin-bottom:24px" id="success-expires">…</div>
+          <a href="/#install" class="btn primary lg full" data-i18n="signup.success.download">Download desktop app →</a>
+          <button type="button" class="btn full mt-16" id="resend-btn" data-i18n="signup.success.resend">Resend verification email</button>
         </div>
       </div>
 
       <div>
         <div class="perks">
-          <h3>What you get</h3>
+          <h3 data-i18n="signup.perks.get.h">What you get</h3>
           <ul>
-            <li>30 days, all features</li>
-            <li>3 seats — invite your team</li>
-            <li>All 18 cloud LLM providers</li>
-            <li>Full local Ollama (33 models)</li>
-            <li>MCP servers, agent manifests</li>
-            <li>Audit log, regulated mode</li>
+            <li data-i18n="signup.perks.get.1">30 days, all features</li>
+            <li data-i18n="signup.perks.get.2">3 seats — invite your team</li>
+            <li data-i18n="signup.perks.get.3">All 18 cloud LLM providers</li>
+            <li data-i18n="signup.perks.get.4">Full local Ollama (33 models)</li>
+            <li data-i18n="signup.perks.get.5">MCP servers, agent manifests</li>
+            <li data-i18n="signup.perks.get.6">Audit log, regulated mode</li>
           </ul>
         </div>
         <div class="perks mt-16">
-          <h3>After 30 days</h3>
+          <h3 data-i18n="signup.perks.after.h">After 30 days</h3>
           <ul>
-            <li>Pay $25/seat/mo (Starter) or up</li>
-            <li>Or extend free — write us</li>
-            <li>No data deleted for 12 months</li>
-            <li>Full export at any time</li>
+            <li data-i18n="signup.perks.after.1">Pay $25/seat/mo (Starter) or up</li>
+            <li data-i18n="signup.perks.after.2">Or extend free — write us</li>
+            <li data-i18n="signup.perks.after.3">No data deleted for 12 months</li>
+            <li data-i18n="signup.perks.after.4">Full export at any time</li>
           </ul>
         </div>
       </div>
     </div>
 
-    <div class="text-center mt-32" style="margin-bottom:60px">
-      <p class="text-muted" style="font-size:13px">
-        Already have a license key? <a href="/login.html" style="color:var(--cyan)">Sign in here →</a>
+    <div class="signup-foot">
+      <p style="font-size:14px;color:var(--ink-2)">
+        <span data-i18n="signup.foot.alt">Already have a license key?</span>
+        <a href="/login.html" data-i18n="signup.foot.signin">Sign in here →</a>
       </p>
     </div>
   </div>
@@ -150,22 +262,14 @@
   <script src="/_layout.js" defer></script>
   <script src="/_countries.js"></script>
   <script>
-    // Cloud API base — same pattern as desktop app's getCloudApi(),
-    // overridable via window.DIALEKT_CLOUD_API for staging.
     const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
 
     document.addEventListener('DOMContentLoaded', async () => {
-      // Populate countries
       window.populateCountries(document.getElementById('country'));
 
-      // utm capture
       const url = new URL(location.href);
       const utm = url.searchParams.get('utm_source') || url.searchParams.get('source') || document.referrer || '';
 
-      // Pull authoritative ToS / Privacy version strings from the cloud
-      // and display them under the consent checkbox. The same versions
-      // get submitted with the signup payload so the audit log records
-      // exactly what the user saw on screen (lawyer requirement).
       let tosVersion = 'unknown', privacyVersion = 'unknown';
       try {
         const r = await fetch(`${CLOUD_API}/auth/legal/versions`);
@@ -181,12 +285,16 @@
       const form = document.getElementById('signup-form');
       const submitBtn = document.getElementById('submit-btn');
       const alertSlot = document.getElementById('alert-slot');
+      const submitDefault = () => (window.dlkI18n?.getLang() === 'ru')
+        ? 'Создать пробный период →'
+        : 'Create my 30-day trial →';
+      const submitWorking = () => (window.dlkI18n?.getLang() === 'ru') ? 'Создаём…' : 'Creating…';
 
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         alertSlot.innerHTML = '';
         submitBtn.disabled = true;
-        submitBtn.textContent = 'CREATING…';
+        submitBtn.textContent = submitWorking();
 
         const data = {
           email: form.email.value.trim().toLowerCase(),
@@ -195,7 +303,6 @@
           intended_use: form.intended_use.value.trim(),
           accept_tos: form.accept_tos.checked,
           signup_source: utm.slice(0, 80) || null,
-          // Versions the user actually saw on the page (audit evidence).
           tos_version: tosVersion,
           privacy_version: privacyVersion,
         };
@@ -210,33 +317,38 @@
           if (!r.ok) {
             alertSlot.innerHTML = `<div class="alert err">${body.detail || ('Error ' + r.status)}</div>`;
             submitBtn.disabled = false;
-            submitBtn.textContent = 'CREATE MY 30-DAY TRIAL →';
+            submitBtn.textContent = submitDefault();
             return;
           }
 
-          // Success — swap to success state
           document.getElementById('success-email').textContent = data.email;
           document.getElementById('success-key').textContent = body.license_key;
           if (body.expires_at) {
             const d = new Date(body.expires_at);
-            document.getElementById('success-expires').textContent = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+            const lang = window.dlkI18n?.getLang() || 'en';
+            document.getElementById('success-expires').textContent = d.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' });
           }
           form.style.display = 'none';
           document.getElementById('success-state').style.display = 'block';
 
-          // Resend handler
           document.getElementById('resend-btn').addEventListener('click', async () => {
             await fetch(`${CLOUD_API}/auth/resend-verify`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: data.email }),
             }).catch(() => {});
-            alertSlot.innerHTML = `<div class="alert ok">Verification email resent to ${data.email}</div>`;
+            const msg = (window.dlkI18n?.getLang() === 'ru')
+              ? `Письмо повторно отправлено на ${data.email}`
+              : `Verification email resent to ${data.email}`;
+            alertSlot.innerHTML = `<div class="alert ok">${msg}</div>`;
           });
         } catch (err) {
-          alertSlot.innerHTML = `<div class="alert err">Network error: ${err.message}. Please try again.</div>`;
+          const msg = (window.dlkI18n?.getLang() === 'ru')
+            ? `Сетевая ошибка: ${err.message}. Попробуйте ещё раз.`
+            : `Network error: ${err.message}. Please try again.`;
+          alertSlot.innerHTML = `<div class="alert err">${msg}</div>`;
           submitBtn.disabled = false;
-          submitBtn.textContent = 'CREATE MY 30-DAY TRIAL →';
+          submitBtn.textContent = submitDefault();
         }
       });
     });
