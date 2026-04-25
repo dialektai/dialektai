@@ -39,11 +39,26 @@ _SERVICE = "dialekt"
 
 # Names that must NEVER land in plaintext ~/.dialekt/config.json.
 # migrate_from_config() consumes this list on upgrade.
-SENSITIVE_KEYS: tuple[str, ...] = (
+#
+# Per-provider credential keys (provider_<id>_<field>) are appended at
+# import time from the LLM catalog so the migration loop scrubs them
+# alongside the static keys. Importing the catalog here is safe because
+# catalog.py has no runtime dependencies on dialekt.* — it's pure data.
+_STATIC_KEYS: tuple[str, ...] = (
     "license_key",
     "cloud_bearer_token",
     "cloud_api_key",         # legacy, superseded by bearer_token
 )
+
+try:
+    from dialekt.llm.catalog import all_provider_secret_keys
+    _PROVIDER_KEYS: tuple[str, ...] = all_provider_secret_keys()
+except Exception:
+    # Catalog import failure must not brick the keychain layer — fall back
+    # to static keys only. A broken catalog is a UI bug, not a security bug.
+    _PROVIDER_KEYS = ()
+
+SENSITIVE_KEYS: tuple[str, ...] = _STATIC_KEYS + _PROVIDER_KEYS
 
 _CONFIG_DIR = Path.home() / ".dialekt"
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
