@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — dialekt.ai</title>
+  <meta name="description" content="Have a license key? Paste it here to sign in to dialekt.ai.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .login-wrap { min-height: calc(100vh - 200px); display: flex; align-items: center; justify-content: center; padding: 60px 24px; }
+    .login-card { width: 100%; max-width: 460px; }
+    .login-card h1 { font-size: 28px; margin-bottom: 8px; }
+    .login-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+    .key-info {
+      background: var(--bg1); border: 1px solid var(--border); padding: 20px;
+      margin-top: 28px;
+    }
+    .tenant-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
+    .tenant-row .k { color: var(--dim); font-family: var(--mono); letter-spacing: 0.06em; }
+    .tenant-row .v { color: var(--text); font-family: var(--mono); }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="card card-pad-lg">
+        <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:14px">SIGN IN · LICENSE KEY</div>
+        <h1>Have a license key?</h1>
+        <p class="sub">Paste it below to verify your tenant. Or use it directly in the desktop app — that works too.</p>
+
+        <form id="login-form" novalidate>
+          <div class="field">
+            <label for="license_key">License key</label>
+            <input type="text" id="license_key" name="license_key" required
+              placeholder="dialekt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              autocomplete="off"
+              style="font-size:12px">
+            <div class="field-hint">From the email we sent when you signed up.</div>
+          </div>
+
+          <div id="alert-slot"></div>
+
+          <button type="submit" class="btn primary lg full" id="submit-btn">
+            VERIFY LICENSE →
+          </button>
+        </form>
+
+        <!-- Result -->
+        <div id="result" style="display:none">
+          <div class="key-info">
+            <div class="upper" style="color:var(--cyan);margin-bottom:10px">ACTIVE LICENSE</div>
+            <div class="tenant-row"><span class="k">Plan</span><span class="v" id="r-plan">—</span></div>
+            <div class="tenant-row"><span class="k">Seats</span><span class="v" id="r-seats">—</span></div>
+            <div class="tenant-row"><span class="k">Expires</span><span class="v" id="r-expires">—</span></div>
+            <div class="tenant-row"><span class="k">Role</span><span class="v" id="r-role">—</span></div>
+          </div>
+          <a href="/#install" class="btn primary lg full mt-16">DOWNLOAD DESKTOP APP →</a>
+        </div>
+
+        <div class="mt-32" style="padding-top:24px;border-top:1px solid var(--border)">
+          <p class="text-muted" style="font-size:13px;margin-bottom:8px">Lost your key?</p>
+          <p style="font-size:12px;color:var(--dim);line-height:1.6">
+            Email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a> from the address you signed up with — we'll resend it.
+          </p>
+        </div>
+
+        <div class="text-center mt-24">
+          <p class="text-muted" style="font-size:13px">
+            No license yet? <a href="/signup.html" style="color:var(--cyan)">Start a free trial →</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+  <script>
+    const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('login-form');
+      const submitBtn = document.getElementById('submit-btn');
+      const alertSlot = document.getElementById('alert-slot');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        alertSlot.innerHTML = '';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'VERIFYING…';
+
+        const key = form.license_key.value.trim();
+        try {
+          const r = await fetch(`${CLOUD_API}/auth/validate-license`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: key, machine_id: 'web-' + (navigator.userAgent.slice(0,40)) }),
+          });
+          const body = await r.json();
+          if (!r.ok || !body.valid) {
+            alertSlot.innerHTML = `<div class="alert err">License key not found or expired. If you just signed up, check your email and click the verification link first.</div>`;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'VERIFY LICENSE →';
+            return;
+          }
+
+          // Show details
+          form.style.display = 'none';
+          document.getElementById('result').style.display = 'block';
+          document.getElementById('r-plan').textContent = body.plan || '—';
+          document.getElementById('r-seats').textContent = body.seats_limit || '—';
+          document.getElementById('r-expires').textContent = body.expires_at
+            ? new Date(body.expires_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+            : '—';
+          document.getElementById('r-role').textContent = body.user_role || '—';
+        } catch (err) {
+          alertSlot.innerHTML = `<div class="alert err">Network error: ${err.message}. Try again.</div>`;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'VERIFY LICENSE →';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

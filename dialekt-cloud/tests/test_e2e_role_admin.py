@@ -27,18 +27,14 @@ import pytest_asyncio
 
 
 @pytest.mark.asyncio
-async def test_01_admin_login_rejects_bad_key_and_issues_session_for_good(client):
-    import os
-
-    bad = await client.post("/admin/login", json={"admin_key": "not-the-real-key"})
-    assert bad.status_code == 403
-
-    good = await client.post(
-        "/admin/login", json={"admin_key": os.environ["DIALEKT_ADMIN_KEY"]}
-    )
-    assert good.status_code == 200
-    body = good.json()
-    assert "session_token" in body and body["session_token"]
+async def test_01_admin_login_rejects_legacy_admin_key_payload(client):
+    """The old POST /admin/login {admin_key: ...} flow is dead. New flow is
+    email + password + TOTP via /admin/login → /admin/login/totp.
+    Authenticated API calls now use either the X-Admin-Key break-glass header
+    (preferred for tests + CLI) or the dialekt_admin_session cookie set by
+    the new login flow. See tests/test_admin_2fa.py for the cookie path."""
+    legacy = await client.post("/admin/login", json={"admin_key": "anything"})
+    assert legacy.status_code == 422  # pydantic validation against new schema
 
 
 # ── 2 · Create tenant ───────────────────────────────────────────────────────

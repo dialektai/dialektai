@@ -34,7 +34,12 @@ SETTINGS_FILE = DIALEKT_DIR / "config.json"
 OLD_SETTINGS_FILE = _HOME / ".config" / "dialekt" / "settings.json"  # migration source
 
 DEFAULT_SETTINGS: dict = {
-    "model": "gemma3-12b",
+    "model": "gemma3:12b",
+    "model_provider": "ollama",
+    # When true, hide the cloud-providers tab entirely. Pilots in regulated
+    # markets (KZ ПДн post-18.01.2026) cannot legally route prompts to
+    # third-party clouds. Default false; flip via /settings POST.
+    "regulated_mode": False,
     # Default cloud endpoint. Pilots / dev can override this via Settings → Cloud
     # (POST /settings with cloud_api_url) or by editing ~/.dialekt/config.json.
     "cloud_api_url": "https://dialekt-cloud.dias.now",
@@ -2108,6 +2113,303 @@ async def ollama_check():
     }
 
 
+# ── Ollama automated install (Linux only) ─────────────────────────────────────
+#
+# We pin the install script to its public URL and verify a SHA-256 hash
+# before piping into sh — the mentor flagged unverified `curl | sh` from
+# the backend as a P1 footgun (captive portal MITM, supply-chain).
+#
+# The hash is the SHA-256 of the `install.sh` content as fetched from
+# ollama.com. The first official pin lands on whatever the script returns
+# the first time the user clicks "install automatically" — the user sees
+# the pin in the UI before approving. Subsequent installs require the same
+# pin or trigger a re-confirm.
+OLLAMA_INSTALL_URL = "https://ollama.com/install.sh"
+OLLAMA_INSTALL_PIN_FILE = DIALEKT_DIR / "ollama_install_sha256.pin"
+OLLAMA_INSTALL_TIMEOUT = 180  # seconds; clamp anything longer
+
+_ollama_install_proc: dict = {"proc": None, "platform": None}
+
+
+@app.get("/ollama/install/preview")
+async def ollama_install_preview():
+    """Fetch install.sh, return its content + sha256 so the UI can show what
+    will run before the user consents. Linux only; other platforms get a
+    `supported: false` response.
+    """
+    import hashlib, httpx, platform
+    if platform.system().lower() != "linux":
+        return {"supported": False, "platform": platform.system().lower()}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(OLLAMA_INSTALL_URL)
+            r.raise_for_status()
+        content = r.text
+        sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        pinned = None
+        if OLLAMA_INSTALL_PIN_FILE.exists():
+            try:
+                pinned = OLLAMA_INSTALL_PIN_FILE.read_text().strip()
+            except Exception:
+                pinned = None
+        return {
+            "supported": True,
+            "url": OLLAMA_INSTALL_URL,
+            "sha256": sha256,
+            "pinned_sha256": pinned,
+            "matches_pin": pinned == sha256 if pinned else None,
+            "size_bytes": len(content),
+            "preview": content[:2000],  # first ~2KB for UI display
+            "command": f"curl -fsSL {OLLAMA_INSTALL_URL} | sh",
+        }
+    except Exception as e:
+        return {"supported": True, "error": str(e)}
+
+
+@app.get("/ollama/install/stream")
+async def ollama_install_stream(sha256: str):
+    """SSE stream of the install.sh execution. Linux only.
+
+    Caller MUST pass the sha256 it just saw in /preview — we re-fetch the
+    script and refuse to run if the hash drifted between preview and
+    confirm (TOCTOU defence).
+    """
+    import asyncio, hashlib, httpx, os, platform, subprocess
+    if platform.system().lower() != "linux":
+        async def _err():
+            yield 'data: {"error": "automated install supported on Linux only", "phase": "abort"}\n\n'
+        return StreamingResponse(_err(), media_type="text/event-stream")
+
+    async def generate():
+        try:
+            yield 'data: {"phase": "downloading", "msg": "fetching install.sh"}\n\n'
+            async with httpx.AsyncClient(timeout=30) as c:
+                r = await c.get(OLLAMA_INSTALL_URL)
+                r.raise_for_status()
+            content = r.text
+            actual = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if actual != sha256:
+                yield (
+                    'data: {"phase": "abort", "error": "sha256 mismatch — script changed since preview", '
+                    f'"expected": "{sha256}", "actual": "{actual}"}}\n\n'
+                )
+                return
+            # Pin on first successful match
+            try:
+                OLLAMA_INSTALL_PIN_FILE.parent.mkdir(parents=True, exist_ok=True)
+                OLLAMA_INSTALL_PIN_FILE.write_text(actual)
+            except Exception:
+                pass
+
+            yield f'data: {{"phase": "verified", "sha256": "{actual}"}}\n\n'
+            yield 'data: {"phase": "running", "msg": "executing install script"}\n\n'
+
+            env = os.environ.copy()
+            env["DEBIAN_FRONTEND"] = "noninteractive"
+            proc = await asyncio.create_subprocess_exec(
+                "sh", "-c", content,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+            )
+            _ollama_install_proc["proc"] = proc
+
+            async def reader():
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    text = line.decode("utf-8", errors="replace").rstrip("\n")
+                    yield (text or "")
+
+            try:
+                started = asyncio.get_event_loop().time()
+                async for line in reader():
+                    if asyncio.get_event_loop().time() - started > OLLAMA_INSTALL_TIMEOUT:
+                        proc.kill()
+                        yield 'data: {"phase": "abort", "error": "install timeout"}\n\n'
+                        return
+                    if line:
+                        # Escape JSON specials for SSE payload
+                        safe = json.dumps({"phase": "log", "line": line})
+                        yield f"data: {safe}\n\n"
+                rc = await proc.wait()
+                if rc == 0:
+                    yield 'data: {"phase": "done", "msg": "install completed"}\n\n'
+                else:
+                    yield f'data: {{"phase": "abort", "error": "install exited with code {rc}"}}\n\n'
+            finally:
+                _ollama_install_proc["proc"] = None
+        except Exception as e:
+            safe = json.dumps({"phase": "abort", "error": str(e)})
+            yield f"data: {safe}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/ollama/install/cancel")
+async def ollama_install_cancel():
+    proc = _ollama_install_proc.get("proc")
+    if proc is None:
+        return {"ok": False, "error": "no install in progress"}
+    try:
+        proc.kill()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── LLM catalog & provider endpoints ──────────────────────────────────────────
+
+
+@app.get("/llm/catalog")
+async def llm_catalog():
+    """Full Ollama + cloud catalog. Filters out cloud providers when
+    `regulated_mode` is set (KZ ПДн compliance).
+    """
+    from dialekt.llm.catalog import catalog_dict
+    s = load_settings()
+    out = catalog_dict()
+    if s.get("regulated_mode"):
+        out["providers"] = []
+        out["regulated_mode"] = True
+    return out
+
+
+@app.get("/llm/providers")
+async def llm_providers():
+    """List of cloud providers with auth status (configured/missing).
+    Hidden under `regulated_mode`.
+    """
+    from dialekt.llm.resolver import providers_with_status
+    s = load_settings()
+    if s.get("regulated_mode"):
+        return {"providers": [], "regulated_mode": True}
+    return {"providers": providers_with_status(), "regulated_mode": False}
+
+
+@app.post("/llm/providers/{provider_id}/credentials")
+async def llm_save_provider_credentials(provider_id: str, body: dict):
+    """Persist provider credentials to keychain. Only fields declared in
+    the catalog are accepted; unknown keys are dropped.
+    """
+    from dialekt.llm.catalog import get_provider
+    from dialekt.secrets import set_secret
+
+    p = get_provider(provider_id)
+    if p is None:
+        from fastapi import HTTPException
+        raise HTTPException(404, f"unknown provider {provider_id}")
+    saved: list[str] = []
+    for field in p.auth_fields:
+        if field in body and body[field]:
+            try:
+                set_secret(f"provider_{provider_id}_{field}", str(body[field]))
+                saved.append(field)
+            except Exception as e:
+                log.warning(f"provider {provider_id}: cannot save {field}: {e}")
+    return {"ok": True, "saved_fields": saved}
+
+
+@app.delete("/llm/providers/{provider_id}/credentials")
+async def llm_delete_provider_credentials(provider_id: str):
+    from dialekt.llm.catalog import get_provider
+    from dialekt.secrets import delete_secret
+
+    p = get_provider(provider_id)
+    if p is None:
+        from fastapi import HTTPException
+        raise HTTPException(404, f"unknown provider {provider_id}")
+    for field in p.auth_fields:
+        try:
+            delete_secret(f"provider_{provider_id}_{field}")
+        except Exception:
+            pass
+    return {"ok": True}
+
+
+@app.post("/llm/providers/{provider_id}/test")
+async def llm_test_provider(provider_id: str, body: dict | None = None):
+    """Send a 1-token completion to verify credentials. Returns latency
+    and any litellm error verbatim — useful for the credentials modal's
+    "Test connection" button.
+    """
+    from dialekt.llm.catalog import get_provider
+    from dialekt.llm.resolver import resolve_litellm_model
+    import time
+
+    p = get_provider(provider_id)
+    if p is None:
+        from fastapi import HTTPException
+        raise HTTPException(404, f"unknown provider {provider_id}")
+
+    body = body or {}
+    test_model = body.get("model") or (p.models[0].id if p.models else None)
+    if not test_model:
+        return {"ok": False, "error": "no model to test against"}
+
+    resolved = resolve_litellm_model({
+        "model_provider": provider_id,
+        "model": test_model,
+    })
+    try:
+        import litellm  # type: ignore
+    except Exception as e:
+        return {"ok": False, "error": f"litellm not importable: {e}"}
+
+    kwargs = {
+        "model": resolved["model"],
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1,
+        "temperature": 0,
+    }
+    if resolved["api_base"]:
+        kwargs["api_base"] = resolved["api_base"]
+    if resolved["api_key"]:
+        kwargs["api_key"] = resolved["api_key"]
+    kwargs.update(resolved["extra"])
+
+    started = time.time()
+    try:
+        # Run blocking litellm call in a thread to avoid blocking the loop.
+        import asyncio
+        def _call():
+            return litellm.completion(**kwargs)
+        await asyncio.wait_for(asyncio.to_thread(_call), timeout=20)
+        return {
+            "ok": True,
+            "latency_ms": int((time.time() - started) * 1000),
+            "model": resolved["model"],
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e)[:500],
+            "latency_ms": int((time.time() - started) * 1000),
+        }
+
+
+@app.get("/llm/current")
+async def llm_current():
+    """Current resolved model — what would be applied to a fresh interpreter
+    right now. Used by Settings/Onboarding to display the live state.
+    """
+    from dialekt.llm.resolver import resolve_litellm_model, has_credentials
+    s = load_settings()
+    resolved = resolve_litellm_model(s)
+    return {
+        "provider": resolved["provider"],
+        "model": s.get("model"),
+        "litellm_model": resolved["model"],
+        "is_local": resolved["is_local"],
+        "configured": True if resolved["is_local"] else has_credentials(resolved["provider"]),
+    }
+
+
 @app.get("/sessions")
 async def list_sessions():
     cursor = await db.execute(
@@ -2226,13 +2528,25 @@ async def get_settings_endpoint():
 
 @app.post("/settings")
 async def post_settings(body: dict):
+    from dialekt.llm.resolver import resolve_litellm_model, apply_to_interpreter
+
     s = load_settings()
     s.update(body)
     save_settings(s)
+    # Re-resolve once for the merged settings; apply to every live
+    # interpreter. Routing through resolve_litellm_model() is the bug-fix
+    # for the prior hardcoded "ollama_chat/{model}" — cloud selections
+    # used to revert silently after every save.
+    model_changed = (
+        "model" in body or "model_provider" in body
+        or any(k.startswith("provider_") for k in body)
+    )
+    resolved = resolve_litellm_model(s) if model_changed else None
+
     for itp in list(_active_interpreters.values()):
         try:
-            if "model" in body:
-                itp.llm.model = f"ollama_chat/{body['model']}"
+            if resolved is not None:
+                apply_to_interpreter(itp, resolved)
             if "temperature" in body:
                 itp.llm.temperature = float(body["temperature"])
             if "context_window" in body:
@@ -2696,10 +3010,13 @@ def make_interpreter(
     from dialekt.llm.prompt_wrapper import (
         build_system_prompt, substitute_template_vars, should_wrap,
     )
+    from dialekt.llm.resolver import resolve_litellm_model, apply_to_interpreter
+
     s = load_settings()
     interpreter.reset()
 
-    default_model = s.get("model", "gemma3-12b")
+    provider_id = s.get("model_provider") or "ollama"
+    default_model = s.get("model", "gemma3:12b")
     manifest_dict: dict | None = None
     if agent and agent.get("manifest_yaml"):
         try:
@@ -2708,16 +3025,27 @@ def make_interpreter(
         except Exception as e:
             log.warning(f"pick_model: manifest parse failed for {agent.get('name')!r}: {e}")
 
-    if manifest_dict and (manifest_dict.get("model") or {}):
+    # Cloud-mode short-circuit: agent manifests use Ollama-style preferred/
+    # acceptable tags; family_of() semantics break when default_model is a
+    # cloud model id like "claude-opus-4-7". Honour the user's session
+    # default and skip manifest-driven selection. Per-provider model maps
+    # in manifests are a future enhancement (see mentor review P0).
+    if provider_id == "ollama" and manifest_dict and (manifest_dict.get("model") or {}):
         installed = get_installed_ollama_models()
         model = pick_model_for_agent(manifest_dict, installed, default_model)
-        log.info(f"Agent {agent.get('name')!r}: using model {model}")
+        log.info(f"Agent {agent.get('name')!r}: using model {model} (manifest)")
     else:
         model = default_model
-        log.info(f"No agent manifest, using session default model {model}")
+        agent_label = repr(agent.get("name")) if agent else "session"
+        if provider_id != "ollama":
+            log.info(f"Agent {agent_label}: cloud provider {provider_id}, using session default {model}")
+        else:
+            log.info(f"No agent manifest, using session default model {model}")
 
-    interpreter.llm.model = f"ollama_chat/{model}"
-    interpreter.llm.api_base = "http://localhost:11434"
+    # Patch the resolved settings so resolver sees the agent-picked model
+    # rather than the bare session default.
+    resolved = resolve_litellm_model({**s, "model": model})
+    apply_to_interpreter(interpreter, resolved)
     interpreter.llm.context_window = int(s.get("context_window", 8192))
     interpreter.llm.max_tokens = int(s.get("max_tokens", 4096))
     interpreter.llm.temperature = float(s.get("temperature", 0.7))
@@ -2828,9 +3156,14 @@ async def ws_chat(ws: WebSocket):
                 continue
 
             if msg.get("type") == "model":
-                model = msg.get("model", "gemma3-12b")
-                itp.llm.model = f"ollama_chat/{model}"
-                await send({"type": "model_ok", "model": model})
+                # Live-swap the model on an active websocket. Honour the
+                # current provider so cloud sessions don't fall back to
+                # ollama_chat/.
+                from dialekt.llm.resolver import resolve_litellm_model, apply_to_interpreter
+                model = msg.get("model", "gemma3:12b")
+                provider_id = msg.get("provider") or load_settings().get("model_provider") or "ollama"
+                apply_to_interpreter(itp, resolve_litellm_model({"model": model, "model_provider": provider_id}))
+                await send({"type": "model_ok", "model": model, "provider": provider_id})
                 continue
 
             if msg.get("type") == "autonomy":

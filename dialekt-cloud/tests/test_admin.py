@@ -3,17 +3,19 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_admin_login_valid(client):
-    import os
-    r = await client.post("/admin/login", json={"admin_key": os.environ["DIALEKT_ADMIN_KEY"]})
-    assert r.status_code == 200
-    assert "session_token" in r.json()
+async def test_admin_login_unknown_email_401(client):
+    """Old shape (`{admin_key: ...}`) is gone — login now requires
+    email + password. Bad email returns 401."""
+    r = await client.post("/admin/login", json={"email": "ghost@nowhere.example", "password": "x"})
+    assert r.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_admin_login_invalid(client):
-    r = await client.post("/admin/login", json={"admin_key": "wrongkey"})
-    assert r.status_code == 403
+async def test_admin_login_legacy_shape_rejected(client):
+    """Submitting the old admin_key payload now fails validation (no
+    email/password fields)."""
+    r = await client.post("/admin/login", json={"admin_key": "anything"})
+    assert r.status_code == 422  # pydantic validation error
 
 
 @pytest.mark.asyncio
@@ -113,8 +115,10 @@ async def test_stats(client, admin_headers):
 
 @pytest.mark.asyncio
 async def test_admin_without_key_rejected(client):
+    """Per admin_2fa_DESIGN: missing auth returns 401 (was 403). 401 is
+    correct semantically — 'authenticate' vs 403 'forbidden'."""
     r = await client.get("/admin/tenants")
-    assert r.status_code == 403
+    assert r.status_code == 401
 
 
 @pytest.mark.asyncio

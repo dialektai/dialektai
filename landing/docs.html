@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentation — dialekt.ai</title>
+  <meta name="description" content="Getting started with dialekt.ai — install, license, models, MCP, agents.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .docs-grid { display: grid; grid-template-columns: 220px 1fr; gap: 48px; padding: 60px 0; }
+    @media (max-width: 760px) { .docs-grid { grid-template-columns: 1fr; gap: 32px; } }
+    .docs-toc { position: sticky; top: 80px; align-self: start; }
+    .docs-toc h4 { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 14px; }
+    .docs-toc a { display: block; font-size: 13px; color: var(--muted); padding: 7px 0; border-left: 2px solid transparent; padding-left: 12px; }
+    .docs-toc a:hover, .docs-toc a.active { color: var(--text); border-left-color: var(--cyan); }
+    .docs-content h1 { font-size: clamp(28px, 4vw, 40px); margin-bottom: 16px; }
+    .docs-content h2 { font-size: 22px; margin: 48px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .docs-content h3 { font-size: 16px; margin: 28px 0 10px; color: var(--cyan); }
+    .docs-content p { color: var(--muted); line-height: 1.7; margin-bottom: 14px; font-size: 14px; }
+    .docs-content code { background: var(--bg2); padding: 2px 6px; border: 1px solid var(--border); font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+    .docs-content pre { background: var(--bg1); border: 1px solid var(--border); padding: 16px; overflow-x: auto; margin: 14px 0; }
+    .docs-content pre code { background: none; padding: 0; border: none; color: var(--text); font-size: 12px; }
+    .docs-content ul { color: var(--muted); line-height: 1.7; padding-left: 22px; margin-bottom: 14px; }
+    .docs-content kbd { background: var(--bg2); border: 1px solid var(--border-hi); padding: 2px 6px; font-family: var(--mono); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="wrap">
+    <div class="docs-grid">
+      <aside class="docs-toc">
+        <h4>Documentation</h4>
+        <a href="#start" class="active">Getting started</a>
+        <a href="#install">Install</a>
+        <a href="#license">License & trial</a>
+        <a href="#models">Picking a model</a>
+        <a href="#mcp">MCP servers</a>
+        <a href="#agents">Building agents</a>
+        <a href="#permissions">Permissions</a>
+        <a href="#cli">CLI</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </aside>
+
+      <div class="docs-content">
+        <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">DOCS · v0.21</div>
+        <h1 id="start">Getting started</h1>
+        <p>dialekt is a local-first desktop AI agent. The fastest path: install, paste your trial key, pick a model, give it a task. This page walks through that in ~5 minutes.</p>
+
+        <h2 id="install">Install</h2>
+        <p>Download links are sent to your inbox after you <a href="/signup.html" style="color:var(--cyan)">start a free trial</a>. We deliver native builds for Linux, macOS, and Windows in one email — pick your platform, install, paste the trial key.</p>
+        <ul>
+          <li>Linux — <code>.deb</code> for Debian/Ubuntu, <code>.AppImage</code> for everything else</li>
+          <li>macOS — <code>.dmg</code> · Apple Silicon · 12.0+</li>
+          <li>Windows — <code>.exe</code> installer · 10/11 · x64</li>
+        </ul>
+        <p>16 GB RAM minimum. 48 GB recommended for 32B-class models.</p>
+
+        <h2 id="license">License & trial</h2>
+        <p>The first launch shows the License screen. Two paths:</p>
+        <ul>
+          <li><strong style="color:var(--text)">Have a key</strong> — paste it. Validated against the licence service. The key arrives in the welcome email after signup.</li>
+          <li><strong style="color:var(--text)">Don't have one yet</strong> — go to <a href="/signup.html" style="color:var(--cyan)">/signup</a>. 30 days, 3 seats, all features. Verify your email, paste the key, you're running.</li>
+        </ul>
+
+        <h2 id="models">Picking a model</h2>
+        <p>The onboarding picker has two tabs:</p>
+        <h3>Local · Ollama</h3>
+        <p>33 models curated. Search by name, filter by category (General · Reasoning · Coding · Vision · Embeddings · Lightweight · Frontier). Each card shows RAM fit against your machine. We auto-rank: installed-and-fits → fits → unknown → too big.</p>
+        <p>Recommended starters by RAM:</p>
+        <ul>
+          <li>8 GB — <code>llama3.1:8b</code> or <code>qwen3:8b</code></li>
+          <li>16 GB — <code>qwen3:14b</code> or <code>qwen2.5-coder:14b</code> for coding</li>
+          <li>32 GB+ — <code>llama3.3:70b</code> or <code>qwen2.5-coder:32b</code></li>
+        </ul>
+
+        <h3>Cloud · Providers</h3>
+        <p>18 providers — Anthropic, OpenAI, Google Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM (build.nvidia.com), Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate.</p>
+        <p>Click a provider → enter API key → "Test connection" sends a 1-token completion → "Save & use". Keys are stored in your OS keychain (GNOME Keyring / macOS Keychain / Windows Credential Manager). Never sent to dialekt-cloud.</p>
+
+        <h2 id="mcp">MCP servers</h2>
+        <p>dialekt speaks the Model Context Protocol. Add servers from Settings → MCP → Add server. Common ones:</p>
+        <pre><code>npx -y @modelcontextprotocol/server-github
+npx -y @modelcontextprotocol/server-filesystem
+uvx mcp-server-postgres</code></pre>
+        <p>Per-tool consent: any MCP tool that writes / executes / spends money asks before the first call, with a "remember for this session" option.</p>
+
+        <h2 id="agents">Building agents</h2>
+        <p>Agents = a manifest YAML + a system prompt + a list of tool capabilities. Two ways to create:</p>
+        <ul>
+          <li><strong style="color:var(--text)">9-step wizard</strong> — Settings → Agents → New. Walks through goal, model preference, MCPs, permissions, schedule.</li>
+          <li><strong style="color:var(--text)">Import YAML</strong> — paste an existing manifest. Schema versioned via <code>dialekt-manifest-validator</code>.</li>
+        </ul>
+
+        <h2 id="permissions">Permissions</h2>
+        <p>Six capabilities, tri-state per:</p>
+        <ul>
+          <li>Filesystem — paths you select; sandboxed by default</li>
+          <li>Terminal — shell access; ask-per-command by default</li>
+          <li>Browser — Chromium drive (coming v0.9)</li>
+          <li>Screen capture — opt-in, ask-per-call</li>
+          <li>Mouse & keyboard — off by default; powerful, stays sealed</li>
+          <li>Keychain — sealed; never accessible to agents</li>
+        </ul>
+
+        <h2 id="cli">CLI</h2>
+        <p>Everything the desktop UI does is also a local HTTP API on <code>localhost:8765</code>. Useful for scripting:</p>
+        <pre><code>curl http://localhost:8765/llm/catalog | jq '.providers[].id'
+curl -X POST http://localhost:8765/settings -H 'Content-Type: application/json' \
+  -d '{"model_provider":"anthropic","model":"claude-opus-4-7"}'</code></pre>
+
+        <h2 id="troubleshooting">Troubleshooting</h2>
+        <h3>Ollama not detected</h3>
+        <p>The install screen auto-runs <code>curl -fsSL https://ollama.com/install.sh | sh</code> on Linux (with consent + SHA verify). On macOS/Windows it opens the download page and polls.</p>
+        <h3>License "not valid" right after signup</h3>
+        <p>You haven't clicked the verify-email link yet. Check your inbox; spam folder; resend from /signup if needed.</p>
+        <h3>Cloud provider returns 401</h3>
+        <p>Test connection in the credentials modal. Most common: API key has trailing whitespace, or wrong project ID for Vertex AI / Bedrock.</p>
+
+        <p style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:var(--dim)">
+          More docs coming. Found a gap? Email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+  <script>
+    // Highlight TOC active section based on scroll
+    const links = document.querySelectorAll('.docs-toc a');
+    const sections = [...links].map(a => document.getElementById(a.getAttribute('href').slice(1)));
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY + 120;
+      let active = sections[0];
+      for (const s of sections) { if (s && s.offsetTop <= y) active = s; }
+      links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + active?.id));
+    }, { passive: true });
+  </script>
+</body>
+</html>

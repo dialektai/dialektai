@@ -1,15 +1,18 @@
 """dialekt-cloud FastAPI application."""
+import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .config import settings
+from .config import settings, assert_production_ready
 from .db import close_pool, get_pool, migrate
 from .routers import admin, admin_ui, agents, auth, health
 from .services.email import EmailService
+from .services.scheduler import run_lifecycle_scheduler
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -17,7 +20,21 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting dialekt-cloud...")
+    logger.info("Starting dialekt-cloud (env=%s)...", settings.ENV)
+
+    # Production safety: refuse to boot if security-critical knobs are still
+    # the dev defaults, or if SMTP credentials are missing. Better to die
+    # at startup with a clear list than to run a leaky stack.
+    problems = assert_production_ready()
+    if problems:
+        logger.error("Production-readiness check FAILED:")
+        for p in problems:
+            logger.error("  - %s", p)
+        raise RuntimeError(
+            "dialekt-cloud refuses to start in production with %d unresolved issues "
+            "(see logs). Set ENV=development if this is a dev box." % len(problems)
+        )
+
     pool = await get_pool(settings.DATABASE_URL)
     app.state.pool = pool
     await migrate(pool)
@@ -29,9 +46,37 @@ async def lifespan(app: FastAPI):
         from_addr=settings.SMTP_FROM,
         use_tls=settings.SMTP_TLS,
     )
+
+    # Soft check on startup: warn (don't crash) if no admin exists yet.
+    # Useful for the very first deploy where the operator is about to run
+    # `dialekt-admin admin create` but hasn't yet.
+    try:
+        async with pool.acquire() as conn:
+            n_admins = await conn.fetchval("SELECT COUNT(*) FROM admins")
+        if n_admins == 0:
+            logger.warning(
+                "no admins in DB yet — dashboard login will refuse everyone except the "
+                "break-glass key. Bootstrap with: dialekt-admin admin create --email=zhumagaliyev@dias.now"
+            )
+    except Exception as exc:
+        logger.warning("admin presence check skipped: %s", exc)
+    # Background tasks (trial-expiring reminders etc.) Disable in tests
+    # via DIALEKT_DISABLE_SCHEDULER=true so the test suite doesn't spawn
+    # a background loop that keeps trying to email mocked tenants.
+    scheduler_task: asyncio.Task | None = None
+    if os.environ.get("DIALEKT_DISABLE_SCHEDULER", "").lower() not in ("1", "true", "yes"):
+        scheduler_task = asyncio.create_task(run_lifecycle_scheduler(app))
     logger.info("dialekt-cloud ready")
-    yield
-    await close_pool()
+    try:
+        yield
+    finally:
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            try:
+                await scheduler_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        await close_pool()
 
 
 app = FastAPI(

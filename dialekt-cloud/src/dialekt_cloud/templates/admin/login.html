@@ -1,38 +1,241 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>dialekt.ai — Admin</title>
+<title>dialekt.ai — Admin login</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Courier New', monospace; background: #0a0e14; color: #cdd6f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-.card { background: #13181f; border: 1px solid #2a3244; padding: 48px; width: 100%; max-width: 400px; }
-.logo { font-size: 16px; color: #89dceb; letter-spacing: .12em; margin-bottom: 32px; }
-h1 { font-size: 18px; color: #cdd6f4; margin-bottom: 4px; }
-p { font-size: 12px; color: #6c7086; margin-bottom: 32px; }
-label { display: block; font-size: 11px; color: #6c7086; letter-spacing: .08em; margin-bottom: 6px; }
-input { width: 100%; background: #0a0e14; border: 1px solid #2a3244; color: #cdd6f4; font-family: inherit; font-size: 13px; padding: 10px 12px; outline: none; }
+body { font-family: 'Courier New', monospace; background: #0a0e14; color: #cdd6f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.card { background: #13181f; border: 1px solid #2a3244; padding: 40px; width: 100%; max-width: 460px; }
+.logo { font-size: 16px; color: #89dceb; letter-spacing: .12em; margin-bottom: 28px; }
+h1 { font-size: 20px; color: #cdd6f4; margin-bottom: 6px; }
+p.sub { font-size: 12px; color: #6c7086; margin-bottom: 28px; line-height: 1.55; }
+label { display: block; font-size: 10px; color: #6c7086; letter-spacing: .12em; margin-bottom: 6px; text-transform: uppercase; }
+input { width: 100%; background: #0a0e14; border: 1px solid #2a3244; color: #cdd6f4; font-family: inherit; font-size: 13px; padding: 11px 13px; outline: none; margin-bottom: 14px; }
 input:focus { border-color: #89dceb; }
-button { width: 100%; background: #89dceb; color: #0a0e14; border: none; font-family: inherit; font-size: 13px; font-weight: bold; letter-spacing: .06em; padding: 12px; cursor: pointer; margin-top: 16px; }
+button { width: 100%; background: #89dceb; color: #0a0e14; border: none; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .08em; padding: 12px; cursor: pointer; margin-top: 8px; }
 button:hover { background: #74c7ec; }
-.error { background: #45142a; border: 1px solid #f38ba8; color: #f38ba8; padding: 10px 12px; font-size: 12px; margin-bottom: 16px; }
+button[disabled] { opacity: .4; cursor: not-allowed; }
+button.ghost { background: transparent; color: #94a3b8; border: 1px solid #2a3244; margin-top: 8px; font-weight: 400; letter-spacing: 0; }
+.alert { padding: 10px 12px; font-size: 12px; margin-bottom: 14px; border: 1px solid; line-height: 1.5; }
+.alert.err { color: #f38ba8; border-color: #f38ba8; background: rgba(243,139,168,0.05); }
+.alert.ok { color: #a6e3a1; border-color: #a6e3a1; background: rgba(166,227,161,0.05); }
+.qr { background: #fff; padding: 16px; margin: 16px 0; }
+.qr svg { width: 100%; height: auto; max-width: 240px; display: block; margin: 0 auto; }
+.codes { background: #0a0e14; border: 1px dashed #89dceb; padding: 14px; font-size: 12px; line-height: 1.7; margin: 12px 0; column-count: 2; column-gap: 16px; }
+.codes div { font-family: 'JetBrains Mono', monospace; color: #89dceb; }
+.muted { font-size: 11px; color: #6c7086; line-height: 1.55; margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a3244; }
+.muted code { color: #94a3b8; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">dialekt.ai / ADMIN</div>
-  <h1>Вход в панель управления</h1>
-  <p>Только для основателя</p>
 
-  {% if error %}
-  <div class="error">{{ error }}</div>
-  {% endif %}
+  <!-- Stage 1: email + password -->
+  <div id="stage-password">
+    <h1>Sign in</h1>
+    <p class="sub">Email + password, then a TOTP code from your authenticator app.</p>
+    <form id="form-password" autocomplete="on">
+      <label>EMAIL</label>
+      <input type="email" name="email" autocomplete="username" autofocus required>
+      <label>PASSWORD</label>
+      <input type="password" name="password" autocomplete="current-password" required>
+      <div id="alert-password"></div>
+      <button type="submit" id="btn-password">CONTINUE →</button>
+    </form>
+  </div>
 
-  <form method="POST" action="/admin/ui/login">
-    <label>КЛЮЧ ДОСТУПА</label>
-    <input type="password" name="admin_key" placeholder="Введите DIALEKT_ADMIN_KEY" autofocus required>
-    <button type="submit">ВОЙТИ →</button>
-  </form>
+  <!-- Stage 2: TOTP / backup code -->
+  <div id="stage-totp" style="display:none">
+    <h1>Two-factor code</h1>
+    <p class="sub">Enter the 6-digit code from your authenticator app.</p>
+    <form id="form-totp">
+      <label id="label-totp">6-DIGIT CODE</label>
+      <input type="text" name="code" id="input-totp" inputmode="numeric" maxlength="9" autocomplete="one-time-code" autofocus required>
+      <div id="alert-totp"></div>
+      <button type="submit" id="btn-totp">VERIFY →</button>
+      <button type="button" class="ghost" id="btn-use-backup">Use a backup code instead</button>
+    </form>
+  </div>
+
+  <!-- Stage 3: enroll TOTP (first login) -->
+  <div id="stage-enroll" style="display:none">
+    <h1>Enroll your authenticator</h1>
+    <p class="sub">Scan this QR with Google Authenticator, 1Password, Authy, etc. Then enter the 6-digit code below.</p>
+    <div id="qr-slot" class="qr"></div>
+    <p class="sub" style="margin-bottom:8px"><strong style="color:#cdd6f4">Or paste this secret manually:</strong></p>
+    <div class="codes" style="column-count:1" id="enroll-secret-display"></div>
+    <form id="form-enroll-confirm">
+      <label>VERIFY 6-DIGIT CODE</label>
+      <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus required>
+      <div id="alert-enroll"></div>
+      <button type="submit" id="btn-enroll-confirm">CONFIRM &amp; SHOW BACKUP CODES →</button>
+    </form>
+  </div>
+
+  <!-- Stage 4: backup codes display (one-time) -->
+  <div id="stage-backup" style="display:none">
+    <h1>Save your backup codes</h1>
+    <p class="sub">10 single-use codes. Use one if you lose your authenticator. <strong style="color:#f38ba8">Shown only this once.</strong></p>
+    <div class="codes" id="backup-codes-list"></div>
+    <button type="button" id="btn-download-codes">DOWNLOAD AS .TXT</button>
+    <button type="button" class="ghost" id="btn-go-dashboard">I'VE SAVED THEM — CONTINUE →</button>
+  </div>
+
+  <p class="muted">
+    Lost everything? See the recovery runbook · SSH + <code>dialekt-admin admin reset-2fa --email=…</code>
+  </p>
 </div>
+
+<script>
+const showStage = (id) => {
+  ['password', 'totp', 'enroll', 'backup'].forEach(s =>
+    document.getElementById('stage-' + s).style.display = s === id ? 'block' : 'none');
+};
+const setAlert = (slot, kind, msg) => {
+  document.getElementById(slot).innerHTML = msg ? `<div class="alert ${kind}">${msg}</div>` : '';
+};
+
+let challengeToken = null;
+let enrollSecret = null;
+let useBackup = false;
+let backupCodes = [];
+
+document.getElementById('form-password').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setAlert('alert-password', '', '');
+  const btn = document.getElementById('btn-password');
+  btn.disabled = true; btn.textContent = 'CHECKING…';
+  const fd = new FormData(e.target);
+  try {
+    const r = await fetch('/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: fd.get('email').trim(), password: fd.get('password') }),
+    });
+    const body = await r.json();
+    if (!r.ok) {
+      setAlert('alert-password', 'err', body.detail || ('Error ' + r.status));
+      btn.disabled = false; btn.textContent = 'CONTINUE →';
+      return;
+    }
+    challengeToken = body.challenge_token;
+    if (body.next === 'totp_challenge') {
+      showStage('totp');
+    } else if (body.next === 'enroll_totp') {
+      const pw = fd.get('password');
+      const er = await fetch('/admin/login/enroll-totp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challenge_token: challengeToken, password_reconfirm: pw }),
+      });
+      const eb = await er.json();
+      if (!er.ok) {
+        setAlert('alert-password', 'err', eb.detail || 'enroll error');
+        btn.disabled = false; btn.textContent = 'CONTINUE →';
+        return;
+      }
+      enrollSecret = eb.secret;
+      document.getElementById('qr-slot').innerHTML = eb.qr_svg;
+      document.getElementById('enroll-secret-display').innerHTML = `<div>${eb.secret}</div>`;
+      showStage('enroll');
+    }
+  } catch (err) {
+    setAlert('alert-password', 'err', 'Network error: ' + err.message);
+    btn.disabled = false; btn.textContent = 'CONTINUE →';
+  }
+});
+
+document.getElementById('btn-use-backup').addEventListener('click', () => {
+  useBackup = !useBackup;
+  document.getElementById('label-totp').textContent = useBackup ? 'BACKUP CODE (8 CHARS)' : '6-DIGIT CODE';
+  const inp = document.getElementById('input-totp');
+  inp.value = '';
+  inp.placeholder = useBackup ? 'ABCDEFGH' : '123 456';
+  document.getElementById('btn-use-backup').textContent = useBackup ? 'Use TOTP code instead' : 'Use a backup code instead';
+});
+
+document.getElementById('form-totp').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setAlert('alert-totp', '', '');
+  const btn = document.getElementById('btn-totp');
+  btn.disabled = true; btn.textContent = 'VERIFYING…';
+  const fd = new FormData(e.target);
+  try {
+    const r = await fetch('/admin/login/totp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challenge_token: challengeToken,
+        code: fd.get('code'),
+        is_backup_code: useBackup,
+      }),
+    });
+    const body = await r.json();
+    if (!r.ok) {
+      setAlert('alert-totp', 'err', body.detail || ('Error ' + r.status));
+      btn.disabled = false; btn.textContent = 'VERIFY →';
+      return;
+    }
+    if (useBackup && body.backup_codes_remaining != null) {
+      setAlert('alert-totp', 'ok', `OK · ${body.backup_codes_remaining} backup codes left.`);
+    }
+    setTimeout(() => location.href = '/admin/ui/', 600);
+  } catch (err) {
+    setAlert('alert-totp', 'err', 'Network error: ' + err.message);
+    btn.disabled = false; btn.textContent = 'VERIFY →';
+  }
+});
+
+document.getElementById('form-enroll-confirm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setAlert('alert-enroll', '', '');
+  const btn = document.getElementById('btn-enroll-confirm');
+  btn.disabled = true; btn.textContent = 'CONFIRMING…';
+  const fd = new FormData(e.target);
+  try {
+    const r = await fetch('/admin/login/enroll-totp/confirm', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challenge_token: challengeToken,
+        secret: enrollSecret,
+        code: fd.get('code'),
+      }),
+    });
+    const body = await r.json();
+    if (!r.ok) {
+      setAlert('alert-enroll', 'err', body.detail || 'Code rejected');
+      btn.disabled = false; btn.textContent = 'CONFIRM & SHOW BACKUP CODES →';
+      return;
+    }
+    backupCodes = body.backup_codes || [];
+    document.getElementById('backup-codes-list').innerHTML =
+      backupCodes.map(c => `<div>${c}</div>`).join('');
+    showStage('backup');
+  } catch (err) {
+    setAlert('alert-enroll', 'err', 'Network error: ' + err.message);
+    btn.disabled = false; btn.textContent = 'CONFIRM & SHOW BACKUP CODES →';
+  }
+});
+
+// Backup codes download — CLIENT-SIDE blob (mentor add-on: no server roundtrip).
+document.getElementById('btn-download-codes').addEventListener('click', () => {
+  const date = new Date().toISOString().slice(0, 10);
+  const text = `dialekt.ai admin backup codes — ${date}\n\n` +
+    backupCodes.map((c, i) => `${(i + 1).toString().padStart(2, '0')}. ${c}`).join('\n') +
+    `\n\nKeep these safe. Each code works once. Generated ${new Date().toString()}.\n`;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dialekt-admin-backup-codes-${date.replace(/-/g, '')}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('btn-go-dashboard').addEventListener('click', () => {
+  if (confirm("Saved them somewhere safe? You won't see these codes again.")) {
+    location.href = '/admin/ui/';
+  }
+});
+</script>
 </body>
 </html>

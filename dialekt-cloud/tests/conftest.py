@@ -27,6 +27,20 @@ os.environ.setdefault("SMTP_PORT", "1025")
 os.environ.setdefault("SMTP_TLS", "false")
 os.environ.setdefault("SMTP_USER", "")
 os.environ.setdefault("SMTP_PASSWORD", "")
+# Relax signup anti-abuse for tests — both ASGI test client and parallel
+# test workers share the same IP (127.0.0.1) which would otherwise trip
+# the 3-per-week production limit after the third signup test.
+os.environ.setdefault("DIALEKT_SIGNUP_IP_LIMIT", "10000")
+# Tests create admins via the helper fixture with throwaway @dialekt.ai
+# emails. Production policy enforces @dias.now; we relax it here so the
+# tests don't require knowledge of the production domain.
+os.environ.setdefault("DIALEKT_ADMIN_EMAIL_DOMAIN", "")
+# Don't spawn the lifecycle scheduler during tests — they invoke the
+# scheduler pass directly when they want to verify behaviour.
+os.environ.setdefault("DIALEKT_DISABLE_SCHEDULER", "true")
+# Force dev mode so the production-readiness gate stays out of the way of
+# tests, even when a real .env file in cwd has ENV=production set.
+os.environ["ENV"] = "development"
 
 
 def _can_connect_db() -> bool:
@@ -61,8 +75,12 @@ class MockEmailService:
     def __init__(self):
         self.sent = []
 
-    async def send(self, *, to, subject, template, context):
-        self.sent.append({"to": to, "subject": subject, "template": template})
+    async def send(self, *, to, subject, template, context, from_addr=None, reply_to=None):
+        self.sent.append({
+            "to": to, "subject": subject,
+            "template": template, "context": context,
+            "from_addr": from_addr, "reply_to": reply_to,
+        })
         return True
 
     async def send_invite(self, *, to, invite_token, company_name, landing_url):
@@ -75,6 +93,22 @@ class MockEmailService:
 
     async def send_welcome(self, *, to, company_name, landing_url):
         self.sent.append({"type": "welcome", "to": to})
+        return True
+
+    async def send_trial_expiring(self, **kwargs):
+        self.sent.append({"type": "trial_expiring", **kwargs})
+        return True
+
+    async def send_license_extended(self, **kwargs):
+        self.sent.append({"type": "license_extended", **kwargs})
+        return True
+
+    async def send_admin_signup_notification(self, **kwargs):
+        self.sent.append({"type": "admin_signup_notification", **kwargs})
+        return True
+
+    async def send_admin_security_alert(self, **kwargs):
+        self.sent.append({"type": "admin_security_alert", **kwargs})
         return True
 
 
@@ -95,8 +129,23 @@ async def pool():
 @pytest_asyncio.fixture(scope="session")
 async def app(pool):
     from dialekt_cloud.main import app as _app
+    from dialekt_cloud.services import releases as _releases
     _app.state.pool = pool
     _app.state.email = MockEmailService()
+    # Stub the GitHub-fetching releases service so tests don't hammer the
+    # network and have deterministic download URLs to assert on.
+    _releases._cache = {
+        "at": float("inf"),  # never expire during test session
+        "data": {
+            "version": "v0.21.0",
+            "published_at": "2026-04-25T00:00:00Z",
+            "page_url": "https://github.com/dialektai/dialekt/releases/latest",
+            "linux_deb": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt_0.21.0_amd64.deb",
+            "linux_app": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0.AppImage",
+            "macos_dmg": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0.dmg",
+            "windows_exe": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0-setup.exe",
+        },
+    }
     return _app
 
 

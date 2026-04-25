@@ -68,6 +68,8 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
 <div class="topbar">
   <div class="logo">dialekt.ai / ADMIN</div>
   <div style="display:flex;align-items:center;gap:20px">
+    <span x-show="me?.email" style="font-size:11px;color:#89dceb;font-family:'JetBrains Mono',monospace" x-text="me?.email"></span>
+    <span x-show="me?.via === 'break-glass-key'" style="font-size:10px;color:#f9e2af;border:1px solid #f9e2af;padding:2px 6px;letter-spacing:.08em">BREAK-GLASS</span>
     <span style="font-size:11px;color:#6c7086" x-text="'Tenants: ' + (stats.tenants?.total ?? '...')"></span>
     <a href="/admin/ui/logout">выйти</a>
   </div>
@@ -80,6 +82,7 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
     <a class="nav-item" :class="{active: page==='tenants'}" @click="page='tenants';loadTenants()">КЛИЕНТЫ</a>
     <a class="nav-item" :class="{active: page==='create'}" @click="page='create'">+ НОВЫЙ КЛИЕНТ</a>
     <a class="nav-item" :class="{active: page==='stats'}" @click="page='stats';loadStats()">СТАТИСТИКА</a>
+    <a class="nav-item" :class="{active: page==='security'}" @click="page='security';loadSecurity()" x-show="me?.admin_id">🔒 БЕЗОПАСНОСТЬ</a>
   </div>
 
   <div class="main">
@@ -239,6 +242,113 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
       </div>
     </div>
 
+    <!-- Security (own admin self-service) -->
+    <div class="page" :class="{active: page==='security'}">
+      <h2>🔒 Безопасность</h2>
+      <p style="color:#6c7086;font-size:12px;margin-bottom:24px">
+        Управление вашим аккаунтом администратора · <span class="mono" x-text="me?.email"></span>
+      </p>
+
+      <!-- Profile card -->
+      <div style="background:#13181f;border:1px solid #2a3244;padding:20px;margin-bottom:18px">
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.12em;margin-bottom:14px">МОЙ АККАУНТ</div>
+        <div class="detail-row"><span class="detail-label">Email</span><span class="mono" x-text="me?.email ?? '—'"></span></div>
+        <div class="detail-row"><span class="detail-label">Auth-метод</span><span class="mono" x-text="me?.via ?? '—'"></span></div>
+        <div class="detail-row"><span class="detail-label">2FA (TOTP)</span><span class="mono" x-text="me?.totp_enrolled ? '✓ enrolled' : '— not enrolled'"></span></div>
+        <div class="detail-row"><span class="detail-label">Backup-кодов осталось</span><span class="mono" x-text="(me?.backup_codes_remaining ?? 0) + ' / 10'"></span></div>
+        <div class="detail-row"><span class="detail-label">Прошлый вход</span><span class="mono" x-text="me?.last_login_at ? new Date(me.last_login_at).toLocaleString('ru-RU') : '—'"></span></div>
+        <div class="detail-row"><span class="detail-label">IP прошлого входа</span><span class="mono" x-text="me?.last_login_ip ?? '—'"></span></div>
+      </div>
+
+      <!-- Change password -->
+      <div style="background:#13181f;border:1px solid #2a3244;padding:20px;margin-bottom:18px">
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.12em;margin-bottom:14px">СМЕНИТЬ ПАРОЛЬ</div>
+        <div class="form-row">
+          <label>ТЕКУЩИЙ ПАРОЛЬ</label>
+          <input type="password" x-model="pwForm.old_password" autocomplete="current-password">
+        </div>
+        <div class="form-row">
+          <label>НОВЫЙ ПАРОЛЬ (МИНИМУМ 12 СИМВОЛОВ)</label>
+          <input type="password" x-model="pwForm.new_password" autocomplete="new-password">
+        </div>
+        <div class="form-row">
+          <label>ПОВТОРИТЬ НОВЫЙ ПАРОЛЬ</label>
+          <input type="password" x-model="pwForm.new_password_confirm" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary btn-sm"
+                @click="changePassword()"
+                :disabled="!pwForm.old_password || !pwForm.new_password || pwForm.new_password !== pwForm.new_password_confirm">
+          СМЕНИТЬ ПАРОЛЬ
+        </button>
+        <span x-show="pwMsg.text" :style="`font-size:11px;color:${pwMsg.ok ? '#a6e3a1' : '#f38ba8'};margin-left:12px`" x-text="pwMsg.text"></span>
+      </div>
+
+      <!-- Regenerate backup codes -->
+      <div style="background:#13181f;border:1px solid #2a3244;padding:20px;margin-bottom:18px">
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.12em;margin-bottom:14px">РЕГЕНЕРАЦИЯ BACKUP-КОДОВ</div>
+        <p style="font-size:12px;color:#6c7086;margin-bottom:14px;line-height:1.5">
+          Сгенерировать 10 новых backup-кодов. Старые сразу станут недействительными. Покажем коды один раз — сразу скачайте и сохраните.
+        </p>
+        <template x-if="!regenCodes.length">
+          <div>
+            <div class="form-row">
+              <label>ПОДТВЕРДИТЕ ПАРОЛЬ</label>
+              <input type="password" x-model="regenPassword" autocomplete="current-password" placeholder="ваш текущий пароль">
+            </div>
+            <button class="btn btn-warn btn-sm" @click="regenerateBackupCodes()" :disabled="!regenPassword">
+              СГЕНЕРИРОВАТЬ НОВЫЕ КОДЫ
+            </button>
+            <span x-show="regenMsg" style="font-size:11px;color:#f38ba8;margin-left:12px" x-text="regenMsg"></span>
+          </div>
+        </template>
+        <template x-if="regenCodes.length">
+          <div>
+            <div style="background:#0a0e14;border:1px dashed #89dceb;padding:14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#89dceb;column-count:2;column-gap:16px;line-height:1.8;margin-bottom:14px">
+              <template x-for="(c,i) in regenCodes" :key="i">
+                <div><span style="color:#6c7086" x-text="String(i+1).padStart(2,'0') + '.'"></span> <span x-text="c"></span></div>
+              </template>
+            </div>
+            <button class="btn btn-primary btn-sm" @click="downloadBackupCodes()">СКАЧАТЬ .TXT</button>
+            <button class="btn btn-ghost btn-sm" @click="regenCodes=[];regenPassword=''" style="margin-left:8px">ЗАКРЫТЬ</button>
+            <p style="font-size:11px;color:#f38ba8;margin-top:14px">⚠ Покажем эти коды только один раз. Сохраните перед закрытием.</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- Login history -->
+      <div style="background:#13181f;border:1px solid #2a3244;padding:20px">
+        <div style="font-size:10px;color:#6c7086;letter-spacing:.12em;margin-bottom:14px">ИСТОРИЯ ВХОДА (последние 50)</div>
+        <table>
+          <thead>
+            <tr>
+              <th>ВРЕМЯ</th>
+              <th>СТАДИЯ</th>
+              <th>УСПЕХ</th>
+              <th>IP</th>
+              <th>ПРИЧИНА (если ошибка)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="row in loginHistory" :key="row.at">
+              <tr>
+                <td class="mono" style="font-size:11px" x-text="new Date(row.at).toLocaleString('ru-RU')"></td>
+                <td class="mono" style="font-size:11px" x-text="row.stage"></td>
+                <td>
+                  <span x-show="row.succeeded" style="color:#a6e3a1">✓</span>
+                  <span x-show="!row.succeeded" style="color:#f38ba8">✗</span>
+                </td>
+                <td class="mono" style="font-size:11px;color:#6c7086" x-text="row.ip ?? '—'"></td>
+                <td class="mono" style="font-size:11px;color:#6c7086" x-text="row.failure_reason ?? ''"></td>
+              </tr>
+            </template>
+            <tr x-show="loginHistory.length === 0">
+              <td colspan="5" style="color:#6c7086;text-align:center;padding:20px">Нет записей</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /layout -->
 
@@ -284,7 +394,45 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
           <button class="btn btn-ghost" @click="resumeTenant()">▶ ВОЗОБНОВИТЬ</button>
         </template>
         <button class="btn btn-warn" @click="showInvoiceForm=!showInvoiceForm">📄 СЧЁТ</button>
+        <button class="btn btn-ghost" @click="showExtendForm=!showExtendForm">⏱ ПРОДЛИТЬ</button>
       </div>
+    </div>
+
+    <!-- Extend form -->
+    <div x-show="showExtendForm" style="background:#0a0e14;border:1px solid #2a3244;padding:16px;margin-bottom:16px">
+      <div style="font-size:10px;color:#6c7086;letter-spacing:.08em;margin-bottom:12px">ПРОДЛИТЬ ИЛИ ВЫДАТЬ БЕСПЛАТНО</div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>ДНЕЙ (+/-)</label>
+          <input type="number" x-model.number="extendForm.days" placeholder="365">
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn btn-ghost btn-sm" @click="extendForm.days=30">+30</button>
+            <button class="btn btn-ghost btn-sm" @click="extendForm.days=90">+90 (квартал)</button>
+            <button class="btn btn-ghost btn-sm" @click="extendForm.days=365">+365 (бесплат. год)</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>ПЛАН (опционально)</label>
+          <select x-model="extendForm.plan">
+            <option value="">— не менять —</option>
+            <option value="trial">trial</option>
+            <option value="starter">starter</option>
+            <option value="professional">professional</option>
+            <option value="enterprise">enterprise</option>
+            <option value="comp">comp (бесплатно)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>МЕСТ (опционально)</label>
+          <input type="number" x-model.number="extendForm.seats_limit" placeholder="не менять">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>ПРИЧИНА (для лога)</label>
+        <input type="text" x-model="extendForm.reason" placeholder="напр.: оплачено за квартал / бесплатный год для пилот-партнёра">
+      </div>
+      <button class="btn btn-primary btn-sm" @click="extendTenant()" :disabled="!extendForm.reason || !extendForm.days">ПРИМЕНИТЬ</button>
+      <span x-show="extendMsg" style="font-size:11px;color:#a6e3a1;margin-left:12px" x-text="extendMsg"></span>
     </div>
 
     <!-- Invoice form -->
@@ -334,11 +482,19 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
 
 <script>
 function adminApp() {
-  const ADMIN_KEY = {{ admin_key | tojson }};
-  const headers = { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY };
+  // Per admin_2fa_DESIGN P0: NO admin key rendered into HTML.
+  // Auth comes from the dialekt_admin_session httpOnly cookie set by the
+  // login flow at /admin/login → /admin/login/totp. Browser includes the
+  // cookie automatically on same-origin fetch().
+  const headers = { 'Content-Type': 'application/json' };
 
   const api = async (path, opts={}) => {
-    const r = await fetch(path, { headers, ...opts });
+    const r = await fetch(path, { headers, credentials: 'same-origin', ...opts });
+    if (r.status === 401 || r.status === 403) {
+      // Session expired → bounce to login
+      location.href = '/admin/ui/login';
+      throw new Error('session expired');
+    }
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   };
@@ -353,7 +509,19 @@ function adminApp() {
     showInvoiceForm: false,
     invoiceForm: { amount_kzt: 0, period_months: 3, company_address: '' },
     invoiceMsg: '',
+    showExtendForm: false,
+    extendForm: { days: 30, plan: '', seats_limit: null, reason: '' },
+    extendMsg: '',
     actionMsg: { text: '', ok: true },
+
+    // Security tab state
+    me: null,                            // /admin/me payload
+    pwForm: { old_password: '', new_password: '', new_password_confirm: '' },
+    pwMsg: { text: '', ok: true },
+    regenPassword: '',
+    regenCodes: [],                      // populated on successful rotation
+    regenMsg: '',
+    loginHistory: [],
     newTenant: { company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '' },
     createMsg: { text: '', ok: true },
     creating: false,
@@ -368,11 +536,77 @@ function adminApp() {
     },
 
     async init() {
-      await Promise.all([this.loadStats(), this.loadTenants()]);
+      await Promise.all([this.loadStats(), this.loadTenants(), this.loadMe()]);
     },
 
     async loadStats() {
       try { this.stats = await api('/admin/stats'); } catch(e) {}
+    },
+
+    async loadMe() {
+      try { this.me = await api('/admin/me'); } catch(e) { this.me = null; }
+    },
+
+    async loadSecurity() {
+      // Refresh me + login history when entering the Security tab
+      await this.loadMe();
+      try { this.loginHistory = await api('/admin/security/login-history'); }
+      catch(e) { this.loginHistory = []; }
+    },
+
+    async changePassword() {
+      this.pwMsg = { text: '', ok: true };
+      if (this.pwForm.new_password.length < 12) {
+        this.pwMsg = { text: 'Минимум 12 символов', ok: false };
+        return;
+      }
+      if (this.pwForm.new_password !== this.pwForm.new_password_confirm) {
+        this.pwMsg = { text: 'Пароли не совпадают', ok: false };
+        return;
+      }
+      try {
+        await api('/admin/password/change', {
+          method: 'POST',
+          body: JSON.stringify({
+            old_password: this.pwForm.old_password,
+            new_password: this.pwForm.new_password,
+          }),
+        });
+        this.pwForm = { old_password: '', new_password: '', new_password_confirm: '' };
+        this.pwMsg = { text: '✓ Пароль обновлён', ok: true };
+      } catch(e) {
+        this.pwMsg = { text: 'Ошибка: ' + e.message, ok: false };
+      }
+    },
+
+    async regenerateBackupCodes() {
+      this.regenMsg = '';
+      try {
+        const data = await api('/admin/totp/regenerate-backup-codes', {
+          method: 'POST',
+          body: JSON.stringify({ password_reconfirm: this.regenPassword }),
+        });
+        this.regenCodes = data.backup_codes || [];
+        this.regenPassword = '';
+        await this.loadMe();
+      } catch(e) {
+        this.regenMsg = 'Ошибка: ' + e.message;
+      }
+    },
+
+    downloadBackupCodes() {
+      // Client-side blob — plaintext never re-enters server memory
+      const date = new Date().toISOString().slice(0, 10);
+      const text = `dialekt.ai admin backup codes — ${date}\n` +
+        `email: ${this.me?.email || '?'}\n\n` +
+        this.regenCodes.map((c, i) => `${(i + 1).toString().padStart(2, '0')}. ${c}`).join('\n') +
+        `\n\nKeep these safe. Each code works once. Generated ${new Date().toString()}.\n`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `dialekt-admin-backup-codes-${date.replace(/-/g, '')}.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
     },
 
     async loadTenants() {
@@ -440,6 +674,25 @@ function adminApp() {
         await this.openTenant(this.tenantDetail.id);
       } catch(e) {
         this.invoiceMsg = 'Ошибка: ' + e.message;
+      }
+    },
+
+    async extendTenant() {
+      this.extendMsg = '';
+      try {
+        const payload = { days: this.extendForm.days, reason: this.extendForm.reason };
+        if (this.extendForm.plan) payload.plan = this.extendForm.plan;
+        if (this.extendForm.seats_limit) payload.seats_limit = this.extendForm.seats_limit;
+        const data = await api(`/admin/tenants/${this.tenantDetail.id}/extend`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        const newDate = new Date(data.expires_at).toLocaleDateString('ru-RU');
+        this.extendMsg = `✓ Продлено до ${newDate}`;
+        this.extendForm = { days: 30, plan: '', seats_limit: null, reason: '' };
+        await this.openTenant(this.tenantDetail.id);
+      } catch(e) {
+        this.extendMsg = 'Ошибка: ' + e.message;
       }
     },
 

@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cross-border Consent &amp; UI Texts — dialekt.ai</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .legal { max-width: 820px; margin: 0 auto; padding: 60px 24px 80px; }
+    .legal h1 { font-size: clamp(24px,3.4vw,34px); margin: 0 0 8px; line-height: 1.25; }
+    .legal h2 { font-size: 18px; margin: 32px 0 12px; padding-bottom: 6px;
+                 border-bottom: 1px solid var(--border); color: var(--cyan); }
+    .legal h3 { font-size: 15px; margin: 24px 0 10px; color: var(--text); letter-spacing:.005em; }
+    .legal h4 { font-size: 13px; margin: 18px 0 8px; color: var(--text); text-transform: uppercase; letter-spacing:.06em; }
+    .legal p, .legal li { color: var(--muted); line-height: 1.7; font-size: 14px; }
+    .legal ul, .legal ol { padding-left: 20px; margin: 12px 0; }
+    .legal a { color: var(--cyan); }
+    .legal a:hover { text-decoration: underline; }
+    .legal hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+    .legal code { font-family: var(--mono); font-size: 12.5px;
+                   background: var(--bg2); padding: 1px 6px; border-radius: 3px;
+                   border: 1px solid var(--border); color: var(--text); }
+    .legal pre { background: var(--bg2); border: 1px solid var(--border);
+                  padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+                  font-family: var(--mono); font-size: 12px; color: var(--text);
+                  line-height: 1.55; }
+    .legal pre code { background: none; border: 0; padding: 0; }
+    .legal table { width: 100%; border-collapse: collapse; margin: 14px 0;
+                    font-size: 13px; color: var(--muted); }
+    .legal th, .legal td { border: 1px solid var(--border); padding: 8px 10px;
+                            text-align: left; vertical-align: top; line-height: 1.55; }
+    .legal th { background: var(--bg2); color: var(--text); font-weight: 600; }
+    .legal blockquote { border-left: 2px solid var(--amber); margin: 16px 0;
+                         padding: 10px 16px; background: rgba(245,158,11,0.06);
+                         color: var(--text); font-size: 13.5px; line-height: 1.65; }
+    .legal blockquote p { color: inherit; }
+    .legal strong { color: var(--text); font-weight: 600; }
+
+    .lang-switch { display: flex; gap: 12px; align-items: center;
+                    margin-bottom: 22px; font-size: 12px; }
+    .lang-switch .pill { padding: 4px 10px; border: 1px solid var(--border);
+                          color: var(--muted); font-family: var(--mono);
+                          letter-spacing:.06em; text-transform: uppercase; }
+    .lang-switch .pill.active { color: var(--cyan); border-color: var(--cyan); }
+    .lang-switch .pill:hover { color: var(--text); }
+
+    .source-note { margin-top: 40px; padding-top: 20px;
+                    border-top: 1px solid var(--border); font-size: 12px;
+                    color: var(--dim); }
+    .impl-banner { background: rgba(245,158,11,0.06); border: 1px solid var(--amber);
+                     padding: 12px 16px; margin-bottom: 22px; font-size: 12.5px;
+                     color: var(--text); line-height: 1.6; }
+    .impl-banner strong { color: var(--amber); }
+    .related { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; }
+    .related a { color: var(--muted); }
+    .related a:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="legal">
+    <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">CROSS-BORDER CONSENT &amp; UI TEXTS · v1.0 · INTERNAL REF</div>
+
+    <div class="impl-banner">
+      <strong>Implementation reference (noindex).</strong> Готовые формулировки согласий для встраивания в signup-форму, first-run wizard, активацию Cloud LLM провайдеров, отзыв согласия и cookie-banner. Юридическая база — Privacy Policy v1.0, Terms of Service v1.0, Public Offer v1.0. Этот документ — источник для разработчиков, а не самостоятельный публичный договор.
+    </div>
+
+    <h1>Cross-Border Consent &amp; UI Texts</h1>
+<h2>Формулировки для интерфейса dialekt.ai</h2>
+<p><strong>Версия:</strong> 1.0
+<strong>Дата:</strong> 25 апреля 2026 г.
+<strong>Связанные документы:</strong> Privacy Policy v1.0, Terms of Service v1.0, Public Offer v1.0</p>
+<hr />
+<h2>Назначение документа</h2>
+<p>Настоящий документ содержит готовые тексты согласий и информационных уведомлений для встраивания в пользовательский интерфейс продукта dialekt.ai. Каждый текст разработан с учётом требований:</p>
+<ul>
+<li>статей 7–8 Закона РК «О персональных данных и их защите» №94-V (с изменениями от 18.01.2026);</li>
+<li>статей 6, 7, 9, 13, 49 GDPR;</li>
+<li>директивы ePrivacy 2002/58/EC (для cookie consent в будущем).</li>
+</ul>
+<p><strong>Каждый текст имеет техническую разметку</strong> для разработчиков с указанием:
+- где размещается (URL/экран/контекст);
+- тип элемента UI (чекбокс, баннер, модальное окно);
+- состояние по умолчанию (предзаполнено / не предзаполнено);
+- условия логирования согласия в БД (timestamp + версия текста).</p>
+<hr />
+<h2>A. SIGNUP FORM — регистрация на лендинге</h2>
+<p><strong>Локация:</strong> https://dialekt.ai (форма регистрации)
+<strong>Контекст:</strong> до создания Учётной записи в dialekt-cloud.</p>
+<h3>A.1 Основное согласие на обработку ПДн и принятие документов</h3>
+<p><strong>Тип:</strong> обязательный чекбокс
+<strong>По умолчанию:</strong> ☐ НЕ предзаполнен
+<strong>Блокирует:</strong> кнопку «Sign up» / «Зарегистрироваться»</p>
+<h4>Русский текст:</h4>
+<blockquote>
+<p>☐ Я ознакомился(-ась) и принимаю условия <a href="https://dialekt.ai/legal/privacy">Политики конфиденциальности</a>, <a href="https://dialekt.ai/legal/terms">Условий использования</a> и <a href="https://dialekt.ai/legal/offer">Публичного договора-оферты</a>. Я даю согласие на обработку моих персональных данных (имя, email, страна, цели использования, IP-адрес) ТОО «Dialekt.ai» в целях создания и поддержания учётной записи, выдачи лицензии и операционной коммуникации.</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<p>☐ I have read and accept the <a href="https://dialekt.ai/legal/privacy">Privacy Policy</a>, <a href="https://dialekt.ai/legal/terms">Terms of Service</a>, and <a href="https://dialekt.ai/legal/offer">Public Offer</a>. I consent to the processing of my personal data (name, email, country, intended use, IP address) by TOO "Dialekt.ai" for the purposes of creating and maintaining my account, issuing the licence, and operational communication.</p>
+</blockquote>
+<h4>Технические требования:</h4>
+<ul>
+<li>При сабмите формы записать в БД таблицу <code>consent_log</code>:</li>
+<li><code>user_id</code>, <code>consent_type = 'privacy_terms_offer'</code>, <code>version = '1.0'</code>, <code>text_hash</code>, <code>granted_at</code>, <code>ip_address</code>, <code>user_agent</code></li>
+<li>Хранить полный текст согласия в версионированной таблице <code>consent_versions</code> для возможности предъявить регулятору.</li>
+</ul>
+<hr />
+<h3>A.2 Согласие на трансграничную передачу персональных данных</h3>
+<p><strong>Тип:</strong> обязательный чекбокс <strong>с раскрывающимся блоком</strong>
+<strong>По умолчанию:</strong> ☐ НЕ предзаполнен
+<strong>Блокирует:</strong> кнопку «Sign up»
+<strong>Показывается:</strong> <strong>всегда</strong>, всем пользователям независимо от страны (упрощает архитектуру; KZ-резидентам это критично, остальным — информативно)</p>
+<h4>Русский текст:</h4>
+<p><strong>Заголовок:</strong> Согласие на трансграничную передачу персональных данных</p>
+<p><strong>Раскрывающийся блок (по клику «Подробнее»):</strong></p>
+<blockquote>
+<p>В целях оказания Сервисов dialekt.ai передаёт ваши регистрационные данные (имя, email, страна, цели использования, IP-адрес) следующим обработчикам, расположенным за пределами Республики Казахстан:</p>
+<table>
+<thead>
+<tr>
+<th>Получатель</th>
+<th>Юрисдикция</th>
+<th>Передаваемые данные</th>
+<th>Цель</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zoho Corporation</td>
+<td>Соединённые Штаты Америки</td>
+<td>email, имя, содержимое транзакционных писем</td>
+<td>Доставка лицензионного ключа, восстановление пароля, инвойсы</td>
+</tr>
+<tr>
+<td>Cloudflare, Inc.</td>
+<td>Соединённые Штаты Америки (с глобальной edge-сетью)</td>
+<td>IP-адрес, метаданные DNS-запросов</td>
+<td>Защита от DDoS, маршрутизация трафика</td>
+</tr>
+<tr>
+<td>GitHub, Inc.</td>
+<td>Соединённые Штаты Америки</td>
+<td>IP-адрес, метаданные загрузок</td>
+<td>Доставка установочных файлов Программного продукта</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Срок передачи и хранения:</strong> в течение срока действия вашей учётной записи. После удаления учётной записи данные удаляются в порядке, описанном в <a href="https://dialekt.ai/legal/privacy">Политике конфиденциальности</a>.</p>
+<p><strong>Уровень защиты:</strong> Соединённые Штаты Америки в настоящее время не входят в перечень государств, обеспечивающих адекватный уровень защиты персональных данных в значении Закона РК «О персональных данных и их защите» №94-V. С каждым из вышеуказанных получателей заключено соглашение об обработке персональных данных (DPA), обязывающее их применять меры защиты не ниже уровня, установленного законодательством РК.</p>
+<p><strong>Право отзыва:</strong> вы вправе отозвать настоящее согласие в любой момент путём направления заявления на адрес privacy@dias.now. Отзыв согласия влечёт невозможность дальнейшего предоставления Сервисов и закрытие вашей учётной записи. Отзыв согласия не затрагивает правомерности обработки, осуществлённой до момента отзыва.</p>
+</blockquote>
+<p><strong>Чекбокс согласия (под раскрывающимся блоком):</strong></p>
+<blockquote>
+<p>☐ Я даю отдельное явное согласие на трансграничную передачу моих персональных данных в США указанным обработчикам в целях, указанных выше, в порядке статей 7–8 Закона РК «О персональных данных и их защите» №94-V.</p>
+</blockquote>
+<h4>English text:</h4>
+<p><strong>Title:</strong> Consent to International Transfer of Personal Data</p>
+<p><strong>Expandable block (on "Learn more" click):</strong></p>
+<blockquote>
+<p>To provide the Services, dialekt.ai transfers your registration data (name, email, country, intended use, IP address) to the following processors located outside Kazakhstan and outside the European Economic Area:</p>
+<table>
+<thead>
+<tr>
+<th>Recipient</th>
+<th>Jurisdiction</th>
+<th>Data transferred</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zoho Corporation</td>
+<td>United States</td>
+<td>email, name, contents of transactional emails</td>
+<td>Delivery of licence key, password reset, invoices</td>
+</tr>
+<tr>
+<td>Cloudflare, Inc.</td>
+<td>United States (with global edge network)</td>
+<td>IP address, DNS metadata</td>
+<td>DDoS protection, traffic routing</td>
+</tr>
+<tr>
+<td>GitHub, Inc.</td>
+<td>United States</td>
+<td>IP address, download metadata</td>
+<td>Distribution of Product binaries</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Duration of transfer and storage:</strong> for the duration of your account. Following account deletion, data is deleted in the manner described in the <a href="https://dialekt.ai/legal/privacy">Privacy Policy</a>.</p>
+<p><strong>For EEA/UK residents:</strong> transfers to Kazakhstan (where the controller is established) and to the United States are made on the basis of Standard Contractual Clauses adopted by the European Commission pursuant to Implementing Decision (EU) 2021/914, and (where applicable) the EU-U.S. Data Privacy Framework.</p>
+<p><strong>Right of withdrawal:</strong> you may withdraw this consent at any time by emailing privacy@dias.now. Withdrawal will result in the inability to provide the Services and the closure of your account. Withdrawal does not affect the lawfulness of processing carried out prior to the withdrawal.</p>
+</blockquote>
+<p><strong>Consent checkbox (below the expandable block):</strong></p>
+<blockquote>
+<p>☐ I provide my separate, explicit consent to the international transfer of my personal data to the United States to the processors identified above for the purposes stated, in accordance with Articles 7–8 of the Law of Kazakhstan on Personal Data No. 94-V (where applicable to me) and Article 49 GDPR (where applicable to me).</p>
+</blockquote>
+<h4>Технические требования:</h4>
+<ul>
+<li>Записать в <code>consent_log</code>: <code>consent_type = 'cross_border_us'</code>, <code>version</code>, <code>recipient_list_hash</code>, <code>granted_at</code>.</li>
+<li>Связать запись с конкретными sub-processors через таблицу <code>consent_recipients</code>.</li>
+<li>При изменении состава sub-processors (например, замена Zoho на ZeptoMail) — <strong>переспросить согласие</strong> у действующих пользователей по email.</li>
+</ul>
+<hr />
+<h3>A.3 Опциональное согласие на маркетинговые рассылки</h3>
+<p><strong>Тип:</strong> опциональный чекбокс <strong>отдельный от A.1 и A.2</strong>
+<strong>По умолчанию:</strong> ☐ НЕ предзаполнен
+<strong>НЕ блокирует:</strong> регистрацию</p>
+<h4>Русский текст:</h4>
+<blockquote>
+<p>☐ Я согласен(-на) получать от ТОО «Dialekt.ai» информационные рассылки о новых функциях продукта, обновлениях и предложениях. Я понимаю, что могу отписаться в один клик из любого письма или направив запрос на privacy@dias.now.</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<p>☐ I consent to receive product updates, feature announcements, and offers from TOO "Dialekt.ai". I understand I can unsubscribe at any time via the link in each email or by emailing privacy@dias.now.</p>
+</blockquote>
+<h4>Технические требования:</h4>
+<ul>
+<li><strong>Критично:</strong> этот чекбокс <strong>не должен</strong> быть объединён с A.1 или A.2. Объединение нескольких согласий в один чекбокс — нарушение GDPR Art.7(2) и Recital 32, а также ст.8 Закона РК.</li>
+<li>Записать в <code>consent_log</code> отдельной записью с <code>consent_type = 'marketing'</code>.</li>
+<li>Каждое маркетинговое письмо обязано содержать unsubscribe link, ведущий на one-click-unsubscribe (без ввода email и без обязательного логина).</li>
+</ul>
+<hr />
+<h2>B. FIRST-RUN WIZARD — после установки Продукта</h2>
+<p><strong>Локация:</strong> Программный продукт dialekt.ai, первый запуск
+<strong>Контекст:</strong> до начала функционального использования Продукта.</p>
+<h3>B.1 Информационное уведомление о локальной обработке данных</h3>
+<p><strong>Тип:</strong> информационный экран (не требует согласия)
+<strong>Действие:</strong> кнопка «Continue» / «Продолжить»</p>
+<h4>Русский текст:</h4>
+<blockquote>
+<h3>Ваши данные остаются на вашем устройстве</h3>
+<p>dialekt.ai разработан так, чтобы по умолчанию все ваши промпты, ответы моделей, история переписки и файлы, к которым вы предоставляете доступ, обрабатывались <strong>локально на этом устройстве</strong>.</p>
+<p>На наши серверы передаются только:
+- данные вашей учётной записи и лицензии;
+- технические журналы доступа (для безопасности);
+- содержимое ваших обращений в поддержку.</p>
+<p>Если вы активируете облачного LLM-провайдера (Anthropic, OpenAI, Google, AWS и других), ваши промпты будут передаваться напрямую с этого устройства в API такого провайдера, минуя наши серверы. Перед активацией каждого провайдера вы получите отдельный запрос на согласие.</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<h3>Your data stays on your device</h3>
+<p>dialekt.ai is designed so that, by default, all your prompts, model responses, chat history, and files you grant access to are processed <strong>locally on this device</strong>.</p>
+<p>Only the following data is sent to our servers:
+- your account and licence data;
+- technical access logs (for security);
+- content of your support requests.</p>
+<p>If you activate a cloud LLM provider (Anthropic, OpenAI, Google, AWS, and others), your prompts will be transmitted directly from this device to the provider's API, bypassing our servers. Before activating each provider, you will receive a separate consent prompt.</p>
+</blockquote>
+<hr />
+<h3>B.2 Опциональный сбор телеметрии (если будете добавлять в будущем)</h3>
+<blockquote>
+<p><strong>Примечание:</strong> в текущей архитектуре dialekt.ai телеметрия не собирается. Этот блок добавляется в UI <strong>только</strong> после реализации опциональной телеметрии и обновления Privacy Policy. До этого момента раздел B.2 не отображается пользователю.</p>
+</blockquote>
+<p><strong>Тип:</strong> опциональный чекбокс
+<strong>По умолчанию:</strong> ☐ НЕ предзаполнен</p>
+<h4>Русский текст:</h4>
+<blockquote>
+<p>☐ Помочь улучшить dialekt.ai: разрешить отправку анонимных данных об ошибках и использовании функций. Никакое содержимое промптов, ответов или файлов передаваться не будет. Подробнее см. <a href="https://dialekt.ai/legal/privacy#telemetry">Политику конфиденциальности, раздел Телеметрия</a>.</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<p>☐ Help improve dialekt.ai: allow sending anonymous error reports and feature usage data. No content of prompts, responses, or files will be transmitted. See <a href="https://dialekt.ai/legal/privacy#telemetry">Privacy Policy, Telemetry section</a> for details.</p>
+</blockquote>
+<hr />
+<h2>C. CLOUD LLM PROVIDER ACTIVATION — активация облачного LLM-провайдера</h2>
+<p><strong>Локация:</strong> Программный продукт dialekt.ai, экран настроек / выбор модели
+<strong>Контекст:</strong> перед первой активацией каждого облачного LLM-провайдера. Согласие запрашивается <strong>отдельно для каждого провайдера</strong> и <strong>только один раз</strong> (повторный запрос не требуется при последующих использованиях того же провайдера).</p>
+<h3>C.1 Шаблон согласия — общая форма</h3>
+<p><strong>Тип:</strong> модальное окно с обязательным чекбоксом
+<strong>По умолчанию:</strong> ☐ НЕ предзаполнен
+<strong>Блокирует:</strong> ввод API-ключа и активацию провайдера</p>
+<h4>Русский текст (шаблон):</h4>
+<blockquote>
+<h3>Активация облачного LLM-провайдера: {PROVIDER_NAME}</h3>
+<p>Вы собираетесь активировать <strong>{PROVIDER_NAME}</strong>. Это означает, что:</p>
+<ol>
+<li><strong>Куда передаются ваши данные:</strong></li>
+<li>Ваши промпты, прикреплённые файлы и контекст диалога будут передаваться напрямую с этого устройства в API {PROVIDER_NAME}.</li>
+<li>Серверы {PROVIDER_NAME} расположены в <strong>{PROVIDER_JURISDICTION}</strong>.</li>
+<li>
+<p>Запросы <strong>не проходят через серверы dialekt.ai</strong>.</p>
+</li>
+<li>
+<p><strong>Кто отвечает за ваши данные:</strong></p>
+</li>
+<li>{PROVIDER_NAME} становится самостоятельным оператором ваших данных в значении применимого законодательства.</li>
+<li>Использование {PROVIDER_NAME} регулируется собственными условиями и политикой конфиденциальности этого провайдера.</li>
+<li>
+<p>dialekt.ai не несёт ответственности за обработку ваших данных провайдером.</p>
+</li>
+<li>
+<p><strong>Что вам нужно сделать:</strong></p>
+</li>
+<li>Ознакомиться с <a href="{PROVIDER_TOS_URL}">условиями обслуживания {PROVIDER_NAME}</a>;</li>
+<li>Ознакомиться с <a href="{PROVIDER_PRIVACY_URL}">политикой конфиденциальности {PROVIDER_NAME}</a>;</li>
+<li>
+<p>Получить и ввести ваш собственный API-ключ от {PROVIDER_NAME}.</p>
+</li>
+<li>
+<p><strong>Особенно важно для резидентов Казахстана:</strong></p>
+</li>
+<li>Передача данных в <strong>{PROVIDER_JURISDICTION}</strong> является трансграничной передачей персональных данных в значении статей 7–8 Закона РК «О персональных данных и их защите» №94-V.</li>
+<li>{ADEQUACY_STATEMENT}</li>
+</ol>
+<p>☐ Я подтверждаю, что ознакомился с указанной информацией, принимаю условия {PROVIDER_NAME} и даю согласие на трансграничную передачу моих данных в {PROVIDER_JURISDICTION} в целях получения ответов от модели {PROVIDER_NAME}. Я понимаю, что могу отозвать согласие в любой момент, отключив этого провайдера в настройках Продукта.</p>
+<p>[Cancel] [Continue and enter API key]</p>
+</blockquote>
+<p><strong>Переменные шаблона:</strong></p>
+<ul>
+<li><code>{PROVIDER_NAME}</code> — отображаемое имя провайдера (например, «Anthropic», «OpenAI», «DeepSeek»)</li>
+<li><code>{PROVIDER_JURISDICTION}</code> — страна по умолчанию (см. таблицу ниже)</li>
+<li><code>{PROVIDER_TOS_URL}</code> — ссылка на ToS провайдера</li>
+<li><code>{PROVIDER_PRIVACY_URL}</code> — ссылка на Privacy Policy провайдера</li>
+<li><code>{ADEQUACY_STATEMENT}</code> — стандартная фраза в зависимости от юрисдикции (см. C.2)</li>
+</ul>
+<h4>English text (template):</h4>
+<blockquote>
+<h3>Activate Cloud LLM Provider: {PROVIDER_NAME}</h3>
+<p>You are about to activate <strong>{PROVIDER_NAME}</strong>. This means:</p>
+<ol>
+<li><strong>Where your data goes:</strong></li>
+<li>Your prompts, attached files, and conversation context will be transmitted directly from this device to {PROVIDER_NAME}'s API.</li>
+<li>{PROVIDER_NAME}'s servers are located in <strong>{PROVIDER_JURISDICTION}</strong>.</li>
+<li>
+<p>Requests <strong>do not transit through dialekt.ai servers</strong>.</p>
+</li>
+<li>
+<p><strong>Who is responsible for your data:</strong></p>
+</li>
+<li>{PROVIDER_NAME} becomes an independent controller of your data under applicable law.</li>
+<li>Use of {PROVIDER_NAME} is governed by that provider's own terms and privacy policy.</li>
+<li>
+<p>dialekt.ai is not responsible for the provider's processing of your data.</p>
+</li>
+<li>
+<p><strong>What you need to do:</strong></p>
+</li>
+<li>Review <a href="{PROVIDER_TOS_URL}">{PROVIDER_NAME}'s terms of service</a>;</li>
+<li>Review <a href="{PROVIDER_PRIVACY_URL}">{PROVIDER_NAME}'s privacy policy</a>;</li>
+<li>
+<p>Obtain and enter your own API key from {PROVIDER_NAME}.</p>
+</li>
+<li>
+<p><strong>Especially important for residents of Kazakhstan:</strong></p>
+</li>
+<li>Transfer of data to <strong>{PROVIDER_JURISDICTION}</strong> constitutes a cross-border transfer of personal data under Articles 7–8 of the Law of Kazakhstan on Personal Data No. 94-V.</li>
+<li>{ADEQUACY_STATEMENT}</li>
+</ol>
+<p>☐ I confirm that I have reviewed the above information, accept {PROVIDER_NAME}'s terms, and consent to the cross-border transfer of my data to {PROVIDER_JURISDICTION} for the purpose of obtaining responses from {PROVIDER_NAME}'s model. I understand that I can withdraw consent at any time by deactivating this provider in the Product settings.</p>
+<p>[Cancel] [Continue and enter API key]</p>
+</blockquote>
+<hr />
+<h3>C.2 Стандартные фразы об адекватности юрисдикции (<code>{ADEQUACY_STATEMENT}</code>)</h3>
+<p><strong>Логика подстановки:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Юрисдикция провайдера</th>
+<th>Статус</th>
+<th>Текст ADEQUACY_STATEMENT (RU)</th>
+<th>Текст ADEQUACY_STATEMENT (EN)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Франция (Mistral)</td>
+<td>Адекватная (ЕС в перечне РК)</td>
+<td>Франция признаётся РК как страна с адекватным уровнем защиты персональных данных. Дополнительные согласия не требуются.</td>
+<td>France is recognised by Kazakhstan as providing an adequate level of personal data protection. No additional consent is required for KZ residents.</td>
+</tr>
+<tr>
+<td>США (большинство)</td>
+<td>Неадекватная</td>
+<td>США не входят в перечень стран с адекватным уровнем защиты по законодательству РК. Активируя провайдера, вы даёте отдельное явное согласие на трансграничную передачу.</td>
+<td>The United States is not on the list of countries providing an adequate level of protection under Kazakhstani law. By activating this provider, you grant separate explicit consent to the cross-border transfer.</td>
+</tr>
+<tr>
+<td>Канада (Cohere)</td>
+<td>Условно адекватная</td>
+<td>Канада обеспечивает уровень защиты, сопоставимый с РК для коммерческой обработки. Тем не менее, активируя провайдера, вы подтверждаете согласие на трансграничную передачу.</td>
+<td>Canada provides a level of protection comparable to Kazakhstan for commercial processing. By activating this provider, you confirm consent to the cross-border transfer.</td>
+</tr>
+<tr>
+<td>Китай (DeepSeek, Z.AI)</td>
+<td><strong>Высокий риск</strong></td>
+<td><strong>ВНИМАНИЕ:</strong> Китайская Народная Республика не обеспечивает адекватный уровень защиты персональных данных, признаваемый РК. Передача данных в Китай сопряжена с повышенными рисками доступа со стороны государственных органов КНР. Активация этого провайдера может быть <strong>несовместима с обязательствами вашей организации</strong> в регулируемых отраслях (банки, медицина, госструктуры).</td>
+<td><strong>WARNING:</strong> The People's Republic of China does not provide a level of personal data protection recognised by Kazakhstan. Transfer of data to China carries elevated risks of access by Chinese government authorities. Activation of this provider may be <strong>incompatible with your organisation's obligations</strong> in regulated industries (banking, healthcare, government).</td>
+</tr>
+</tbody>
+</table>
+<h3>C.3 Жёсткая блокировка для regulated_mode</h3>
+<p><strong>Контекст:</strong> если в настройках Продукта активирован <code>regulated_mode</code>, активация Облачных LLM-провайдеров <strong>полностью заблокирована</strong> на уровне приложения. Запрос согласия по C.1 не отображается; вместо этого показывается информационное уведомление.</p>
+<h4>Русский текст:</h4>
+<blockquote>
+<h3>Активация облачных LLM-провайдеров отключена</h3>
+<p>Ваш экземпляр dialekt.ai работает в <strong>регулируемом режиме</strong> (regulated_mode). В этом режиме разрешено использование только локально размещённых моделей (Ollama).</p>
+<p>Активация {PROVIDER_NAME} и других облачных провайдеров заблокирована для обеспечения соответствия требованиям регулируемых отраслей (банковский сектор, медицина, государственные органы).</p>
+<p>Если вам требуется доступ к облачным провайдерам, обратитесь к администратору вашей организации.</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<h3>Cloud LLM provider activation is disabled</h3>
+<p>Your instance of dialekt.ai is running in <strong>regulated mode</strong>. In this mode, only locally-hosted models (Ollama) are permitted.</p>
+<p>Activation of {PROVIDER_NAME} and other cloud providers is blocked to ensure compliance with the requirements of regulated industries (banking, healthcare, government).</p>
+<p>If you require access to cloud providers, please contact your organisation's administrator.</p>
+</blockquote>
+<h3>C.4 Дополнительная безусловная блокировка DeepSeek и Z.AI в regulated_mode</h3>
+<p>В режиме <code>regulated_mode</code> провайдеры <strong>DeepSeek</strong> и <strong>Z.AI</strong> заблокированы безусловно на уровне кода (не только на уровне UI). Любая попытка их активации через изменение конфигурационных файлов должна приводить к ошибке валидации и журналированию инцидента в <code>founder_admin_log</code>.</p>
+<hr />
+<h2>D. WITHDRAWAL OF CONSENT — отзыв согласия</h2>
+<p><strong>Локация:</strong> Учётная запись пользователя в dialekt-cloud, раздел «Privacy &amp; Data» / «Конфиденциальность и данные»
+<strong>Контекст:</strong> механизм для реализации права на отзыв согласия (Art. 7(3) GDPR, ст. 8 Закона РК).</p>
+<h3>D.1 Список действующих согласий с возможностью отзыва</h3>
+<h4>Русский текст (страница с табличной формой):</h4>
+<blockquote>
+<h3>Управление согласиями</h3>
+<p>Ниже приведены ваши действующие согласия. Вы вправе отозвать любое из них в любой момент.</p>
+<table>
+<thead>
+<tr>
+<th>Согласие</th>
+<th>Дата предоставления</th>
+<th>Версия</th>
+<th>Действие</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Принятие Политики, Условий и Оферты</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td><em>Отзыв возможен только через закрытие учётной записи</em></td>
+</tr>
+<tr>
+<td>Трансграничная передача данных в США</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Отозвать]</td>
+</tr>
+<tr>
+<td>Маркетинговые рассылки</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Отозвать]</td>
+</tr>
+<tr>
+<td>Активация Anthropic</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Отозвать в настройках Продукта]</td>
+</tr>
+<tr>
+<td>Активация OpenAI</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Отозвать в настройках Продукта]</td>
+</tr>
+<tr>
+<td><em>(другие активированные провайдеры)</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Важно:</strong> отзыв согласия на трансграничную передачу влечёт невозможность дальнейшего предоставления Сервисов и закрытие вашей учётной записи в течение 30 календарных дней. Отзыв согласия не затрагивает правомерности обработки, осуществлённой до момента отзыва.</p>
+<p>Если вы хотите полностью удалить вашу учётную запись и связанные с ней данные, направьте запрос на <a href="mailto:privacy@dias.now">privacy@dias.now</a> или используйте кнопку ниже:</p>
+<p>[Запросить полное удаление учётной записи и данных]</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<h3>Manage Your Consents</h3>
+<p>Below are your active consents. You may withdraw any of them at any time.</p>
+<table>
+<thead>
+<tr>
+<th>Consent</th>
+<th>Granted</th>
+<th>Version</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acceptance of Privacy Policy, Terms, and Public Offer</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td><em>Withdrawal only via account closure</em></td>
+</tr>
+<tr>
+<td>Cross-border transfer to the United States</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Withdraw]</td>
+</tr>
+<tr>
+<td>Marketing communications</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Withdraw]</td>
+</tr>
+<tr>
+<td>Anthropic activation</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Withdraw in Product settings]</td>
+</tr>
+<tr>
+<td>OpenAI activation</td>
+<td>{GRANT_DATE}</td>
+<td>v1.0</td>
+<td>[Withdraw in Product settings]</td>
+</tr>
+<tr>
+<td><em>(other activated providers)</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Important:</strong> withdrawal of cross-border transfer consent will result in the inability to provide the Services and closure of your account within 30 calendar days. Withdrawal does not affect the lawfulness of processing carried out prior to the withdrawal.</p>
+<p>If you wish to fully delete your account and associated data, email <a href="mailto:privacy@dias.now">privacy@dias.now</a> or use the button below:</p>
+<p>[Request full account and data deletion]</p>
+</blockquote>
+<hr />
+<h2>E. COOKIE BANNER — для будущего использования</h2>
+<p><strong>Статус:</strong> в текущей архитектуре на лендинге используются только строго необходимые cookie (Cloudflare bot protection). Cookie banner <strong>не требуется</strong> до момента добавления аналитики, ремаркетинга или иных non-essential cookies.</p>
+<p><strong>Этот раздел активируется только при добавлении non-essential cookies (Plausible, PostHog, Google Analytics и т.д.).</strong></p>
+<h3>E.1 Шаблон baseline cookie banner</h3>
+<h4>Русский текст:</h4>
+<blockquote>
+<h3>Использование cookie</h3>
+<p>Мы используем cookie для обеспечения работы сайта и (с вашего согласия) для понимания того, как посетители используют наш сайт. Подробнее см. <a href="https://dialekt.ai/legal/privacy#cookies">Политику конфиденциальности</a>.</p>
+<p>[Принять все] [Только необходимые] [Настроить]</p>
+</blockquote>
+<h4>English text:</h4>
+<blockquote>
+<h3>Use of Cookies</h3>
+<p>We use cookies to operate the site and (with your consent) to understand how visitors use our site. See our <a href="https://dialekt.ai/legal/privacy#cookies">Privacy Policy</a> for details.</p>
+<p>[Accept all] [Necessary only] [Customise]</p>
+</blockquote>
+<h4>Технические требования:</h4>
+<ul>
+<li>Кнопки «Принять все» и «Только необходимые» должны быть <strong>визуально равноценными</strong> (одинаковый размер, цвет, расположение). Это требование GDPR Recital 32 и решений CJEU (Planet49 C-673/17).</li>
+<li>До нажатия любой из кнопок non-essential cookies <strong>не должны</strong> ставиться.</li>
+<li>В разделе «Настроить» должны быть отдельные тогглы для каждой категории (analytics, marketing, functional), все по умолчанию выключены.</li>
+</ul>
+<hr />
+<h2>F. AUDIT TRAIL — журналирование согласий</h2>
+<h3>F.1 Схема таблицы <code>consent_log</code> (PostgreSQL)</h3>
+<pre><code class="language-sql">CREATE TABLE consent_log (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id),
+    consent_type VARCHAR(64) NOT NULL,           -- 'privacy_terms_offer', 'cross_border_us', 'marketing', 'llm_anthropic', etc.
+    consent_version VARCHAR(16) NOT NULL,         -- '1.0'
+    consent_text_hash VARCHAR(64) NOT NULL,       -- SHA-256 текста, который видел пользователь
+    granted_at TIMESTAMPTZ NOT NULL,
+    withdrawn_at TIMESTAMPTZ,                     -- NULL если действует
+    ip_address INET NOT NULL,
+    user_agent TEXT,
+    locale VARCHAR(8) NOT NULL,                   -- 'ru', 'en'
+    metadata JSONB                                -- доп. данные: список получателей при cross-border, и т.д.
+);
+
+CREATE INDEX idx_consent_log_user ON consent_log(user_id);
+CREATE INDEX idx_consent_log_active ON consent_log(user_id, consent_type) WHERE withdrawn_at IS NULL;
+</code></pre>
+<h3>F.2 Схема таблицы <code>consent_versions</code></h3>
+<pre><code class="language-sql">CREATE TABLE consent_versions (
+    consent_type VARCHAR(64) NOT NULL,
+    version VARCHAR(16) NOT NULL,
+    locale VARCHAR(8) NOT NULL,
+    full_text TEXT NOT NULL,
+    text_hash VARCHAR(64) NOT NULL,
+    effective_from TIMESTAMPTZ NOT NULL,
+    effective_until TIMESTAMPTZ,
+    PRIMARY KEY (consent_type, version, locale)
+);
+</code></pre>
+<p><strong>Назначение:</strong> при проверке регулятором или в споре с пользователем мы должны иметь возможность предъявить <strong>точный текст</strong>, который пользователь видел в момент предоставления согласия. Хеш в <code>consent_log</code> сверяется с хешем в <code>consent_versions</code>.</p>
+<h3>F.3 Retention журнала согласий</h3>
+<ul>
+<li>Записи <code>consent_log</code> хранятся <strong>3 года после отзыва согласия</strong> или <strong>3 года после удаления учётной записи</strong>, в зависимости от того, что наступит раньше после удаления учётки.</li>
+<li><code>consent_versions</code> — хранятся <strong>бессрочно</strong> (это история юридических документов, удалять нельзя).</li>
+</ul>
+<h3>F.4 Защита от подделки согласий</h3>
+<ul>
+<li>Записи <code>consent_log</code> доступны на запись только сервису согласий, не общему backend-приложению.</li>
+<li>Изменение существующих записей запрещено на уровне БД (триггер запрещает UPDATE, кроме поля <code>withdrawn_at</code>).</li>
+<li>Раз в неделю производится подписание актуального состояния таблицы хешем (Merkle root) с архивацией в внешнее immutable storage (опционально для compliance-зрелости уровня Enterprise).</li>
+</ul>
+<hr />
+<h2>G. ОБНОВЛЕНИЕ СОГЛАСИЙ ПРИ ИЗМЕНЕНИИ УСЛОВИЙ</h2>
+<h3>G.1 Когда требуется переспросить согласие</h3>
+<table>
+<thead>
+<tr>
+<th>Изменение</th>
+<th>Действие</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Существенное изменение Privacy Policy (новые цели обработки, новые категории данных)</td>
+<td>Email-уведомление + переподтверждение при следующем входе</td>
+</tr>
+<tr>
+<td>Добавление нового sub-processor с новой юрисдикцией</td>
+<td>Email-уведомление + переподтверждение cross-border consent</td>
+</tr>
+<tr>
+<td>Замена существующего sub-processor (Zoho → ZeptoMail в той же юрисдикции)</td>
+<td>Email-уведомление за 30 дней; переподтверждение <strong>не требуется</strong>, если не меняется юрисдикция</td>
+</tr>
+<tr>
+<td>Изменение Terms of Service в части, не затрагивающей обработку ПДн</td>
+<td>Email-уведомление за 30 дней без переподтверждения</td>
+</tr>
+<tr>
+<td>Опечатки, уточнения формулировок</td>
+<td>Без уведомления</td>
+</tr>
+</tbody>
+</table>
+<h3>G.2 Текст переподтверждения согласия (при следующем входе)</h3>
+<h4>Русский текст:</h4>
+<blockquote>
+<h3>Обновление условий обработки данных</h3>
+<p>Мы обновили <a href="https://dialekt.ai/legal/privacy">Политику конфиденциальности</a> и <a href="https://dialekt.ai/legal/terms">Условия использования</a>. Существенные изменения:</p>
+<ul>
+<li>{CHANGE_LIST}</li>
+</ul>
+<p>Изменения вступают в силу с {EFFECTIVE_DATE}. Чтобы продолжить использование Сервисов, ознакомьтесь с обновлёнными условиями и подтвердите согласие.</p>
+<p>☐ Я ознакомился(-ась) с обновлёнными Политикой и Условиями и принимаю их.
+☐ {ADDITIONAL_CONSENT_IF_CROSS_BORDER_CHANGED}</p>
+<p>[Принять и продолжить] [Отказаться и закрыть учётную запись]</p>
+</blockquote>
+<hr />
+<h2>H. ЧЕКЛИСТ ВНЕДРЕНИЯ</h2>
+<p>Перед публичным релизом dialekt.ai разработчик подтверждает следующее:</p>
+<ul>
+<li>[ ] <strong>A.1</strong> реализован: чекбокс не предзаполнен, блокирует submit, ведёт лог в <code>consent_log</code>.</li>
+<li>[ ] <strong>A.2</strong> реализован: раскрывающийся блок с актуальным списком sub-processors, чекбокс не предзаполнен, лог записывается с указанием получателей.</li>
+<li>[ ] <strong>A.3</strong> реализован: чекбокс маркетинга <strong>отдельный</strong>, не предзаполнен, не блокирует submit.</li>
+<li>[ ] <strong>B.1</strong> показывается при первом запуске Продукта.</li>
+<li>[ ] <strong>C.1</strong> реализован для <strong>каждого</strong> из 18 поддерживаемых LLM-провайдеров с правильным <code>{PROVIDER_JURISDICTION}</code> и <code>{ADEQUACY_STATEMENT}</code>.</li>
+<li>[ ] <strong>C.3</strong> проверен: при <code>regulated_mode = true</code> модальное окно C.1 не отображается, вместо него показывается C.3.</li>
+<li>[ ] <strong>C.4</strong> проверен: DeepSeek и Z.AI заблокированы на уровне кода в <code>regulated_mode</code>, не только в UI.</li>
+<li>[ ] <strong>D.1</strong> реализован: страница «Privacy &amp; Data» с возможностью отозвать каждое согласие.</li>
+<li>[ ] <strong>F.1, F.2</strong> созданы: таблицы <code>consent_log</code> и <code>consent_versions</code> существуют в БД.</li>
+<li>[ ] <strong>F.4</strong> настроен: триггеры запрета UPDATE, ограничения доступа на запись.</li>
+<li>[ ] Все тексты доступны на двух языках (RU + EN), переключение языка работает.</li>
+<li>[ ] Unsubscribe link в маркетинговых письмах работает в один клик без логина.</li>
+<li>[ ] Endpoint <code>POST /api/v1/consent/withdraw</code> реализован для программного отзыва согласия.</li>
+</ul>
+<hr />
+<p><strong>Конец документа Cross-Border Consent &amp; UI Texts v1.0</strong></p>
+
+    <div class="related">
+      <a href="/privacy.html">→ Privacy Policy (EN)</a>
+      <a href="/privacy-ru.html">→ Политика конфиденциальности (RU)</a>
+      <a href="/terms.html">→ Terms of Service (EN)</a>
+      <a href="/terms-ru.html">→ Условия обслуживания (RU)</a>
+      <a href="/public-offer.html">→ Публичная оферта (KZ)</a>
+    </div>
+
+    <p class="source-note">Markdown-исходник: <a href="https://github.com/dialektai/dialektai/blob/main/docs/legal/cross-border-consent-ui-texts.md"><code>docs/legal/cross-border-consent-ui-texts.md</code></a></p>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+</body>
+</html>

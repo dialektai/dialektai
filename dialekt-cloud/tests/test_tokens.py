@@ -79,21 +79,50 @@ def test_bearer_token_malformed():
 
 
 def test_admin_session_token_roundtrip():
-    admin_key = "a" * 64
-    token = create_admin_session_token(admin_key, SECRET)
-    assert verify_admin_session_token(token, admin_key, SECRET)
+    """Multi-admin v1.1: admin_id + email baked into payload, JWT_SECRET-only signing."""
+    token = create_admin_session_token(admin_id="abc-123", email="dias@dialekt.ai", secret=SECRET)
+    payload = verify_admin_session_token(token, SECRET)
+    assert payload is not None
+    assert payload["admin_id"] == "abc-123"
+    assert payload["email"] == "dias@dialekt.ai"
+    assert payload["role"] == "founder_admin"
 
 
-def test_admin_session_token_wrong_key():
-    admin_key = "a" * 64
-    token = create_admin_session_token(admin_key, SECRET)
-    assert not verify_admin_session_token(token, "b" * 64, SECRET)
+def test_admin_session_token_wrong_secret():
+    token = create_admin_session_token(admin_id="abc", email="x@y.z", secret=SECRET)
+    assert verify_admin_session_token(token, "different_secret") is None
 
 
 def test_admin_session_token_expired():
-    admin_key = "a" * 64
-    token = create_admin_session_token(admin_key, SECRET, ttl=-1)
-    assert not verify_admin_session_token(token, admin_key, SECRET)
+    token = create_admin_session_token(admin_id="abc", email="x@y.z", secret=SECRET, ttl=-1)
+    assert verify_admin_session_token(token, SECRET) is None
+
+
+def test_admin_session_token_signing_does_not_use_admin_key():
+    """Mentor P2 fix: DIALEKT_ADMIN_KEY is no longer in the signing material.
+    Two tokens minted with the same admin_id but the same secret must verify
+    against ONLY the JWT_SECRET, regardless of any 'admin_key' env var."""
+    token = create_admin_session_token(admin_id="abc", email="x@y.z", secret=SECRET)
+    # Verifies under JWT_SECRET, no extra key parameter accepted by the new sig.
+    assert verify_admin_session_token(token, SECRET) is not None
+
+
+def test_admin_session_token_rejects_old_shape_without_admin_id():
+    """Pre-v1.1 tokens (no admin_id in payload) MUST be refused — caller
+    must not be able to authenticate as 'whoever' with a legacy token."""
+    import json, base64, hmac, hashlib
+    # Forge a payload missing admin_id — same shape as old tokens.
+    legacy_payload = {"role": "founder_admin", "iat": 0, "exp": 9_999_999_999}
+    body = base64.urlsafe_b64encode(
+        json.dumps(legacy_payload, separators=(",", ":"), sort_keys=True).encode()
+    ).decode().rstrip("=")
+    sig = base64.urlsafe_b64encode(
+        hmac.new((SECRET + "_admin_session").encode(), body.encode(), hashlib.sha256).digest()
+    ).decode().rstrip("=")
+    forged = f"{body}.{sig}"
+    # Even though the signature is technically correct, the missing
+    # admin_id must trigger refusal.
+    assert verify_admin_session_token(forged, SECRET) is None
 
 
 def test_different_users_different_tokens():

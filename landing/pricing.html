@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricing — dialekt.ai</title>
+  <meta name="description" content="Transparent per-seat pricing. Trial free for 30 days. Starter $25, Professional $55, Enterprise $95+ per seat per month.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .pricing-hero { padding: 80px 0 24px; text-align: center; }
+    .pricing-hero h1 { font-size: clamp(32px, 6vw, 64px); line-height: 1.05; margin-bottom: 16px; }
+    .pricing-hero p { font-size: 16px; color: var(--muted); max-width: 600px; margin: 0 auto; line-height: 1.6; }
+    .billing-toggle { display: inline-flex; gap: 0; margin-top: 28px; border: 1px solid var(--border); }
+    .billing-toggle button { padding: 8px 18px; background: transparent; color: var(--muted); border: none; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; }
+    .billing-toggle button.active { background: var(--cyan); color: var(--bg0); }
+    .compare-table { margin-top: 80px; border: 1px solid var(--border); }
+    .compare-table table { width: 100%; border-collapse: collapse; }
+    .compare-table th, .compare-table td { padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .compare-table th { background: var(--bg1); font-family: var(--mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.12em; text-transform: uppercase; }
+    .compare-table td:not(:first-child) { text-align: center; }
+    .compare-table td.feature { color: var(--text); }
+    .compare-table td.yes { color: var(--green); }
+    .compare-table td.no { color: var(--dim); }
+    .compare-table tr:hover td { background: rgba(0,212,255,0.02); }
+    .faq { margin-top: 80px; }
+    .faq h2 { font-size: clamp(24px, 4vw, 40px); margin-bottom: 32px; }
+    .faq details { border-bottom: 1px solid var(--border); padding: 18px 0; }
+    .faq summary { cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text); padding-right: 24px; position: relative; }
+    .faq summary::after { content: "+"; position: absolute; right: 0; color: var(--cyan); font-size: 20px; }
+    .faq details[open] summary::after { content: "−"; }
+    .faq p { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="wrap">
+    <div class="pricing-hero">
+      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:14px">PRICING · PER SEAT · PER MONTH</div>
+      <h1>Pay for the team,<br>not for the hype.</h1>
+      <p>Per-seat pricing. No usage-based billing. No "tokens metered" surprise charges. Local Ollama is unlimited; cloud LLM providers bill you directly.</p>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Trial -->
+      <div class="tier">
+        <div class="tier-name">Trial</div>
+        <div class="tier-price">$0</div>
+        <div class="tier-blurb">30 days free. No credit card. Verify your email and you're in.</div>
+        <a href="/signup.html" class="btn full">START FREE TRIAL</a>
+        <ul class="tier-features mt-24">
+          <li>30 days, all features</li>
+          <li>3 seats included</li>
+          <li>All 18 cloud providers</li>
+          <li>Local Ollama (33 models)</li>
+          <li>Email support</li>
+          <li class="muted">Dedicated SLA</li>
+          <li class="muted">SSO / SAML</li>
+        </ul>
+      </div>
+
+      <!-- Starter -->
+      <div class="tier">
+        <div class="tier-name">Starter</div>
+        <div class="tier-price"><span class="currency">$</span>25<span class="per">/seat · мес</span></div>
+        <div class="tier-blurb">Минимум 3 seats. Команды до 15 человек, индивидуальные разработчики.</div>
+        <a href="mailto:hello@dialekt.ai?subject=Starter%20plan%20request" class="btn full">CONTACT SALES</a>
+        <ul class="tier-features mt-24">
+          <li>From 3 seats</li>
+          <li>Local Ollama (full catalog)</li>
+          <li>All 18 cloud providers (own keys)</li>
+          <li>Email support · 48h SLA</li>
+          <li>Audit log · 90 days</li>
+          <li class="muted">Priority support</li>
+          <li class="muted">SSO / SAML</li>
+        </ul>
+      </div>
+
+      <!-- Professional (PRIMARY) -->
+      <div class="tier primary">
+        <div class="tier-badge">PRIMARY</div>
+        <div class="tier-name">Professional</div>
+        <div class="tier-price"><span class="currency">$</span>55<span class="per">/seat · мес</span></div>
+        <div class="tier-blurb">Минимум 5 seats. SMB 50–300 сотрудников.</div>
+        <a href="mailto:hello@dialekt.ai?subject=Professional%20plan%20request" class="btn primary full">CONTACT SALES</a>
+        <ul class="tier-features mt-24">
+          <li>From 5 seats</li>
+          <li>Everything in Starter</li>
+          <li>Priority support · 4h SLA</li>
+          <li>Audit log · unlimited retention</li>
+          <li>Regulated mode (KZ ПДн)</li>
+          <li>Custom MCP servers · onboarding</li>
+          <li>Quarterly check-ins</li>
+        </ul>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="tier">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price"><span class="currency">$</span>95<span class="per">+ /seat · мес</span></div>
+        <div class="tier-blurb">Минимум 10 seats. SSO, SLA, выделенная поддержка.</div>
+        <a href="mailto:hello@dialekt.ai?subject=Enterprise%20plan%20request" class="btn full">CONTACT SALES</a>
+        <ul class="tier-features mt-24">
+          <li>From 10 seats</li>
+          <li>Everything in Professional</li>
+          <li>SSO (SAML / OIDC)</li>
+          <li>Dedicated CSM</li>
+          <li>Custom SLA (1h, 99.9% uptime)</li>
+          <li>On-prem dialekt-cloud option</li>
+          <li>Custom contract & invoicing</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="text-center mt-24 text-muted" style="font-size:12px">
+      Prices shown in USD. Billed monthly or annually (-15%). KZT/RUB invoicing available for KZ/RU customers.
+      Cloud LLM provider costs (OpenAI, Anthropic, etc.) are billed by them directly — dialekt does not mark up.
+    </p>
+
+    <!-- Compare -->
+    <div class="compare-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Trial</th>
+            <th>Starter</th>
+            <th>Pro</th>
+            <th>Enterprise</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="feature">Local Ollama (33 models)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">All 18 cloud LLM providers</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">MCP servers</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">Agent manifests / wizard</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">Minimum seats</td><td>3</td><td>3</td><td>5</td><td>10</td></tr>
+          <tr><td class="feature">Audit log retention</td><td>90 days</td><td>90 days</td><td>unlimited</td><td>unlimited</td></tr>
+          <tr><td class="feature">Support</td><td>email</td><td>email · 48h</td><td>priority · 4h</td><td>dedicated CSM</td></tr>
+          <tr><td class="feature">Regulated mode (KZ ПДн)</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">SSO (SAML / OIDC)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">SLA</td><td class="no">—</td><td class="no">—</td><td>4h response</td><td>custom (1h)</td></tr>
+          <tr><td class="feature">On-prem dialekt-cloud</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td class="feature">Custom contract & invoicing</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FAQ -->
+    <div class="faq">
+      <h2>Pricing FAQ</h2>
+      <details>
+        <summary>Do I pay for tokens / API calls?</summary>
+        <p>No. Per-seat pricing only. If you connect a cloud LLM provider (OpenAI, Anthropic, etc.), they bill you directly with their own metering. dialekt does not see your prompts or responses for cloud providers, and we do not mark up.</p>
+      </details>
+      <details>
+        <summary>What happens after my 30-day trial expires?</summary>
+        <p>Your data stays for 12 months. The license stops validating, but you can email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a> to extend or convert to paid. Local Ollama keeps working — only the cloud-license features deactivate.</p>
+      </details>
+      <details>
+        <summary>Can I get a longer free trial?</summary>
+        <p>Yes — for design partners, regulated-market pilots, and educators we sometimes grant up to 12 months free. Email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a> with your use case.</p>
+      </details>
+      <details>
+        <summary>Do you support KZT / RUB invoices?</summary>
+        <p>Yes. KZ-registered customers get KZT invoices through Caspian Bank settlement; RU customers get RUB invoices via Tochka. International customers pay in USD via SWIFT or invoice-then-card.</p>
+      </details>
+      <details>
+        <summary>Can I switch tiers mid-cycle?</summary>
+        <p>Yes. Upgrade is instant and prorated. Downgrade applies at the next billing cycle.</p>
+      </details>
+      <details>
+        <summary>What's "regulated mode"?</summary>
+        <p>A toggle that hides all cloud LLM providers in the desktop app. Required for some KZ pilots subject to ПДн §16 cross-border rules. All LLM inference stays on local Ollama.</p>
+      </details>
+      <details>
+        <summary>Is there a discount for annual billing?</summary>
+        <p>Yes — 15% off when paid annually. Email us for the annual quote.</p>
+      </details>
+      <details>
+        <summary>Do you have a free / open-source tier?</summary>
+        <p>Yes — the 30-day trial gives you all features for free. After expiry, you can request an extension via email if you're an indie developer, student, or open-source maintainer. Sustainable pricing for everyone else funds the work.</p>
+      </details>
+      <details>
+        <summary>Why do I need to sign up to download?</summary>
+        <p>So we know who's running dialekt and can help when something breaks. Trial signup is 30 seconds, no credit card. The desktop app itself is local-first — your prompts never leave your machine after install.</p>
+      </details>
+    </div>
+
+    <div class="text-center mt-32" style="padding-bottom:80px">
+      <h2 style="font-size:clamp(22px,4vw,32px);margin-bottom:14px">Ready to ship faster?</h2>
+      <p class="text-muted" style="margin-bottom:24px">Start your 30-day trial. No credit card.</p>
+      <a href="/signup.html" class="btn primary lg">START FREE TRIAL →</a>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+</body>
+</html>
