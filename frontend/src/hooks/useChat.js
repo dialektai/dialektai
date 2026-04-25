@@ -14,6 +14,8 @@ export function useChat() {
   const [models, setModels] = useState([]);
   const [activeModel, setActiveModel] = useState('gemma3-12b');
   const [autonomy, setAutonomy] = useState('ask-write');
+  const [consentQueue, setConsentQueue] = useState([]);     // pending mcp_consent_request payloads
+  const [mcpSetupErrors, setMcpSetupErrors] = useState([]); // soft-fail messages from join
 
   const wsRef = useRef(null);
   const streamingMsgRef = useRef(null);
@@ -197,6 +199,23 @@ export function useChat() {
           // session join ack
         } else if (chunk.type === 'autonomy_ok') {
           setAutonomy(chunk.level);
+        } else if (chunk.type === 'mcp_consent_request') {
+          // Backend asks the user to approve a destructive MCP tool call.
+          // Modal renders the head of the queue; concurrent requests
+          // stack and resolve one at a time.
+          setConsentQueue(prev => [...prev, { ...chunk, status: 'pending' }]);
+        } else if (chunk.type === 'mcp_consent_timeout') {
+          // Backend timed out waiting for a response (30s). The
+          // backend already returned DENIED to the runtime; the modal
+          // swaps to an error banner so the user knows what happened.
+          setConsentQueue(prev => prev.map(r =>
+            r.request_id === chunk.request_id ? { ...r, status: 'timed_out' } : r
+          ));
+        } else if (chunk.type === 'mcp_setup_error') {
+          // Soft-fail at session join — agent's mcp_servers couldn't
+          // be wired (missing secret, bad transport spec, etc). Chat
+          // still works, just without MCP. Surface inline.
+          setMcpSetupErrors(prev => [...prev, chunk.error || 'unknown MCP setup error']);
         } else {
           applyChunk(chunk);
         }
@@ -265,11 +284,43 @@ export function useChat() {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   }, []);
 
+  // ── MCP consent ────────────────────────────────────────────────────
+  // Three decisions map to the backend ConsentDecision enum:
+  //   "approved"          — single tool call only
+  //   "approved_session"  — cache (server, tool) for this WS session
+  //   "denied"            — refuse, runtime raises MCPConsentDenied
+  const respondConsent = useCallback((decision) => {
+    setConsentQueue(prev => {
+      const head = prev[0];
+      if (!head || head.status !== 'pending') return prev;
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'mcp_consent_response',
+          request_id: head.request_id,
+          decision,
+        }));
+      }
+      return prev.slice(1);
+    });
+  }, []);
+
+  // User dismissing the timeout banner — backend already returned
+  // DENIED to the runtime, so we just pop the head from the local queue.
+  const ackConsentTimeout = useCallback(() => {
+    setConsentQueue(prev => prev[0]?.status === 'timed_out' ? prev.slice(1) : prev);
+  }, []);
+
+  const dismissMcpSetupError = useCallback((idx) => {
+    setMcpSetupErrors(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
   return {
     messages, streaming, connected, ollamaOnline,
     sessionId, sessionTitle, sessions,
     models, activeModel, autonomy,
     send, stop, clear, newSession, switchModel, setAutonomyLevel, checkHealth,
     fetchSessions, deleteSession, switchSession, confirm,
+    consentQueue, respondConsent, ackConsentTimeout,
+    mcpSetupErrors, dismissMcpSetupError,
   };
 }

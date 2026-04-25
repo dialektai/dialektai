@@ -50,7 +50,18 @@ export default function OfflineScreen({ onNav }) {
   const [checking, setChecking] = useState(false);
   const [starting, setStarting] = useState(false);
   const [lastChecked, setLastChecked] = useState('just now');
+  const [hasLicense, setHasLicense] = useState(null);   // null = unknown
   const timerRef = useRef(null);
+
+  // Probe license status so the "first-time pilot" banner can decide
+  // whether to push toward Settings → License, or just trust they
+  // already have a key and the issue is purely Ollama.
+  useEffect(() => {
+    fetch(`${API}/license/status`)
+      .then(r => r.json())
+      .then(d => setHasLicense(!!(d?.license_key || d?.trial_valid)))
+      .catch(() => setHasLicense(null));
+  }, []);
 
   const check = useCallback(async () => {
     setChecking(true);
@@ -112,6 +123,32 @@ export default function OfflineScreen({ onNav }) {
               dialekt runs on a local Ollama instance at <span className="mono" style={{ color: T.text }}>http://127.0.0.1:11434</span>.
               It looks like the process isn't running, or something is blocking the port.
             </div>
+
+            {/* First-time-pilot escape hatch. Pilots without a license
+                used to dead-end here because MainScreen redirected before
+                LicenseScreen had a chance — now the gate in App.jsx catches
+                that, and this banner offers the same path explicitly so
+                returning pilots also see it. */}
+            {hasLicense === false && (
+              <div style={{
+                border: `1px solid ${T.cyan}66`, background: `${T.cyan}0a`,
+                padding: '12px 16px', marginBottom: 20,
+                display: 'flex', alignItems: 'center', gap: 14,
+              }}>
+                <Icon name="diamond" size={18} color={T.cyan} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: T.text }}>First time using dialekt?</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>
+                    Set up your license or start a 30-day trial — you don't need Ollama running for that.
+                  </div>
+                </div>
+                <button onClick={() => onNav?.('license')} style={{
+                  background: T.cyan, color: '#000', border: 'none',
+                  padding: '7px 16px', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', letterSpacing: '.04em',
+                }}>OPEN LICENSE</button>
+              </div>
+            )}
 
             <div style={{ border: `1px solid ${T.border}`, background: T.bg1, marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${T.border}`, background: T.bg2 }}>
@@ -176,6 +213,21 @@ export default function OfflineScreen({ onNav }) {
                 <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>All past sessions, files and memory are still available — you just can't send new messages.</div>
               </div>
               <button className="dlk-btn" onClick={() => onNav?.('empty')}>Open past sessions</button>
+            </div>
+
+            {/* Always-visible link to Settings → License so returning
+                pilots (license=true but Ollama dead) can still find the
+                License section to swap a key, or hit Restart Onboarding. */}
+            <div style={{
+              marginTop: 12, padding: '10px 14px',
+              display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end',
+              fontSize: 11, color: T.dim,
+            }}>
+              <span>Need to enter or change a license key, or restart onboarding?</span>
+              <button onClick={() => onNav?.('settings', { initialSection: 'License' })} style={{
+                background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                padding: '4px 12px', fontSize: 11, cursor: 'pointer', letterSpacing: '.04em',
+              }}>OPEN SETTINGS → LICENSE</button>
             </div>
           </div>
         </div>

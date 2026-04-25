@@ -3,6 +3,7 @@ import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
+import { getCloudApi } from '../lib/cloud.js';
 
 const API = 'http://localhost:8765';
 
@@ -1124,23 +1125,437 @@ const MCP_TOOLS = [
   { name: 'playwright', source: 'local binary',                            n: 22, state: 'disabled',  desc: 'browser automation' },
 ];
 
+// ── Section: MCP Servers (Phase 1.3) ──────────────────────────────────────────
+//
+// CRUD surface over /mcp-servers. Mirrors ConnectionsSection structure:
+// inline form (no modal), fetch-direct, showConfirm for destructive actions,
+// per-row [TEST] with inline result. Secrets never round-trip — backend
+// returns has_auth_token: bool and never the plaintext.
+
+const EMPTY_MCP_FORM = {
+  name: '',
+  transport: 'stdio',
+  command_text: '',
+  cwd: '',
+  url: '',
+  auth_type: '',
+  auth_token: '',
+  replace_token: false,
+  env_refs: [],          // [{env_name, ref_name}]
+  env_secrets: [],       // [{ref, value}] — plaintext going to keyring
+  timeout_seconds: '30',
+};
+
+const MCP_NAME_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
 function MCPSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [servers, setServers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [testStatus, setTestStatus] = useState({});
+  const [form, setForm] = useState(EMPTY_MCP_FORM);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/mcp-servers`);
+      const data = await r.json();
+      setServers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      addToast('Failed to load MCP servers', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const fset = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const resetForm = () => {
+    setForm(EMPTY_MCP_FORM);
+    setAdding(false);
+    setEditingId(null);
+    setFormError('');
+  };
+
+  const beginEdit = (s) => {
+    setForm({
+      name: s.name,
+      transport: s.transport,
+      command_text: (s.command || []).join('\n'),
+      cwd: s.cwd || '',
+      url: s.url || '',
+      auth_type: s.auth_type || '',
+      auth_token: '',
+      replace_token: false,
+      env_refs: Object.entries(s.env_refs || {}).map(([env_name, ref_name]) => ({ env_name, ref_name })),
+      env_secrets: [],
+      timeout_seconds: String(s.timeout_seconds || 30),
+    });
+    setEditingId(s.id);
+    setAdding(false);
+    setFormError('');
+  };
+
+  const addEnvRef = () => setForm(f => ({ ...f, env_refs: [...f.env_refs, { env_name: '', ref_name: '' }] }));
+  const removeEnvRef = (i) => setForm(f => ({ ...f, env_refs: f.env_refs.filter((_, j) => j !== i) }));
+  const setEnvRef = (i, k, v) => setForm(f => ({
+    ...f,
+    env_refs: f.env_refs.map((r, j) => j === i ? { ...r, [k]: v } : r),
+  }));
+
+  const addEnvSecret = () => setForm(f => ({ ...f, env_secrets: [...f.env_secrets, { ref: '', value: '' }] }));
+  const removeEnvSecret = (i) => setForm(f => ({ ...f, env_secrets: f.env_secrets.filter((_, j) => j !== i) }));
+  const setEnvSecret = (i, k, v) => setForm(f => ({
+    ...f,
+    env_secrets: f.env_secrets.map((s, j) => j === i ? { ...s, [k]: v } : s),
+  }));
+
+  const validate = () => {
+    if (!MCP_NAME_RE.test(form.name)) return 'Name must be kebab-case (a-z, 0-9, -), start with a letter.';
+    if (editingId == null && servers.some(s => s.name === form.name)) return `Server named "${form.name}" already exists.`;
+    if (form.transport === 'stdio' && !form.command_text.trim()) return 'stdio transport requires a command.';
+    if (form.transport === 'http' && !/^https?:\/\//.test(form.url.trim())) return 'http transport requires a valid URL.';
+    const isCreating = editingId == null;
+    if (form.auth_type === 'bearer' && isCreating && !form.auth_token) return 'Bearer auth requires a token.';
+    const ts = parseFloat(form.timeout_seconds);
+    if (!Number.isFinite(ts) || ts < 5 || ts > 300) return 'Timeout must be between 5 and 300 seconds.';
+    return '';
+  };
+
+  const submit = async () => {
+    const err = validate();
+    if (err) { setFormError(err); return; }
+    setFormError('');
+    setSaving(true);
+
+    const env_refs = Object.fromEntries(form.env_refs.filter(r => r.env_name && r.ref_name).map(r => [r.env_name, r.ref_name]));
+    const env_secrets = form.env_secrets.filter(s => s.ref && s.value);
+
+    const payload = {
+      name: form.name,
+      transport: form.transport,
+      timeout_seconds: parseFloat(form.timeout_seconds),
+      cwd: form.cwd || null,
+      env_refs,
+      env_secrets,
+    };
+    if (form.transport === 'stdio') {
+      payload.command = form.command_text.split('\n').map(s => s.trim()).filter(Boolean);
+    } else {
+      payload.url = form.url.trim();
+      if (form.auth_type) payload.auth_type = form.auth_type;
+      if (form.auth_token && (editingId == null || form.replace_token)) payload.auth_token = form.auth_token;
+    }
+
+    try {
+      const url = editingId ? `${API}/mcp-servers/${editingId}` : `${API}/mcp-servers`;
+      const method = editingId ? 'PATCH' : 'POST';
+      const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const msg = (await r.json().catch(() => ({})))?.detail || `HTTP ${r.status}`;
+        setFormError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        return;
+      }
+      await refresh();
+      addToast(editingId ? 'Server updated' : 'Server added', 'ok');
+      resetForm();
+    } catch (e) {
+      setFormError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = (s) => {
+    showConfirm({
+      title: `Delete "${s.name}"?`,
+      body: 'The server config and its keyring entries will be removed. Agents using this server will fail until you add it again.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          const r = await fetch(`${API}/mcp-servers/${s.id}`, { method: 'DELETE' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          setServers(prev => prev.filter(x => x.id !== s.id));
+          addToast(`"${s.name}" deleted`, 'ok');
+        } catch (e) {
+          addToast(`Delete failed: ${e}`, 'error');
+          refresh();
+        }
+      },
+    });
+  };
+
+  const runTest = async (s) => {
+    setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'testing' } }));
+    try {
+      const r = await fetch(`${API}/mcp-servers/${s.id}/test`, { method: 'POST' });
+      const data = await r.json();
+      if (data.success) {
+        setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'ok', tool_count: data.tool_count } }));
+      } else {
+        setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'error', error: data.error } }));
+      }
+      refresh();
+    } catch (e) {
+      setTestStatus(prev => ({ ...prev, [s.id]: { phase: 'error', error: String(e) } }));
+    }
+  };
+
+  const FInput = ({ label, k, type = 'text', placeholder, style: s }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...s }}>
+      <label style={{ fontSize: 11, color: T.dim }}>{label}</label>
+      <input type={type} value={form[k]} onChange={e => fset(k, e.target.value)}
+        placeholder={placeholder} style={{
+          background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+          padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+        }} />
+    </div>
+  );
+
+  const statusDot = (s) => {
+    const st = testStatus[s.id];
+    const live = st?.phase;
+    if (live === 'testing') return { color: T.amber, label: 'testing…' };
+    if (live === 'ok') return { color: T.green, label: `${st.tool_count} tool${st.tool_count === 1 ? '' : 's'}` };
+    if (live === 'error') return { color: T.red, label: 'error' };
+    if (s.last_test_ok === true) return { color: T.green, label: `${s.tool_count || 0} tool${s.tool_count === 1 ? '' : 's'}` };
+    if (s.last_test_ok === false) return { color: T.red, label: 'error' };
+    return { color: T.dim, label: 'untested' };
+  };
+
+  const MCPRow = ({ s, i }) => {
+    const dot = statusDot(s);
+    const st = testStatus[s.id];
+    const transportLine = s.transport === 'stdio'
+      ? `stdio · ${(s.command || []).slice(0, 2).join(' ')}${(s.command || []).length > 2 ? ' …' : ''}`
+      : `http · ${s.url}`;
+    return (
+      <Card key={s.id} title={s.name} n={String(i + 1).padStart(2, '0')} right={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="mono" style={{ color: dot.color, fontSize: 11 }} aria-label={dot.label}>● {dot.label}</span>
+        </div>
+      }>
+        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="mono" style={{ fontSize: 11, color: T.muted }}>{transportLine}</div>
+          {s.has_auth_token && (
+            <div style={{ fontSize: 11, color: T.dim }}>Bearer: <span className="mono" style={{ color: T.muted }}>••••••••</span></div>
+          )}
+          {s.auth_type === 'bearer' && !s.has_auth_token && (
+            <div style={{ fontSize: 11, color: T.amber }}>⚠ auth_type=bearer but no token set</div>
+          )}
+          {st?.phase === 'error' && st.error && (
+            <div style={{ fontSize: 11, color: T.red, border: `1px solid ${T.red}33`, padding: '6px 10px', background: `${T.red}0a` }}>{st.error}</div>
+          )}
+          {st?.phase === 'ok' && (
+            <div style={{ fontSize: 11, color: T.green }}>✓ {st.tool_count} tool{st.tool_count === 1 ? '' : 's'} discovered</div>
+          )}
+          {s.last_test_at && !st && (
+            <div style={{ fontSize: 10, color: T.dim }}>last tested {s.last_test_at}{s.last_test_error ? ` — ${s.last_test_error}` : ''}</div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button onClick={() => runTest(s)} disabled={st?.phase === 'testing'} style={{
+              background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+              padding: '5px 12px', fontSize: 11, cursor: st?.phase === 'testing' ? 'default' : 'pointer',
+            }}>{st?.phase === 'testing' ? 'TESTING…' : 'TEST'}</button>
+            <button onClick={() => beginEdit(s)} style={{
+              background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+              padding: '5px 12px', fontSize: 11, cursor: 'pointer',
+            }}>EDIT</button>
+            <button onClick={() => remove(s)} style={{
+              background: 'transparent', border: `1px solid ${T.red}66`, color: T.red,
+              padding: '5px 12px', fontSize: 11, cursor: 'pointer',
+            }}>DELETE</button>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const isFormOpen = adding || editingId != null;
+  const formTitle = editingId ? 'Edit MCP server' : 'New MCP server';
+
   return (
-    <BodyShell crumb="02 / CAPABILITIES → MCP TOOLS" title="Model Context Protocol"
-      desc="External capabilities dialekt can call. Each tool's permissions inherit your global policy.">
-      <ComingSoonBanner version="v1.1" label="MCP tool integration is not yet implemented. Connect external tools like GitHub, Slack, Linear, and Figma in v1.1." />
-      <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, border: `1px solid ${T.border}`, background: T.bg1 }}>
-        <Icon name="cog" size={32} color={T.dim} />
-        <div style={{ fontSize: 13, color: T.dim, textAlign: 'center', maxWidth: 340, lineHeight: 1.6 }}>
-          MCP support will let dialekt call external tools — GitHub, Slack, Linear, Figma, Playwright, and more.
-          Each tool inherits your permission policy (allow / ask / deny).
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
-          {['github', 'slack', 'linear', 'figma', 'playwright', 'postgres'].map(name => (
-            <span key={name} className="mono" style={{ fontSize: 10, color: T.dim, border: `1px solid ${T.border}`, padding: '3px 8px' }}>{name}</span>
-          ))}
-        </div>
-      </div>
+    <BodyShell crumb="02 / CAPABILITIES → MCP SERVERS" title="MCP Servers"
+      desc="External MCP servers agents can call. Credentials are stored in your OS keychain — never in config files or logs.">
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : servers.length === 0 && !isFormOpen ? (
+        <Card>
+          <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <Icon name="cog" size={28} color={T.dim} />
+            <div style={{ color: T.dim, fontSize: 13 }}>No MCP servers yet. Add one to expose external tools to your agents.</div>
+            <button onClick={() => setAdding(true)} style={{
+              background: T.cyan, color: '#000', border: 'none', padding: '8px 18px',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '.04em',
+            }}>+ ADD SERVER</button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {servers.map((s, i) => <MCPRow key={s.id} s={s} i={i} />)}
+          {!isFormOpen && (
+            <button onClick={() => setAdding(true)} style={{
+              background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+              padding: '10px', width: '100%', fontSize: 12, cursor: 'pointer', marginTop: 8, letterSpacing: '.04em',
+            }}>+ ADD SERVER</button>
+          )}
+        </>
+      )}
+
+      {isFormOpen && (
+        <Card title={formTitle} n={editingId ? 'EDIT' : 'NEW'}>
+          <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <FInput label="Name *" k="name" placeholder="github" />
+            <div style={{ fontSize: 10, color: T.dim, marginTop: -8 }}>kebab-case, unique</div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, color: T.dim }}>Transport *</label>
+              <div style={{ display: 'flex', gap: 16 }}>
+                {['stdio', 'http'].map(t => (
+                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+                    <input type="radio" name="mcp-transport" value={t} checked={form.transport === t}
+                      onChange={e => fset('transport', e.target.value)} />
+                    <span className="mono" style={{ color: T.text }}>{t}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {form.transport === 'stdio' ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 11, color: T.dim }}>Command * <span style={{ color: T.dim }}>(one argv token per line)</span></label>
+                  <textarea value={form.command_text} onChange={e => fset('command_text', e.target.value)}
+                    placeholder={'npx\n-y\n@modelcontextprotocol/server-github'} rows={4} style={{
+                      background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                      padding: '8px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)', outline: 'none',
+                      width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                    }} />
+                </div>
+                <FInput label="Working directory (optional)" k="cwd" placeholder="/path/to/cwd" />
+              </>
+            ) : (
+              <>
+                <FInput label="URL *" k="url" placeholder="https://example.com/mcp" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <label style={{ fontSize: 11, color: T.dim }}>Auth</label>
+                  <select value={form.auth_type} onChange={e => fset('auth_type', e.target.value)} style={{
+                    background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                    padding: '7px 10px', fontSize: 12, outline: 'none', width: '100%',
+                  }}>
+                    <option value="">None</option>
+                    <option value="bearer">Bearer token</option>
+                  </select>
+                </div>
+                {form.auth_type === 'bearer' && (
+                  <>
+                    {editingId && !form.replace_token ? (
+                      <div style={{ fontSize: 11, color: T.dim, display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <span>Token: <span className="mono">••••••••</span></span>
+                        <button type="button" onClick={() => fset('replace_token', true)} style={{
+                          background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                          padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+                        }}>REPLACE</button>
+                      </div>
+                    ) : (
+                      <FInput label={editingId ? 'New bearer token *' : 'Bearer token *'} k="auth_token" type="password" placeholder="ghp_…" />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Env refs + secrets — only meaningful for stdio but harmless for http */}
+            {form.transport === 'stdio' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, color: T.dim }}>Environment variables (mapped to secret refs)</div>
+                {form.env_refs.map((r, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+                    <input placeholder="GITHUB_TOKEN" value={r.env_name}
+                      onChange={e => setEnvRef(i, 'env_name', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <input placeholder="github_token (secret ref)" value={r.ref_name}
+                      onChange={e => setEnvRef(i, 'ref_name', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <button onClick={() => removeEnvRef(i)} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                      padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                    }}>−</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addEnvRef} style={{
+                  background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+                  padding: '6px 10px', fontSize: 11, cursor: 'pointer', alignSelf: 'flex-start',
+                }}>+ add variable</button>
+
+                <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
+                  Credential values (plaintext → keyring)
+                </div>
+                {form.env_secrets.map((sec, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}>
+                    <input placeholder="github_token (matches ref)" value={sec.ref}
+                      onChange={e => setEnvSecret(i, 'ref', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12, fontFamily: 'var(--code-font, monospace)',
+                      }} />
+                    <input type="password" placeholder="ghp_…" value={sec.value}
+                      onChange={e => setEnvSecret(i, 'value', e.target.value)} style={{
+                        background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                        padding: '6px 10px', fontSize: 12,
+                      }} />
+                    <button onClick={() => removeEnvSecret(i)} style={{
+                      background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                      padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                    }}>−</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addEnvSecret} style={{
+                  background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
+                  padding: '6px 10px', fontSize: 11, cursor: 'pointer', alignSelf: 'flex-start',
+                }}>+ add credential</button>
+                {editingId && (
+                  <div style={{ fontSize: 10, color: T.dim }}>
+                    Existing credentials stay in the keyring unless a new value is provided here.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <FInput label="Timeout (seconds)" k="timeout_seconds" placeholder="30" />
+
+            {formError && (
+              <div style={{ fontSize: 11, color: T.red, border: `1px solid ${T.red}44`, padding: '8px 12px', background: `${T.red}0a` }}>
+                {formError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={submit} disabled={saving} style={{
+                background: T.cyan, color: '#000', border: 'none', padding: '8px 20px',
+                fontSize: 12, fontWeight: 600, cursor: saving ? 'default' : 'pointer', letterSpacing: '.04em',
+              }}>{saving ? 'SAVING…' : (editingId ? 'SAVE' : 'ADD')}</button>
+              <button onClick={resetForm} disabled={saving} style={{
+                background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                padding: '8px 20px', fontSize: 12, cursor: 'pointer',
+              }}>CANCEL</button>
+            </div>
+          </div>
+        </Card>
+      )}
     </BodyShell>
   );
 }
@@ -1400,6 +1815,302 @@ function PrivacySection() {
           ))}
         </div>
       </Card>
+    </BodyShell>
+  );
+}
+
+// ── Section: License & Account ───────────────────────────────────────────────
+//
+// Re-entry surface for the license key + 30-day trial + onboarding restart.
+// Pilot feedback in 04-2026: users couldn't find where to enter their key
+// after the first-launch LicenseScreen was dismissed and had no way to
+// re-trigger the onboarding flow. This section is the durable home.
+
+function fmtMaskedKey(key) {
+  if (!key) return '—';
+  if (key.length <= 8) return '••••' + key.slice(-2);
+  return key.slice(0, 4) + '••••••••' + key.slice(-4);
+}
+
+function fmtExpiry(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString();
+  } catch { return iso; }
+}
+
+function fmtTrialDaysLeft(trialStartedAt) {
+  if (!trialStartedAt) return null;
+  const started = typeof trialStartedAt === 'number' ? trialStartedAt * 1000 : new Date(trialStartedAt).getTime();
+  if (!Number.isFinite(started)) return null;
+  const elapsedDays = (Date.now() - started) / 86400000;
+  return Math.max(0, Math.ceil(30 - elapsedDays));
+}
+
+function LicenseSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [key, setKey] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/license/status`).then(r => r.json());
+      setStatus(r);
+    } catch (e) {
+      addToast('Failed to load license status', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const submitKey = async () => {
+    const trimmed = key.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      // Match LicenseScreen.jsx validation flow exactly: cloud-validate
+      // first, fall through to local cache if cloud is unreachable.
+      let data;
+      try {
+        const cloudApi = await getCloudApi();
+        const r = await fetch(`${cloudApi}/auth/validate-license`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ license_key: trimmed }),
+        });
+        data = await r.json();
+      } catch {
+        addToast('Cloud unreachable. Check your internet connection.', 'error');
+        return;
+      }
+      if (!data?.valid) {
+        addToast(data?.message || 'License key not found or expired. Contact hello@dialekt.ai', 'error');
+        return;
+      }
+      const tenant = {
+        company_name: data.company_name || null,
+        plan: data.plan,
+        seats_limit: data.seats_limit,
+        expires_at: data.expires_at,
+      };
+      await fetch(`${API}/license/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: trimmed, tenant, bearer_token: data.bearer_token }),
+      });
+      fetch(`${API}/sync/pull`, { method: 'POST' }).catch(() => {});
+      addToast('License activated', 'ok');
+      setKey('');
+      setEditing(false);
+      await refresh();
+    } catch (e) {
+      addToast(`Validation failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startTrial = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/license/trial`, { method: 'POST' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      addToast('Trial started — 30 days', 'ok');
+      await refresh();
+    } catch (e) {
+      addToast(`Trial start failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshFromCloud = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/license/refresh`, { method: 'POST' });
+      const data = await r.json().catch(() => ({}));
+      if (data?.status === 'ok' || data?.valid) {
+        addToast('License revalidated', 'ok');
+      } else {
+        addToast(data?.reason || 'Revalidation failed', 'error');
+      }
+      await refresh();
+    } catch (e) {
+      addToast(`Revalidation failed: ${e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restartOnboarding = () => {
+    showConfirm({
+      title: 'Restart onboarding?',
+      body: 'The first-launch flow (license check, mode pick, Ollama install, model download, permissions) will be shown again on next reload. Your data is not touched.',
+      confirmLabel: 'Restart',
+      onConfirm: async () => {
+        try {
+          await fetch(`${API}/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ onboarding_completed: false }),
+          });
+          window.location.reload();
+        } catch (e) {
+          addToast(`Failed: ${e}`, 'error');
+        }
+      },
+    });
+  };
+
+  const trialDaysLeft = status?.trial ? fmtTrialDaysLeft(status?.trial_started || status?.last_validated_at) : null;
+
+  return (
+    <BodyShell crumb="03 / SYSTEM → LICENSE" title="License & account"
+      desc="Enter or change your dialekt license key, start a trial, or restart the first-launch onboarding flow.">
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : (
+        <>
+          {/* Current state ─────────────────────────────────────── */}
+          <Card title="Current state" n="01">
+            <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: '160px 1fr', gap: '10px 18px', fontSize: 12 }}>
+              <span style={{ color: T.dim }}>Status</span>
+              <span className="mono" style={{ color: status?.valid ? T.green : T.amber }}>
+                {status?.valid ? (status?.trial ? '● TRIAL' : '● ACTIVE') : '○ NO LICENSE'}
+              </span>
+
+              <span style={{ color: T.dim }}>License key</span>
+              <span className="mono" style={{ color: T.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {status?.license_key ? (reveal ? status.license_key : fmtMaskedKey(status.license_key)) : '—'}
+                {status?.license_key && (
+                  <button onClick={() => setReveal(v => !v)} style={{
+                    background: 'transparent', border: `1px solid ${T.border}`, color: T.dim,
+                    padding: '2px 8px', fontSize: 10, cursor: 'pointer',
+                  }}>{reveal ? 'HIDE' : 'REVEAL'}</button>
+                )}
+              </span>
+
+              <span style={{ color: T.dim }}>Plan</span>
+              <span className="mono" style={{ color: T.text }}>{status?.tenant?.plan || (status?.trial ? 'trial' : '—')}</span>
+
+              <span style={{ color: T.dim }}>Company</span>
+              <span style={{ color: T.text }}>{status?.tenant?.company_name || '—'}</span>
+
+              <span style={{ color: T.dim }}>Seats</span>
+              <span className="mono" style={{ color: T.text }}>{status?.tenant?.seats_limit || '—'}</span>
+
+              <span style={{ color: T.dim }}>Expires</span>
+              <span className="mono" style={{ color: T.text }}>
+                {status?.trial ? `trial · ${trialDaysLeft ?? '?'} day${trialDaysLeft === 1 ? '' : 's'} left` : fmtExpiry(status?.tenant?.expires_at)}
+              </span>
+
+              <span style={{ color: T.dim }}>Last revalidated</span>
+              <span className="mono" style={{ color: T.dim, fontSize: 11 }}>
+                {status?.last_validated_at ? new Date(status.last_validated_at * 1000).toLocaleString() : 'never'}
+              </span>
+
+              {status?.revocation_reason && (
+                <>
+                  <span style={{ color: T.red }}>Revocation</span>
+                  <span style={{ color: T.red, fontSize: 11 }}>{status.revocation_reason}</span>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
+              {status?.license_key && (
+                <button onClick={refreshFromCloud} disabled={busy} style={{
+                  background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                  padding: '6px 14px', fontSize: 11, cursor: busy ? 'default' : 'pointer',
+                }}>{busy ? '…' : 'REVALIDATE'}</button>
+              )}
+            </div>
+          </Card>
+
+          {/* Enter / change key ───────────────────────────────── */}
+          <Card title={status?.license_key ? 'Replace license key' : 'Enter license key'} n="02">
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {status?.license_key && !editing ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12, color: T.muted }}>
+                  <span>A key is currently set.</span>
+                  <button onClick={() => setEditing(true)} style={{
+                    background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                    padding: '5px 14px', fontSize: 11, cursor: 'pointer',
+                  }}>REPLACE KEY</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type={reveal ? 'text' : 'password'}
+                    value={key}
+                    onChange={e => setKey(e.target.value)}
+                    placeholder="lic_…"
+                    style={{
+                      background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                      padding: '8px 12px', fontSize: 13, fontFamily: 'var(--code-font, monospace)',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: T.dim }}>
+                    Validated against <span className="mono">api.dialekt.ai</span>. License + bearer token are stored in your OS keychain.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={submitKey} disabled={busy || !key.trim()} style={{
+                      background: T.cyan, color: '#000', border: 'none', padding: '7px 18px',
+                      fontSize: 12, fontWeight: 600, cursor: busy || !key.trim() ? 'default' : 'pointer', letterSpacing: '.04em',
+                    }}>{busy ? 'CHECKING…' : 'ACTIVATE'}</button>
+                    {editing && (
+                      <button onClick={() => { setEditing(false); setKey(''); }} disabled={busy} style={{
+                        background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                        padding: '7px 18px', fontSize: 12, cursor: 'pointer',
+                      }}>CANCEL</button>
+                    )}
+                  </div>
+                </>
+              )}
+              {!status?.license_key && !status?.trial_valid && (
+                <div style={{ paddingTop: 12, borderTop: `1px solid ${T.border}`, marginTop: 4, fontSize: 12, color: T.muted, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span>No key yet?</span>
+                  <button onClick={startTrial} disabled={busy} style={{
+                    background: 'transparent', border: `1px solid ${T.cyan}66`, color: T.cyan,
+                    padding: '5px 14px', fontSize: 11, cursor: busy ? 'default' : 'pointer', letterSpacing: '.04em',
+                  }}>START 30-DAY TRIAL</button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Restart onboarding ────────────────────────────────── */}
+          <Card title="Onboarding" n="03">
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
+              <div style={{ color: T.muted }}>
+                Replay the first-launch flow: license check → mode pick → Ollama install → model download → permissions.
+              </div>
+              <div style={{ color: T.dim, fontSize: 11 }}>
+                Your data, agents, and connections are not affected.
+              </div>
+              <div>
+                <button onClick={restartOnboarding} style={{
+                  background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+                  padding: '7px 18px', fontSize: 12, cursor: 'pointer', letterSpacing: '.04em',
+                }}>RESTART ONBOARDING</button>
+              </div>
+            </div>
+          </Card>
+
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
+            Need a license key? Email <span className="mono" style={{ color: T.muted }}>hello@dialekt.ai</span> with your company name and seat count.
+          </div>
+        </>
+      )}
     </BodyShell>
   );
 }
@@ -2243,7 +2954,7 @@ const NAV_GROUPS = [
     { k: 'Terminal & shell',icon: 'terminal'},
     { k: 'Browser',         icon: 'globe'   },
     { k: 'Screen control',  icon: 'screen'  },
-    { k: 'MCP tools',       icon: 'cog', n: 6 },
+    { k: 'MCP Servers',     icon: 'cog' },
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
   ]},
@@ -2251,6 +2962,7 @@ const NAV_GROUPS = [
     { k: 'Storage & memory',   icon: 'file'   },
     { k: 'Performance',        icon: 'cpu'    },
     { k: 'Privacy & telemetry',icon: 'shield' },
+    { k: 'License',            icon: 'shield' },
     { k: 'Admin',              icon: 'cog'    },
     { k: 'About',              icon: 'diamond'},
   ]},
@@ -2267,12 +2979,13 @@ function renderSection(s) {
     case 'Terminal & shell':   return <TerminalSection />;
     case 'Browser':            return <BrowserSection />;
     case 'Screen control':     return <ScreenSection />;
-    case 'MCP tools':          return <MCPSection />;
+    case 'MCP Servers':        return <MCPSection />;
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;
+    case 'License':            return <LicenseSection />;
     case 'Admin':              return <AdminSection />;
     case 'About':              return <AboutSection />;
     default:                   return <PermissionsSection />;

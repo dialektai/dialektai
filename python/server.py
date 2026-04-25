@@ -135,6 +135,246 @@ DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
 _active_interpreters: dict = {}  # ws_id → interpreter instance
 
+# ── MCP consent bridge (Phase 1.2 commit A) ──────────────────────────────────
+# Module-global pending-consents map. Keyed on f"{ws_id}:{request_id}".
+# Desktop dialekt is single-process; do not move to multi-worker
+# (e.g. uvicorn --workers 2+) without a Redis-backed future registry.
+_pending_consents: dict[str, asyncio.Future] = {}
+
+# Timeout before a consent prompt auto-denies. Overridable from tests
+# (monkeypatch the constant) and from production via the
+# DIALEKT_MCP_CONSENT_TIMEOUT env var (seconds). Pilots running thin
+# laptops with slow models may want to bump this past 30s without a
+# code edit.
+def _read_consent_timeout() -> float:
+    raw = os.environ.get("DIALEKT_MCP_CONSENT_TIMEOUT")
+    if raw is None:
+        return 30.0
+    try:
+        v = float(raw)
+        if v <= 0:
+            return 30.0
+        return v
+    except (TypeError, ValueError):
+        return 30.0
+
+
+_CONSENT_TIMEOUT_SECONDS = _read_consent_timeout()
+
+
+def _build_consent_prompt_fn(ws, ws_id: str, loop):
+    """Return a PromptFn (dialekt.mcp.consent.PromptFn) that talks over this ws.
+
+    The returned async callable is intended to be passed into
+    ``provider_for_autonomy(level, prompt_fn)`` so the resulting
+    ConsentProvider chain (SessionCaching → PromptConsent) resolves
+    destructive MCP tool calls against the user through the WS.
+    """
+    from dialekt.mcp import ConsentDecision, ConsentRequest
+
+    async def _prompt(request: ConsentRequest) -> ConsentDecision:
+        request_id = uuid.uuid4().hex
+        key = f"{ws_id}:{request_id}"
+        fut = loop.create_future()
+        _pending_consents[key] = fut
+        try:
+            await ws.send_text(json.dumps({
+                "type": "mcp_consent_request",
+                "request_id": request_id,
+                "server_name": request.server_name,
+                "tool_name": request.tool_name,
+                "arguments": request.arguments,
+                "destructive": request.destructive,
+                "destructive_source": request.destructive_source,
+            }))
+            try:
+                return await asyncio.wait_for(
+                    fut, timeout=_CONSENT_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                try:
+                    await ws.send_text(json.dumps({
+                        "type": "mcp_consent_timeout",
+                        "request_id": request_id,
+                    }))
+                except Exception:
+                    pass
+                return ConsentDecision.DENIED
+            except asyncio.CancelledError:
+                # ws_chat finally-block cancels pending futures on
+                # disconnect; the prompt caller sees DENIED.
+                return ConsentDecision.DENIED
+        finally:
+            _pending_consents.pop(key, None)
+
+    return _prompt
+
+
+def _handle_consent_response(ws_id: str, msg: dict) -> bool:
+    """Resolve the pending future for msg['request_id']. Return True on dispatch.
+
+    Drops silently on:
+      - unknown request_id (orphan response — frontend bug or replay)
+      - future already done (response raced a timeout)
+    Unknown ``decision`` values are coerced to DENIED (defensive default).
+    """
+    from dialekt.mcp import ConsentDecision
+
+    request_id = msg.get("request_id")
+    if not isinstance(request_id, str) or not request_id:
+        return False
+    key = f"{ws_id}:{request_id}"
+    fut = _pending_consents.get(key)
+    if fut is None or fut.done():
+        log.debug("consent response dropped (unknown/stale): %s", key)
+        return False
+    raw = msg.get("decision", "denied")
+    try:
+        decision = ConsentDecision(raw)
+    except (ValueError, TypeError):
+        decision = ConsentDecision.DENIED
+    fut.set_result(decision)
+    return True
+
+
+def _cancel_pending_consents(ws_id: str) -> None:
+    """Cancel any pending consent futures belonging to this ws_id.
+
+    Called from ws_chat's disconnect cleanup so prompt_fn consumers
+    still awaiting a response unblock with DENIED via CancelledError.
+    """
+    for key in [k for k in _pending_consents if k.startswith(f"{ws_id}:")]:
+        fut = _pending_consents.pop(key, None)
+        if fut is not None and not fut.done():
+            fut.cancel()
+
+
+# ── MCP runtime per chat session (Phase 1.5a) ────────────────────────────────
+# Module-global ws_id → MCPRuntime map. Populated when an agent's manifest
+# declares mcp_servers, popped in ws_chat finally. Test introspection only;
+# do not use for runtime logic — the agent reaches the runtime via
+# bind_mcp_runtime + the `ctx.mcp` namespace, not by looking it up here.
+#
+# Single-process assumption: do NOT enable uvicorn `--workers 2+` for the
+# desktop binary. Pending consents AND active runtimes are process-local;
+# cross-process consent + cross-process tool dispatch would need a
+# Redis-backed registry (or similar) and is explicitly out of scope.
+_active_mcp_runtimes: dict = {}
+
+
+async def _build_session_mcp_runtime(
+    *, manifest: dict, ws, ws_id: str, loop, agent_id: str,
+):
+    """Construct an MCPRuntime + sync adapter for one chat session.
+
+    Returns ``(runtime, sync_adapter, manager, bind_token)`` on success,
+    or ``None`` if the manifest declares no mcp_servers.
+
+    Soft-fails on configuration errors (missing secret, malformed
+    transport spec): emits an ``mcp_setup_error`` WS frame and returns
+    ``None`` so the chat continues without MCP — the agent's
+    ``ctx.mcp`` raises ``RuntimeError`` on first use, which surfaces
+    as a normal tool error rather than killing the session.
+    """
+    servers = list(manifest.get("mcp_servers") or [])
+    if not servers:
+        return None
+
+    from dialekt.mcp import (
+        BearerAuth, EnvVarsAuth, NoAuth,
+        HttpTransportSpec, StdioTransportSpec,
+        provider_for_autonomy,
+    )
+    from dialekt.mcp.manager import MCPClientManager
+    from dialekt.mcp.runtime import MCPRuntime
+    from dialekt.mcp.sync_bridge import create_sync_mcp
+    from dialekt.mcp.secrets_resolver import resolve_env, resolve_secret_refs
+    from dialekt.llm._plugin_context import bind_mcp_runtime, get_context
+
+    try:
+        server_specs: dict = {}
+        for entry in servers:
+            name = entry.get("name") or ""
+            transport_kind = entry.get("transport") or "stdio"
+            timeout = float(entry.get("timeout_seconds") or 30.0)
+            if transport_kind == "stdio":
+                env_raw = dict(entry.get("env") or {})
+                env_resolved = resolve_env(env_raw, server_name=name) if env_raw else {}
+                spec = StdioTransportSpec(
+                    command=list(entry.get("command") or []),
+                    env=env_resolved,
+                    cwd=entry.get("cwd"),
+                    timeout_seconds=timeout,
+                )
+                creds = EnvVarsAuth(vars=env_resolved) if env_resolved else NoAuth()
+            else:
+                spec = HttpTransportSpec(
+                    url=entry.get("url") or "",
+                    timeout_seconds=timeout,
+                )
+                auth = entry.get("auth") or {}
+                if auth.get("type") == "bearer" and auth.get("token"):
+                    token = resolve_secret_refs(auth["token"], server_name=name)
+                    creds = BearerAuth(token=token)
+                else:
+                    creds = NoAuth()
+            server_specs[name] = (spec, creds, timeout)
+
+        autonomy = ((manifest.get("autonomy") or {}).get("recommended")
+                    or "ask-before-write")
+        prompt_fn = _build_consent_prompt_fn(ws, ws_id, loop)
+        consent_provider = provider_for_autonomy(autonomy, prompt_fn)
+
+        # Use the existing PluginContext audit callback. It already POSTs
+        # to /audit/log with the **payload kwargs the runtime emits
+        # (kind, action, result, agent_id, binding_id, target,
+        # duration_ms, error_kind, extra). No re-rolled implementation.
+        audit_cb = get_context()._default_audit_callback
+
+        manager = MCPClientManager(agent_id=agent_id, audit_callback=audit_cb)
+        runtime = MCPRuntime(
+            manager=manager,
+            server_specs=server_specs,
+            consent_provider=consent_provider,
+            audit_callback=audit_cb,
+            autonomy=autonomy,
+            agent_id=agent_id,
+        )
+        sync_adapter = create_sync_mcp(runtime)
+        bind_token = bind_mcp_runtime(sync_adapter)
+        return runtime, sync_adapter, manager, bind_token
+    except Exception as e:
+        log.warning(
+            "MCP setup failed for ws_id=%s agent=%s: %s",
+            ws_id, agent_id, e,
+        )
+        try:
+            await ws.send_text(json.dumps({
+                "type": "mcp_setup_error",
+                "error": str(e)[:500],
+            }))
+        except Exception:
+            pass
+        return None
+
+
+async def _shutdown_session_mcp_runtime(ws_id: str) -> None:
+    """Pop and shut down the runtime registered for this ws_id, if any."""
+    entry = _active_mcp_runtimes.pop(ws_id, None)
+    if entry is None:
+        return
+    runtime, _adapter, manager, bind_token = entry
+    from dialekt.llm._plugin_context import unbind_mcp_runtime
+    try:
+        unbind_mcp_runtime(bind_token)
+    except Exception:
+        pass
+    try:
+        await manager.shutdown()
+    except Exception:
+        log.debug("MCP manager shutdown failed", exc_info=True)
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS connections (
     id         TEXT PRIMARY KEY,
@@ -185,6 +425,28 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
     agent_id        TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
     connection_id   TEXT,
     connection_type TEXT NOT NULL DEFAULT 'postgres',
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- MCP protocol servers registered by the user via Settings UI.
+-- Unrelated to python/mcp_servers/ directory, which holds DB routers
+-- (postgres/mysql/clickhouse) with a legacy misnomer folder name.
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL UNIQUE,
+    transport       TEXT NOT NULL CHECK (transport IN ('stdio', 'http')),
+    command_json    TEXT,
+    env_refs_json   TEXT NOT NULL DEFAULT '{}',
+    cwd             TEXT,
+    url             TEXT,
+    auth_type       TEXT,
+    auth_ref        TEXT,
+    timeout_seconds REAL NOT NULL DEFAULT 30.0,
+    last_test_at    TEXT,
+    last_test_ok    INTEGER,
+    last_test_error TEXT,
+    tool_count      INTEGER,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -440,16 +702,49 @@ async def db_create_agent(name: str, description: str, system_prompt: str,
     return agent_id
 
 
+def _mcp_server_names_from_manifest(manifest_yaml: str | None) -> list[str]:
+    """Parse the manifest YAML once and project the mcp_servers names.
+
+    Empty list when the manifest is missing, malformed, or has no
+    mcp_servers block. Used by /agents serializers so the frontend can
+    show an MCP indicator without re-parsing YAML in the browser
+    (Phase 1.6, design doc §5.2).
+    """
+    if not manifest_yaml:
+        return []
+    try:
+        import yaml as _yml
+        m = _yml.safe_load(manifest_yaml) or {}
+    except Exception:
+        return []
+    servers = m.get("mcp_servers") or []
+    out: list[str] = []
+    for entry in servers:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+            if isinstance(name, str) and name:
+                out.append(name)
+    return out
+
+
+def _serialize_agent_row(row: dict) -> dict:
+    """Augment a raw `agents` row with derived fields. Single source of
+    truth for the /agents response shape."""
+    out = dict(row)
+    out["mcp_server_names"] = _mcp_server_names_from_manifest(out.get("manifest_yaml"))
+    return out
+
+
 async def db_get_agent(agent_id: str) -> dict | None:
     cursor = await db.execute("SELECT * FROM agents WHERE id = ?", (agent_id,))
     row = await cursor.fetchone()
-    return dict(row) if row else None
+    return _serialize_agent_row(dict(row)) if row else None
 
 
 async def db_list_agents() -> list[dict]:
     cursor = await db.execute("SELECT * FROM agents ORDER BY updated_at DESC")
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return [_serialize_agent_row(dict(r)) for r in rows]
 
 
 async def db_update_agent(agent_id: str, **fields) -> None:
@@ -1042,6 +1337,357 @@ async def health():
         return {"status": "ok", "ollama": True, "models": models}
     except Exception as e:
         return {"status": "degraded", "ollama": False, "error": str(e)}
+
+
+# ── MCP Servers CRUD (Phase 1.2 commit B) ──────────────────────────────────
+# Endpoints for the Settings → MCP Servers page. Secrets live in the OS
+# keychain via dialekt.secrets; the mcp_servers row holds the non-secret
+# spec (transport, command/URL, env-var → credential-ref map, timeout,
+# last-test status). Single-user local app — no RBAC middleware here by
+# design; see docs/M2_MCP_UI_DESIGN.md §0 for local-first rationale.
+
+from typing import Literal, Optional
+from pydantic import BaseModel, Field, model_validator
+
+from dialekt.mcp.secrets_resolver import keyring_key
+from dialekt.secrets import set_secret, get_secret, delete_secret
+
+
+class MCPEnvSecret(BaseModel):
+    """One plaintext secret to be written to the keychain on save.
+
+    The value never lands in the mcp_servers row; it is written under
+    (service="dialekt", account=keyring_key(<server>, <ref>)) and
+    referenced from the manifest via ``${secrets.<ref>}``.
+    """
+    ref: str = Field(..., min_length=1)
+    value: str = Field(..., min_length=1)
+
+
+class MCPServerCreate(BaseModel):
+    name: str = Field(..., pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    transport: Literal["stdio", "http"]
+    command: Optional[list[str]] = None
+    env_refs: dict[str, str] = Field(default_factory=dict)
+    env_secrets: list[MCPEnvSecret] = Field(default_factory=list)
+    cwd: Optional[str] = None
+    url: Optional[str] = None
+    auth_type: Optional[Literal["bearer"]] = None
+    auth_ref: Optional[str] = None
+    auth_token: Optional[str] = None
+    timeout_seconds: float = Field(30.0, ge=5.0, le=300.0)
+
+    @model_validator(mode="after")
+    def _require_fields_by_transport(self):
+        if self.transport == "stdio":
+            if not self.command:
+                raise ValueError("stdio transport requires command (list of argv strings)")
+        else:
+            if not self.url:
+                raise ValueError("http transport requires url")
+        if self.auth_type == "bearer" and not self.auth_token:
+            raise ValueError("auth_type='bearer' requires auth_token on create")
+        if self.auth_token and not self.auth_ref:
+            self.auth_ref = "auth_token"
+        return self
+
+
+class MCPServerUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    transport: Optional[Literal["stdio", "http"]] = None
+    command: Optional[list[str]] = None
+    env_refs: Optional[dict[str, str]] = None
+    env_secrets: Optional[list[MCPEnvSecret]] = None
+    cwd: Optional[str] = None
+    url: Optional[str] = None
+    auth_type: Optional[Literal["bearer"]] = None
+    auth_ref: Optional[str] = None
+    auth_token: Optional[str] = None
+    timeout_seconds: Optional[float] = Field(default=None, ge=5.0, le=300.0)
+
+
+def _mcp_row_to_response(row: dict) -> dict:
+    """Serialize a mcp_servers row for the API. NEVER includes secret plaintext."""
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "transport": row["transport"],
+        "command": json.loads(row["command_json"]) if row["command_json"] else None,
+        "env_refs": json.loads(row["env_refs_json"]) if row["env_refs_json"] else {},
+        "cwd": row["cwd"],
+        "url": row["url"],
+        "auth_type": row["auth_type"],
+        # has_auth_token boolean — never the plaintext. Front-end shows "••••"
+        # if true, a "[Set token]" CTA if false.
+        "has_auth_token": bool(row["auth_ref"]),
+        "timeout_seconds": row["timeout_seconds"],
+        "last_test_at": row["last_test_at"],
+        "last_test_ok": bool(row["last_test_ok"]) if row["last_test_ok"] is not None else None,
+        "last_test_error": row["last_test_error"],
+        "tool_count": row["tool_count"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _all_refs_for_row(row: dict) -> list[str]:
+    """Every credential ref registered for this mcp_servers row."""
+    refs = list(json.loads(row["env_refs_json"] or "{}").values())
+    if row["auth_ref"]:
+        refs.append(row["auth_ref"])
+    return refs
+
+
+def _migrate_keyring_rename(old_name: str, new_name: str, refs: list[str]) -> None:
+    """Move every (old_name, ref) secret to (new_name, ref). Crash-safe order:
+    read-all → write-all-new → delete-all-old (per mentor review P2).
+    """
+    if old_name == new_name or not refs:
+        return
+    # 1) Read all existing secrets upfront.
+    snapshot: dict[str, str] = {}
+    for ref in refs:
+        val = get_secret(keyring_key(old_name, ref))
+        if val is not None:
+            snapshot[ref] = val
+    # 2) Write every new-name key first. Safe to overwrite if somehow present.
+    for ref, val in snapshot.items():
+        set_secret(keyring_key(new_name, ref), val)
+    # 3) Delete all old-name keys last. A crash before here leaves old keys
+    #    in place — the caller can retry without losing secrets.
+    for ref in snapshot:
+        try:
+            delete_secret(keyring_key(old_name, ref))
+        except Exception:
+            pass
+
+
+@app.get("/mcp-servers")
+async def list_mcp_servers_endpoint():
+    cur = await db.execute(
+        "SELECT * FROM mcp_servers ORDER BY updated_at DESC"
+    )
+    rows = await cur.fetchall()
+    return [_mcp_row_to_response(dict(r)) for r in rows]
+
+
+@app.get("/mcp-servers/{server_id}")
+async def get_mcp_server_endpoint(server_id: str):
+    from fastapi import HTTPException
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(404, "MCP server not found")
+    return _mcp_row_to_response(dict(row))
+
+
+@app.post("/mcp-servers", status_code=201)
+async def create_mcp_server_endpoint(body: MCPServerCreate):
+    from fastapi import HTTPException
+    import aiosqlite as _aiosqlite
+    cur = await db.execute("SELECT 1 FROM mcp_servers WHERE name = ?", (body.name,))
+    if await cur.fetchone():
+        raise HTTPException(409, f"MCP server named {body.name!r} already exists")
+
+    # Write secrets to keyring BEFORE inserting the row — a keyring failure
+    # should not leave an orphan row referencing missing secrets.
+    for secret in body.env_secrets:
+        set_secret(keyring_key(body.name, secret.ref), secret.value)
+    if body.auth_token:
+        set_secret(keyring_key(body.name, body.auth_ref), body.auth_token)
+
+    server_id = uuid.uuid4().hex
+    try:
+        await db.execute(
+            """
+            INSERT INTO mcp_servers (
+                id, name, transport, command_json, env_refs_json,
+                cwd, url, auth_type, auth_ref, timeout_seconds
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                server_id,
+                body.name,
+                body.transport,
+                json.dumps(body.command) if body.command else None,
+                json.dumps(body.env_refs),
+                body.cwd,
+                body.url,
+                body.auth_type,
+                body.auth_ref,
+                body.timeout_seconds,
+            ),
+        )
+        await db.commit()
+    except _aiosqlite.IntegrityError as e:
+        raise HTTPException(409, f"MCP server named {body.name!r} already exists") from e
+
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    return _mcp_row_to_response(dict(row))
+
+
+@app.patch("/mcp-servers/{server_id}")
+async def update_mcp_server_endpoint(server_id: str, body: MCPServerUpdate):
+    from fastapi import HTTPException
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(404, "MCP server not found")
+    existing = dict(row)
+
+    updates: dict = {}
+    if body.name is not None and body.name != existing["name"]:
+        dup = await db.execute(
+            "SELECT 1 FROM mcp_servers WHERE name = ? AND id != ?",
+            (body.name, server_id),
+        )
+        if await dup.fetchone():
+            raise HTTPException(409, f"MCP server named {body.name!r} already exists")
+        _migrate_keyring_rename(existing["name"], body.name, _all_refs_for_row(existing))
+        updates["name"] = body.name
+    effective_name = updates.get("name", existing["name"])
+
+    if body.transport is not None:
+        updates["transport"] = body.transport
+    if body.command is not None:
+        updates["command_json"] = json.dumps(body.command) if body.command else None
+    if body.env_refs is not None:
+        updates["env_refs_json"] = json.dumps(body.env_refs)
+    if body.cwd is not None:
+        updates["cwd"] = body.cwd
+    if body.url is not None:
+        updates["url"] = body.url
+    if body.auth_type is not None:
+        updates["auth_type"] = body.auth_type
+    if body.auth_ref is not None:
+        updates["auth_ref"] = body.auth_ref
+    if body.timeout_seconds is not None:
+        updates["timeout_seconds"] = body.timeout_seconds
+
+    # Apply new secrets AFTER the row has a consistent name (rename migrated already).
+    if body.env_secrets:
+        for secret in body.env_secrets:
+            set_secret(keyring_key(effective_name, secret.ref), secret.value)
+    if body.auth_token:
+        ref = body.auth_ref or existing["auth_ref"] or "auth_token"
+        updates.setdefault("auth_ref", ref)
+        set_secret(keyring_key(effective_name, ref), body.auth_token)
+
+    if updates:
+        cols = ", ".join(f"{k} = ?" for k in updates)
+        params = list(updates.values()) + [server_id]
+        await db.execute(
+            f"UPDATE mcp_servers SET {cols}, updated_at = datetime('now') WHERE id = ?",
+            params,
+        )
+        await db.commit()
+
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    return _mcp_row_to_response(dict(await cur.fetchone()))
+
+
+@app.delete("/mcp-servers/{server_id}", status_code=204)
+async def delete_mcp_server_endpoint(server_id: str):
+    from fastapi import HTTPException, Response
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(404, "MCP server not found")
+    existing = dict(row)
+    for ref in _all_refs_for_row(existing):
+        try:
+            delete_secret(keyring_key(existing["name"], ref))
+        except Exception:
+            pass
+    await db.execute("DELETE FROM mcp_servers WHERE id = ?", (server_id,))
+    await db.commit()
+    return Response(status_code=204)
+
+
+@app.post("/mcp-servers/{server_id}/test")
+async def test_mcp_server_endpoint(server_id: str):
+    from fastapi import HTTPException
+    from dialekt.mcp import (
+        BearerAuth,
+        EnvVarsAuth,
+        HttpTransportSpec,
+        MCPClient,
+        NoAuth,
+        StdioTransportSpec,
+    )
+    cur = await db.execute("SELECT * FROM mcp_servers WHERE id = ?", (server_id,))
+    row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(404, "MCP server not found")
+    r = dict(row)
+
+    async def _update_test(ok: bool, error: str | None, tool_count: int | None):
+        await db.execute(
+            """
+            UPDATE mcp_servers
+               SET last_test_at = datetime('now'),
+                   last_test_ok = ?,
+                   last_test_error = ?,
+                   tool_count = ?
+             WHERE id = ?
+            """,
+            (1 if ok else 0, error, tool_count, server_id),
+        )
+        await db.commit()
+
+    try:
+        if r["transport"] == "stdio":
+            command = json.loads(r["command_json"] or "[]")
+            if not command:
+                raise ValueError("missing command for stdio transport")
+            env_refs = json.loads(r["env_refs_json"] or "{}")
+            resolved_env: dict[str, str] = {}
+            for env_name, ref in env_refs.items():
+                val = get_secret(keyring_key(r["name"], ref))
+                if val is None:
+                    raise ValueError(
+                        f"env var {env_name!r} references unresolved secret "
+                        f"${{secrets.{ref}}}"
+                    )
+                resolved_env[env_name] = val
+            spec = StdioTransportSpec(
+                command=list(command),
+                env=resolved_env,
+                cwd=r["cwd"],
+                timeout_seconds=float(r["timeout_seconds"]),
+            )
+            creds = EnvVarsAuth(vars=resolved_env) if resolved_env else NoAuth()
+        else:
+            spec = HttpTransportSpec(
+                url=r["url"],
+                timeout_seconds=float(r["timeout_seconds"]),
+            )
+            if r["auth_ref"]:
+                token = get_secret(keyring_key(r["name"], r["auth_ref"]))
+                if token is None:
+                    raise ValueError(
+                        f"auth token ${{secrets.{r['auth_ref']}}} is unresolved"
+                    )
+                creds = BearerAuth(token=token)
+            else:
+                creds = NoAuth()
+
+        client = MCPClient(transport=spec, credentials=creds)
+        async with asyncio.timeout(float(r["timeout_seconds"])):
+            async with client:
+                result = await client.list_tools()
+        tool_count = len(result.tools)
+        await _update_test(True, None, tool_count)
+        return {"success": True, "tool_count": tool_count}
+    except (asyncio.TimeoutError, TimeoutError):
+        err = f"Server did not respond within {float(r['timeout_seconds']):g}s"
+        await _update_test(False, err, None)
+        return {"success": False, "error": err}
+    except Exception as e:
+        err = str(e)[:500] or type(e).__name__
+        await _update_test(False, err, None)
+        return {"success": False, "error": err}
 
 
 @app.post("/ollama/start")
@@ -1803,6 +2449,10 @@ async def ws_chat(ws: WebSocket):
                 await send({"type": "done"})
                 continue
 
+            if msg.get("type") == "mcp_consent_response":
+                _handle_consent_response(ws_id, msg)
+                continue
+
             if msg.get("type") == "confirm":
                 confirm_approved[0] = msg.get("approved", False)
                 confirm_event.set()
@@ -1840,6 +2490,24 @@ async def ws_chat(ws: WebSocket):
                     agent_for_join = await db_get_agent(sess_row[0])
                     if agent_for_join:
                         agent_ctx_for_join = await resolve_agent_context(agent_for_join)
+
+                # Phase 1.5a: build per-session MCPRuntime if the agent's
+                # manifest declares mcp_servers. Soft-fails on config
+                # errors; chat continues without MCP.
+                if agent_for_join and agent_for_join.get("manifest_yaml"):
+                    try:
+                        import yaml as _yml
+                        _parsed_for_mcp = _yml.safe_load(agent_for_join["manifest_yaml"]) or {}
+                    except Exception:
+                        _parsed_for_mcp = {}
+                    if _parsed_for_mcp.get("mcp_servers"):
+                        built = await _build_session_mcp_runtime(
+                            manifest=_parsed_for_mcp,
+                            ws=ws, ws_id=ws_id, loop=loop,
+                            agent_id=agent_for_join["id"],
+                        )
+                        if built is not None:
+                            _active_mcp_runtimes[ws_id] = built
 
                 # Load message history — used for both summarization and few-shot query
                 cursor = await db.execute(
@@ -2034,7 +2702,15 @@ async def ws_chat(ws: WebSocket):
                         send({"type": "done"}), loop
                     ).result(timeout=5)
 
-            thread = threading.Thread(target=run_oi, daemon=True)
+            # Carry the current async context (incl. bind_mcp_runtime's
+            # ContextVar) into OI's raw thread so ctx.mcp can resolve
+            # the runtime from inside synchronous Python blocks. Raw
+            # threading.Thread does NOT inherit contextvars, only
+            # asyncio tasks and asyncio.to_thread workers do — so we
+            # must copy explicitly. Mentor commit-A review P0.
+            import contextvars as _contextvars
+            _ctx_copy = _contextvars.copy_context()
+            thread = threading.Thread(target=lambda: _ctx_copy.run(run_oi), daemon=True)
             thread.start()
 
     except WebSocketDisconnect:
@@ -2043,6 +2719,8 @@ async def ws_chat(ws: WebSocket):
         log.error(f"WS error: {e}")
     finally:
         _active_interpreters.pop(ws_id, None)
+        _cancel_pending_consents(ws_id)
+        await _shutdown_session_mcp_runtime(ws_id)
 
 
 if __name__ == "__main__":

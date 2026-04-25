@@ -3,7 +3,9 @@ import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
 import ChatColumn from '../components/ChatColumn.jsx';
 import RightPanel from '../components/RightPanel.jsx';
+import ConsentModal from '../components/ConsentModal.jsx';
 import { useChat } from '../hooks/useChat.js';
+import { T } from '../tokens.js';
 
 const API = 'http://localhost:8765';
 
@@ -31,6 +33,8 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
     messages, streaming, connected, ollamaOnline,
     sessionId, sessionTitle, models, activeModel, autonomy,
     send, stop, newSession, switchSession, switchModel, setAutonomyLevel, fetchSessions, confirm,
+    consentQueue, respondConsent, ackConsentTimeout,
+    mcpSetupErrors, dismissMcpSetupError,
   } = useChat();
 
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -142,6 +146,37 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
           onAddConnection: () => onNav?.('settings', { initialSection: 'Connections' }),
         } : null}
       />
+      <ConsentModal
+        request={consentQueue[0] || null}
+        queueLength={consentQueue.length}
+        onApprove={() => respondConsent('approved')}
+        onApproveSession={() => respondConsent('approved_session')}
+        onDeny={() => respondConsent('denied')}
+        onTimeoutAck={ackConsentTimeout}
+      />
+      {mcpSetupErrors.length > 0 && (
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9998, display: 'flex', flexDirection: 'column', gap: 6,
+          maxWidth: 'min(640px, calc(100vw - 32px))',
+        }}>
+          {mcpSetupErrors.map((err, i) => (
+            <div key={i} style={{
+              padding: '8px 12px', background: T.bg2,
+              border: `1px solid ${T.amber}88`,
+              display: 'flex', alignItems: 'center', gap: 10,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            }}>
+              <span className="mono" style={{ fontSize: 10, color: T.amber, letterSpacing: '.08em' }}>⚠ MCP SETUP</span>
+              <span style={{ fontSize: 11, color: T.muted, flex: 1 }}>{err}</span>
+              <button onClick={() => dismissMcpSetupError(i)} style={{
+                background: 'transparent', border: 'none', color: T.dim,
+                fontSize: 14, cursor: 'pointer', padding: '0 4px',
+              }} aria-label="dismiss">×</button>
+            </div>
+          ))}
+        </div>
+      )}
       <RightPanel
         messages={messages}
         streaming={streaming}

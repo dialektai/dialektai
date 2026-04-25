@@ -43,6 +43,66 @@ def test_list_agents_initially_has_general_assistant(client):
     assert "General Assistant" in names
 
 
+def test_list_agents_response_includes_mcp_server_names_field(client):
+    """Phase 1.6: GET /agents response must expose mcp_server_names
+    on every row so the LeftPanel indicator can render without
+    re-parsing manifest YAML in the browser. Empty list when the
+    manifest has no mcp_servers (or no manifest at all)."""
+    r = client.get("/agents")
+    assert r.status_code == 200
+    for a in r.json():
+        assert "mcp_server_names" in a
+        assert isinstance(a["mcp_server_names"], list)
+
+
+def test_agent_with_mcp_servers_yaml_exposes_server_names(client):
+    """An agent whose manifest_yaml declares mcp_servers must surface
+    those names in both /agents/{id} and the /agents list response."""
+    yaml = """\
+spec_version: "1.1.0"
+minimum_dialekt_version: "0.20.0"
+mcp_servers:
+  - name: "github"
+    transport: "stdio"
+    command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+  - name: "slack"
+    transport: "http"
+    url: "https://example.com/slack"
+"""
+    r = client.post("/agents", json={
+        "name": "MCP-User",
+        "description": "uses MCP",
+        "system_prompt": ".",
+        "manifest_yaml": yaml,
+        "version": "1.0.0",
+    })
+    assert r.status_code == 201
+    agent_id = r.json()["id"]
+
+    one = client.get(f"/agents/{agent_id}").json()
+    assert one["mcp_server_names"] == ["github", "slack"]
+
+    listed = client.get("/agents").json()
+    found = next(a for a in listed if a["id"] == agent_id)
+    assert found["mcp_server_names"] == ["github", "slack"]
+
+
+def test_malformed_manifest_yaml_returns_empty_mcp_server_names(client):
+    """Bad YAML in manifest_yaml must not crash the serializer —
+    just return an empty list. Defends against silently breaking
+    /agents because of a single corrupt row."""
+    r = client.post("/agents", json={
+        "name": "BadYaml",
+        "description": ".",
+        "system_prompt": ".",
+        "manifest_yaml": "::: not valid yaml :::\n  - foo: [unterminated",
+        "version": "1.0.0",
+    })
+    assert r.status_code == 201
+    one = client.get(f"/agents/{r.json()['id']}").json()
+    assert one["mcp_server_names"] == []
+
+
 def test_create_agent(client):
     r = client.post("/agents", json={
         "name": "SQL Analyst",

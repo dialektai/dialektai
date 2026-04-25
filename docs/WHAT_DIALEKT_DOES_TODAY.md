@@ -1,8 +1,9 @@
 # What dialekt does today
 
-**Version:** v0.10.0 (PR #2 merge — 47 commits, merged 2026-04-24)
-**Date:** 2026-04-24
-**Status:** Pilot-ready
+**Version:** v0.20.0 (in flight — branch `feat/m2-mcp-production-complete`, awaiting ship)
+**Last shipped:** v0.11.1 (Этап 1 MCP Client, 2026-04-23)
+**Date:** 2026-04-25
+**Status:** Pilot-ready (v0.11.1 production); v0.20.0 RC adds MCP Servers UI end-to-end
 
 > This is the **executive pilot-facing summary**. For the full catalog of working agents and their sample queries, see [`AGENT_CATALOG.md`](AGENT_CATALOG.md).
 
@@ -35,7 +36,12 @@ General-purpose assistants (the bundled "General Assistant" with ComfyUI image/v
 ### Multi-tool agents
 Combinations — e.g. a Data Engineer helper with simultaneous access to a PostgreSQL connection, the filesystem, and the shell for ETL-style workflows. Setup: 10 minutes.
 
-**Total in catalog:** 10 verified working configurations across 5 categories. Add your own by remixing the manifests — see [`SETTINGS_COMBOS_TODAY.md`](SETTINGS_COMBOS_TODAY.md) for field combinations that will pass validation and fire at runtime.
+### MCP-enabled agents (v0.20.0)
+External Model Context Protocol servers (GitHub, Slack, filesystem, Linear, Figma, etc.) are configurable through Settings → MCP Servers without editing YAML. The Builder Wizard has a new "MCP Tools" step where users tick the servers an agent can call. Destructive tool calls (anything write-shaped) prompt for explicit consent in a chat-overlay modal — three-button decision (Approve once / Approve for session / Deny) with keyboard shortcuts and full audit trail. Credentials live in the OS keychain via the same `${secrets.<ref>}` interpolation Этап 1 shipped. Manifest-level toggling (`capabilities.groups: [mcp_tools]`) is handled silently when MCP servers are selected.
+
+**Real-server validation:** GitHub MCP path validated end-to-end against `@modelcontextprotocol/server-github` on 2026-04-25 — 10/10 stages green including consent prompt, audit chain linkage, real issue creation, OS-keychain lifecycle. See `docs/MCP_PRODUCTION_VALIDATION.md`. Slack MCP deferred until a maintained Slack server with a reliable connection-test gate is identified. The full unit + integration test suite passes 602 tests on this branch with zero regressions.
+
+**Total in catalog:** 10 verified working configurations across 5 categories + 3 MCP-enabled blueprints (validation pending). Add your own by remixing the manifests — see [`SETTINGS_COMBOS_TODAY.md`](SETTINGS_COMBOS_TODAY.md) for field combinations that will pass validation and fire at runtime.
 
 ---
 

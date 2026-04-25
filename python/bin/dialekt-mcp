@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""Manual / development launcher for the dialekt MCP server.
+
+On packaged installs the Tauri installer symlinks a `dialekt-mcp`
+binary into PATH that calls this script via the bundled Python.
+For dev use:
+
+    python bin/dialekt-mcp --api-key ...
+
+or symlink it somewhere on your PATH manually.
+"""
+import sys
+from pathlib import Path
+
+# Allow running directly from a git checkout without an install.
+_REPO_PYTHON = Path(__file__).resolve().parents[1]
+if str(_REPO_PYTHON) not in sys.path:
+    sys.path.insert(0, str(_REPO_PYTHON))
+
+from dialekt.mcp.server.cli import main
+
+if __name__ == "__main__":
+    sys.exit(main())
