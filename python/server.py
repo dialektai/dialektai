@@ -246,9 +246,10 @@ def _handle_consent_response(ws_id: str, msg: dict) -> bool:
 
     if raw == "approved_all":
         # Resolve the head; then snapshot-resolve every OTHER pending
-        # future for this ws_id as APPROVED. Audit per-call rows still
-        # emit through the normal path (mentor ruling Q1: keep per-call
-        # rows with batch_request_id linkage for forensic joins).
+        # future for this ws_id as APPROVED. Each per-call audit row
+        # still emits through the normal path with its own request_id
+        # (mentor ruling Q1: per-call rows preserved — no batch row,
+        # request_id is the forensic join key).
         fut.set_result(ConsentDecision.APPROVED)
         prefix = f"{ws_id}:"
         siblings = [k for k in _pending_consents
