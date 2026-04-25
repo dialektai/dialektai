@@ -5,9 +5,9 @@
       "id": "github",
       "label": "GitHub",
       "icon": "diamond",
-      "description": "Issue triage, PR review, repo housekeeping. Needs a GitHub Personal Access Token with repo scope.",
+      "description": "Issue triage, PR review, repo housekeeping. Official MCP server from GitHub. Requires the github-mcp-server Go binary on PATH (install via: go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest).",
       "transport": "stdio",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "command": ["github-mcp-server", "stdio"],
       "env_refs": {"GITHUB_PERSONAL_ACCESS_TOKEN": "github_token"},
       "secret_prompts": [
         {
@@ -20,9 +20,8 @@
       ],
       "string_prompts": [],
       "default_timeout_seconds": 30,
-      "validated": true,
-      "validation_notes": "Validated 2026-04-25 against @modelcontextprotocol/server-github 2025.4.8. See docs/MCP_PRODUCTION_VALIDATION.md.",
-      "upstream_status_warning": "@modelcontextprotocol/server-github is marked deprecated by upstream (npm warning at install). Still functional. M2 Month 2 candidate to switch to github.com/github/github-mcp-server (Go binary, official)."
+      "validated": false,
+      "validation_notes": "Migrated 2026-04-25 from upstream-deprecated @modelcontextprotocol/server-github (validated against 2025.4.8 in v0.20.0; see docs/MCP_PRODUCTION_VALIDATION.md). New target: github.com/github/github-mcp-server — Go binary, official from GitHub, actively maintained. Re-validation pending: flip to validated:true after a fresh harness run with a real PAT (must include the Tauri-bundle launch path so the PATH-resolution caveat below is exercised end-to-end). PATH caveat (mentor v0.24 P1): GUI-launched desktop apps on macOS inherit a stripped PATH that often excludes ~/go/bin. If [Test] reports 'command not found', either (a) symlink the binary to /usr/local/bin/github-mcp-server, or (b) edit the command to use the absolute path."
     },
     {
       "id": "filesystem",
