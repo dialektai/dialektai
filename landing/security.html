@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security (DRAFT) — dialekt.ai</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 60px 24px; }
+    .legal h1 { font-size: clamp(28px,4vw,40px); margin-bottom: 8px; }
+    .legal h2 { font-size: 18px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--cyan); }
+    .legal p, .legal li { color: var(--muted); line-height: 1.7; font-size: 14px; }
+    .legal ul { padding-left: 20px; margin: 12px 0; }
+    .draft-banner {
+      background: rgba(245,158,11,0.08); border: 1px solid var(--amber);
+      padding: 16px 20px; margin-bottom: 32px;
+      font-size: 13px; color: var(--amber); line-height: 1.6;
+    }
+    .draft-banner strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="legal">
+    <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">SECURITY · v0.21-draft</div>
+    <h1>Security at dialekt.ai</h1>
+    <p class="text-muted" style="font-size:13px">Last updated: 25 April 2026 · Status: <strong style="color:var(--amber)">DRAFT — pending audit completion</strong></p>
+
+    <div class="draft-banner mt-24">
+      <strong>This page is a placeholder.</strong> Independent security audit and SOC 2 path TBD. The architecture below is verifiable in our public repository now.
+    </div>
+
+    <h2>Threat model</h2>
+    <p>dialekt is a desktop application with optional cloud licensing. The threat model has two halves:</p>
+    <ul>
+      <li><strong style="color:var(--text)">Local:</strong> the app runs on your machine. We protect your API keys (cloud LLM credentials) in your OS keychain, sandbox the agent's filesystem and shell access, and require explicit consent for destructive operations.</li>
+      <li><strong style="color:var(--text)">Cloud:</strong> the licensing service stores tenant metadata (company, email, plan, expiry, invoices) — no prompts, no agent outputs, no source code. Compromise impact: tenant list disclosure, not user data.</li>
+    </ul>
+
+    <h2>Local security measures</h2>
+    <ul>
+      <li>API keys for cloud LLM providers stored in OS keychain (GNOME Keyring / KDE Wallet on Linux, macOS Keychain, Windows Credential Manager). Fallback: AES-256-GCM file with scrypt-derived key from hostname+user.</li>
+      <li>Local backend listens on <code>localhost:8765</code> only — no network exposure.</li>
+      <li>Tri-state permission system (allow / ask / deny) for filesystem, shell, browser, screen capture, mouse/keyboard, keychain.</li>
+      <li>Per-tool MCP consent: any destructive call asks before first use, with optional session-scoped trust.</li>
+      <li>Code execution in sandboxed Python/shell environments via Open Interpreter.</li>
+    </ul>
+
+    <h2>Cloud security measures</h2>
+    <ul>
+      <li>Postgres encrypted at rest (filesystem-level on the host).</li>
+      <li>Cloudflare Tunnel for transport — no public ingress on the origin.</li>
+      <li>HTTPS everywhere (TLS 1.3).</li>
+      <li>Bearer tokens (JWT, HS256) with 24h TTL; secret rotation supported.</li>
+      <li>Role-based access (admin / owner / user).</li>
+      <li>Founder admin actions logged to <code>founder_admin_log</code> with full audit trail (3-year retention).</li>
+      <li>Daily Postgres backups, 7-day rolling.</li>
+    </ul>
+
+    <h2>Build & supply chain</h2>
+    <ul>
+      <li>Releases built reproducibly on GitHub Actions; artifacts SHA-256-tagged.</li>
+      <li>Signed builds for macOS (Apple Developer) and Windows (Authenticode) — in progress.</li>
+      <li>Linux installer fetches the upstream Ollama install.sh with SHA-256 pin verification before exec.</li>
+      <li>npm audit / pip audit run on every PR.</li>
+    </ul>
+
+    <h2>Vulnerability disclosure</h2>
+    <p>Found a vulnerability? Email <a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a>. We respond within 72h. Coordinated disclosure preferred — give us 90 days before public write-up.</p>
+
+    <h2>Compliance roadmap</h2>
+    <ul>
+      <li>KZ ПДн (Law №94-V) — covered by <code>regulated_mode</code> setting and the Privacy Policy. Notification to КНБ РК pending.</li>
+      <li>GDPR — covered for EU pilot tenants by the Privacy Policy and DPO contact.</li>
+      <li>SOC 2 — Type II audit planned for 2026 H2 once paid customer base supports the spend.</li>
+      <li>ISO 27001 — under evaluation for 2027.</li>
+    </ul>
+
+    <h2>Bug bounty</h2>
+    <p>No formal program yet. Significant findings get a public credit and a Pro plan year on the house. Inquire via <a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a>.</p>
+
+    <p class="text-dim mt-32" style="font-size:12px;padding-top:24px;border-top:1px solid var(--border)">
+      Architecture is auditable: the desktop app, cloud service, and validator library are all in <a href="https://github.com/dialektai" style="color:var(--cyan)">github.com/dialektai</a>.
+    </p>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+</body>
+</html>

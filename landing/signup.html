@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Start free 30-day trial — dialekt.ai</title>
+  <meta name="description" content="Get a 30-day free trial license for dialekt.ai. No credit card. Local-first AI agent for developers.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .signup-hero { padding: 60px 0 40px; }
+    .signup-hero h1 { font-size: clamp(28px, 5vw, 48px); line-height: 1.1; margin-bottom: 12px; }
+    .signup-hero p { font-size: 15px; color: var(--muted); line-height: 1.65; max-width: 580px; }
+    .signup-grid { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }
+    @media (max-width: 760px) { .signup-grid { grid-template-columns: 1fr; } }
+    .perks { background: var(--bg1); border: 1px solid var(--border); padding: 24px; }
+    .perks h3 { font-size: 13px; font-family: var(--mono); color: var(--cyan); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 14px; }
+    .perks ul { list-style: none; padding: 0; margin: 0; }
+    .perks li { font-size: 12px; color: var(--text); line-height: 1.55; padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 8px; }
+    .perks li::before { content: "◆"; color: var(--cyan); font-size: 9px; margin-top: 4px; flex-shrink: 0; }
+    .perks li:last-child { border-bottom: none; }
+    .success-card { padding: 32px; }
+    .key-display {
+      background: var(--bg0); border: 1px dashed var(--cyan);
+      padding: 18px; font-family: var(--mono); font-size: 13px;
+      word-break: break-all; color: var(--cyan); margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="wrap">
+    <div class="signup-hero">
+      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">02 · START</div>
+      <h1>30 days free.<br><span class="text-muted">No credit card.</span></h1>
+      <p>Get a real cloud-issued license you can extend later. Verify your email, paste the key into the desktop app, and you're running.</p>
+    </div>
+
+    <div class="signup-grid">
+      <div class="card card-pad-lg" id="signup-card">
+        <form id="signup-form" novalidate>
+          <div class="field">
+            <label for="email">Work email <span class="req">*</span></label>
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@company.com">
+            <div class="field-hint">We send your license key here. Use a real address you can check now.</div>
+          </div>
+
+          <div class="field">
+            <label for="full_name">Full name <span class="req">*</span></label>
+            <input type="text" id="full_name" name="full_name" required autocomplete="name" placeholder="Aigerim Bekova" minlength="2">
+          </div>
+
+          <div class="field">
+            <label for="country">Country <span class="req">*</span></label>
+            <select id="country" name="country" required></select>
+            <div class="field-hint">Used for compliance routing (KZ ПДн / GDPR) and tax invoicing.</div>
+          </div>
+
+          <div class="field">
+            <label for="intended_use">What will you use dialekt for? <span class="req">*</span></label>
+            <textarea id="intended_use" name="intended_use" required minlength="10" maxlength="500"
+              placeholder="e.g.: my team writes Go services and we want a local agent that can read our codebase, run tests, and propose patches without sending code to OpenAI."></textarea>
+            <div class="field-hint">Two sentences are fine. Helps us help you better at the demo call.</div>
+          </div>
+
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" id="accept_tos" name="accept_tos" required>
+              <span>
+                I agree to the
+                <a href="/terms.html" target="_blank">Terms of Service</a>
+                <span class="mono" id="tos-version-label" style="font-size:10px;color:var(--dim);margin:0 4px">v…</span>
+                and
+                <a href="/privacy.html" target="_blank">Privacy Policy</a>
+                <span class="mono" id="privacy-version-label" style="font-size:10px;color:var(--dim);margin:0 4px">v…</span>.
+                I understand that prompts to local Ollama stay on my machine; cloud-LLM providers (if I add any) are governed by their own terms.
+              </span>
+            </label>
+            <div class="field-hint" style="margin-top:8px">
+              Your acceptance is logged with timestamp, IP, and the exact policy versions shown above (KZ ПДн §6 / GDPR Art. 7 evidence).
+            </div>
+          </div>
+
+          <div id="alert-slot"></div>
+
+          <button type="submit" class="btn primary lg full" id="submit-btn">
+            CREATE MY 30-DAY TRIAL →
+          </button>
+
+          <p class="mono" style="font-size:10px;color:var(--dim);margin-top:18px;text-align:center;letter-spacing:.1em">
+            no credit card · no telemetry · no auto-renewal
+          </p>
+        </form>
+
+        <!-- Success state -->
+        <div id="success-state" style="display:none">
+          <div style="font-size:32px;color:var(--green);margin-bottom:12px">✓</div>
+          <h2 style="font-size:24px;margin-bottom:12px">Trial created</h2>
+          <p class="text-muted" style="margin-bottom:18px">
+            We've sent a verification link to <strong id="success-email" style="color:var(--text)"></strong>.
+            Click it, then paste the license key below into the desktop app.
+          </p>
+          <div class="upper" style="color:var(--dim);margin-top:24px;margin-bottom:6px">YOUR LICENSE KEY</div>
+          <div class="key-display" id="success-key">…</div>
+          <div class="upper" style="color:var(--dim);margin-bottom:6px">EXPIRES</div>
+          <div class="mono text-cyan" id="success-expires" style="font-size:14px;margin-bottom:24px">…</div>
+          <a href="/#install" class="btn primary lg full">DOWNLOAD DESKTOP APP →</a>
+          <button type="button" class="btn full mt-16" id="resend-btn">Resend verification email</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="perks">
+          <h3>What you get</h3>
+          <ul>
+            <li>30 days, all features</li>
+            <li>3 seats — invite your team</li>
+            <li>All 18 cloud LLM providers</li>
+            <li>Full local Ollama (33 models)</li>
+            <li>MCP servers, agent manifests</li>
+            <li>Audit log, regulated mode</li>
+          </ul>
+        </div>
+        <div class="perks mt-16">
+          <h3>After 30 days</h3>
+          <ul>
+            <li>Pay $25/seat/mo (Starter) or up</li>
+            <li>Or extend free — write us</li>
+            <li>No data deleted for 12 months</li>
+            <li>Full export at any time</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-32" style="margin-bottom:60px">
+      <p class="text-muted" style="font-size:13px">
+        Already have a license key? <a href="/login.html" style="color:var(--cyan)">Sign in here →</a>
+      </p>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+
+  <script src="/_layout.js" defer></script>
+  <script src="/_countries.js"></script>
+  <script>
+    // Cloud API base — same pattern as desktop app's getCloudApi(),
+    // overridable via window.DIALEKT_CLOUD_API for staging.
+    const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Populate countries
+      window.populateCountries(document.getElementById('country'));
+
+      // utm capture
+      const url = new URL(location.href);
+      const utm = url.searchParams.get('utm_source') || url.searchParams.get('source') || document.referrer || '';
+
+      // Pull authoritative ToS / Privacy version strings from the cloud
+      // and display them under the consent checkbox. The same versions
+      // get submitted with the signup payload so the audit log records
+      // exactly what the user saw on screen (lawyer requirement).
+      let tosVersion = 'unknown', privacyVersion = 'unknown';
+      try {
+        const r = await fetch(`${CLOUD_API}/auth/legal/versions`);
+        if (r.ok) {
+          const j = await r.json();
+          tosVersion = j.tos_version || 'unknown';
+          privacyVersion = j.privacy_version || 'unknown';
+        }
+      } catch { /* offline — labels stay 'v…'; backend will stamp fallback */ }
+      document.getElementById('tos-version-label').textContent = `v${tosVersion}`;
+      document.getElementById('privacy-version-label').textContent = `v${privacyVersion}`;
+
+      const form = document.getElementById('signup-form');
+      const submitBtn = document.getElementById('submit-btn');
+      const alertSlot = document.getElementById('alert-slot');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        alertSlot.innerHTML = '';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'CREATING…';
+
+        const data = {
+          email: form.email.value.trim().toLowerCase(),
+          full_name: form.full_name.value.trim(),
+          country: form.country.value,
+          intended_use: form.intended_use.value.trim(),
+          accept_tos: form.accept_tos.checked,
+          signup_source: utm.slice(0, 80) || null,
+          // Versions the user actually saw on the page (audit evidence).
+          tos_version: tosVersion,
+          privacy_version: privacyVersion,
+        };
+
+        try {
+          const r = await fetch(`${CLOUD_API}/auth/signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          const body = await r.json();
+          if (!r.ok) {
+            alertSlot.innerHTML = `<div class="alert err">${body.detail || ('Error ' + r.status)}</div>`;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'CREATE MY 30-DAY TRIAL →';
+            return;
+          }
+
+          // Success — swap to success state
+          document.getElementById('success-email').textContent = data.email;
+          document.getElementById('success-key').textContent = body.license_key;
+          if (body.expires_at) {
+            const d = new Date(body.expires_at);
+            document.getElementById('success-expires').textContent = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+          }
+          form.style.display = 'none';
+          document.getElementById('success-state').style.display = 'block';
+
+          // Resend handler
+          document.getElementById('resend-btn').addEventListener('click', async () => {
+            await fetch(`${CLOUD_API}/auth/resend-verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: data.email }),
+            }).catch(() => {});
+            alertSlot.innerHTML = `<div class="alert ok">Verification email resent to ${data.email}</div>`;
+          });
+        } catch (err) {
+          alertSlot.innerHTML = `<div class="alert err">Network error: ${err.message}. Please try again.</div>`;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'CREATE MY 30-DAY TRIAL →';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

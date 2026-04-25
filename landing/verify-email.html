@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verifying email — dialekt.ai</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .verify-wrap { min-height: calc(100vh - 200px); display: flex; align-items: center; justify-content: center; padding: 60px 24px; }
+    .verify-card { width: 100%; max-width: 460px; text-align: center; }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    .icon.ok { color: var(--green); }
+    .icon.err { color: var(--red); }
+    .icon.pending { color: var(--cyan); }
+    .key-display {
+      background: var(--bg0); border: 1px dashed var(--cyan);
+      padding: 18px; font-family: var(--mono); font-size: 13px;
+      word-break: break-all; color: var(--cyan); margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="verify-wrap">
+    <div class="verify-card">
+      <div class="card card-pad-lg" id="state-loading">
+        <div class="icon pending">⟳</div>
+        <h1 style="font-size:22px;margin-bottom:12px">Verifying your email…</h1>
+        <p class="text-muted" style="font-size:13px">One moment.</p>
+      </div>
+
+      <div class="card card-pad-lg" id="state-ok" style="display:none">
+        <div class="icon ok">✓</div>
+        <h1 style="font-size:24px;margin-bottom:12px">Email verified</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6">
+          Your trial license is now active. Paste this key into the desktop app's license screen.
+        </p>
+        <div class="upper" style="color:var(--dim);text-align:left;margin-bottom:6px">YOUR LICENSE KEY</div>
+        <div class="key-display" id="r-key" style="text-align:left">—</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:18px">
+          <button class="btn" id="copy-btn">COPY KEY</button>
+          <a class="btn primary" href="/#install">DOWNLOAD APP →</a>
+        </div>
+      </div>
+
+      <div class="card card-pad-lg" id="state-already" style="display:none">
+        <div class="icon ok">✓</div>
+        <h1 style="font-size:22px;margin-bottom:12px">Already verified</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6">
+          This account has already been verified. Use the desktop app or sign in below.
+        </p>
+        <a class="btn primary full" href="/login.html">SIGN IN WITH LICENSE KEY →</a>
+      </div>
+
+      <div class="card card-pad-lg" id="state-err" style="display:none">
+        <div class="icon err">✗</div>
+        <h1 style="font-size:22px;margin-bottom:12px">Link is invalid or expired</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6" id="err-msg">
+          The verification link doesn't match any pending signup.
+        </p>
+        <a class="btn primary full" href="/signup.html">START A NEW TRIAL →</a>
+      </div>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+  <script>
+    const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const showState = (id) => {
+        document.querySelectorAll('[id^="state-"]').forEach(el => el.style.display = 'none');
+        document.getElementById(id).style.display = 'block';
+      };
+
+      if (!token) {
+        showState('state-err');
+        document.getElementById('err-msg').textContent = 'No verification token in the URL.';
+        return;
+      }
+
+      try {
+        const r = await fetch(`${CLOUD_API}/auth/verify-email/${encodeURIComponent(token)}`);
+        const body = await r.json();
+        if (!r.ok) {
+          showState('state-err');
+          document.getElementById('err-msg').textContent = body.detail || 'Verification failed.';
+          return;
+        }
+
+        if (body.already_verified) {
+          showState('state-already');
+        } else {
+          showState('state-ok');
+          document.getElementById('r-key').textContent = body.license_key || '—';
+          document.getElementById('copy-btn').addEventListener('click', () => {
+            navigator.clipboard.writeText(body.license_key || '').then(() => {
+              const btn = document.getElementById('copy-btn');
+              const orig = btn.textContent;
+              btn.textContent = 'COPIED ✓';
+              setTimeout(() => btn.textContent = orig, 1800);
+            });
+          });
+        }
+      } catch (err) {
+        showState('state-err');
+        document.getElementById('err-msg').textContent = 'Network error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

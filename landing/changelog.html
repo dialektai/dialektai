@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changelog — dialekt.ai</title>
+  <meta name="description" content="Release history for dialekt.ai. What shipped when.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .changelog-wrap { padding: 60px 0; max-width: 780px; margin: 0 auto; }
+    .release { padding: 32px 0; border-top: 1px solid var(--border); }
+    .release:first-child { border-top: none; padding-top: 0; }
+    .release-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .release-version { font-family: var(--mono); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .release-version .major { color: var(--cyan); }
+    .release-date { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
+    .release-tag { font-family: var(--mono); font-size: 9px; padding: 3px 7px; border: 1px solid; letter-spacing: 0.1em; text-transform: uppercase; }
+    .release-tag.major { color: var(--cyan); border-color: var(--cyan); }
+    .release-tag.minor { color: var(--amber); border-color: var(--amber); }
+    .release-tag.patch { color: var(--green); border-color: var(--green); }
+    .release-summary { color: var(--text); font-size: 15px; line-height: 1.65; margin-bottom: 18px; }
+    .release h3 { font-size: 13px; font-family: var(--mono); color: var(--cyan); letter-spacing: 0.14em; text-transform: uppercase; margin: 18px 0 8px; }
+    .release ul { color: var(--muted); list-style: none; padding: 0; }
+    .release li { padding: 6px 0; padding-left: 18px; position: relative; line-height: 1.6; font-size: 13px; }
+    .release li::before { content: "→"; position: absolute; left: 0; color: var(--cyan); }
+    .release li code { background: var(--bg2); padding: 1px 5px; font-family: var(--mono); font-size: 11px; color: var(--cyan); border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div data-layout="nav"></div>
+
+  <div class="wrap">
+    <div class="changelog-wrap">
+      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">RELEASES</div>
+      <h1 style="font-size:clamp(28px,4vw,40px);margin-bottom:14px">Changelog</h1>
+      <p class="text-muted" style="font-size:14px;line-height:1.6;max-width:580px;margin-bottom:48px">
+        Every shipped version. Tagged for severity. Subscribe via <a href="/" style="color:var(--cyan)">Telegram</a> for release pings.
+      </p>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.21<span class="major">.0</span></span>
+          <span class="release-date">25 APR 2026</span>
+          <span class="release-tag major">MAJOR</span>
+        </div>
+        <p class="release-summary">
+          Cloud-LLM expansion: <strong style="color:var(--text)">18 providers</strong> joined Ollama. New onboarding picker with search, categories, Linux auto-install. Self-serve trial signup launched.
+        </p>
+        <h3>Added</h3>
+        <ul>
+          <li>18 cloud LLM providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate</li>
+          <li>33 curated Ollama models with category filters and RAM-fit indicators</li>
+          <li>Linux auto-install for Ollama with SHA-256 verified script and live SSE log stream</li>
+          <li>Self-serve 30-day trial via <code>/signup</code> — verify email, get a real cloud-issued license</li>
+          <li>Admin <code>/admin/tenants/:id/extend</code> — combined extend + grant-free-year</li>
+          <li><code>regulated_mode</code> setting hides cloud tab for KZ ПДн compliance</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li>Settings model_provider field — backward-compatible migration</li>
+          <li>Open Interpreter routing now goes through <code>resolve_litellm_model</code> (P0 bug fix: cloud selections used to silently revert to Ollama)</li>
+          <li>Onboarding screen rewritten with tabs and live filters</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li>Live model swap on websocket honours the current provider</li>
+          <li><code>pick_model_for_agent</code> short-circuits in cloud mode</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.20<span class="major">.0</span></span>
+          <span class="release-date">15 APR 2026</span>
+          <span class="release-tag major">MAJOR</span>
+        </div>
+        <p class="release-summary">M2 Month 1 — MCP production integration. GitHub MCP real-server E2E pass.</p>
+        <h3>Added</h3>
+        <ul>
+          <li>MCP-enabled agent class — agents can declare required MCP servers in their manifest</li>
+          <li>Per-tool consent UI in the desktop app — destructive tools ask first</li>
+          <li>MCP indicator on agent rows</li>
+          <li>13 GitHub MCP tools verified end-to-end</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.19<span class="major">.0</span></span>
+          <span class="release-date">02 APR 2026</span>
+          <span class="release-tag minor">MINOR</span>
+        </div>
+        <p class="release-summary">Schema RAG embeddings, ComfyUI integration for image generation, audit log baseline.</p>
+        <h3>Added</h3>
+        <ul>
+          <li>Schema RAG via <code>nomic-embed-text</code> — semantic search over connected database schemas</li>
+          <li>ComfyUI bridge — <code>POST /comfy/txt2img</code> with Flux Schnell, ~10s latency</li>
+          <li><code>founder_admin_log</code> audit trail for all admin actions</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.18<span class="major">.0</span></span>
+          <span class="release-date">14 MAR 2026</span>
+          <span class="release-tag minor">MINOR</span>
+        </div>
+        <p class="release-summary">Per-tenant licensing, invoice PDF generation, founder admin dashboard.</p>
+        <h3>Added</h3>
+        <ul>
+          <li>dialekt-cloud service launched — tenant CRUD, license validation, invite flow</li>
+          <li>KZT invoice PDF generation with seller details from env</li>
+          <li>Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.10<span class="major">.0</span></span>
+          <span class="release-date">12 FEB 2026</span>
+          <span class="release-tag major">MAJOR</span>
+        </div>
+        <p class="release-summary">First public beta. Local Ollama + 9 hardcoded models + permissions sandbox.</p>
+      </article>
+
+      <p class="text-center text-muted mt-32" style="font-size:12px;padding:32px 0;border-top:1px solid var(--border)">
+        Older releases on GitHub. Want a feature? <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">Tell us</a>.
+      </p>
+    </div>
+  </div>
+
+  <div data-layout="footer"></div>
+  <script src="/_layout.js" defer></script>
+</body>
+</html>

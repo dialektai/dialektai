@@ -305,42 +305,28 @@ const DownloadsContext = React.createContext({
 });
 
 function HeroCTA() {
-  const { releases, detectedPlatform } = React.useContext(DownloadsContext);
-  let primary;
-  if (detectedPlatform === 'macos') {
-    primary = { label: '.dmg for macOS', url: releases.dmgUrl, size: releases.dmgSize || '~140 MB', arch: 'apple silicon' };
-  } else if (detectedPlatform === 'windows') {
-    primary = { label: 'Installer for Windows', url: releases.exeUrl, size: releases.exeSize || '~140 MB', arch: 'x64' };
-  } else if (detectedPlatform === 'linux-appimage') {
-    primary = { label: 'AppImage', url: releases.appimageUrl, size: releases.appimageSize || '~130 MB', arch: 'x64' };
-  } else {
-    primary = { label: '.deb for Ubuntu / Debian', url: releases.debUrl, size: releases.debSize || '~130 MB', arch: 'x64' };
-  }
-  const macWinLabel = detectedPlatform === 'macos'
-    ? 'Also: .deb / AppImage / .msi'
-    : detectedPlatform === 'windows'
-      ? 'Also: .deb / AppImage / .dmg'
-      : 'Also: macOS / Windows';
+  // Gated download: hero CTA points to signup, not direct download.
+  // Download URLs are exclusively delivered via verify-email so we capture
+  // every install lead.
+  const { releases } = React.useContext(DownloadsContext);
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
       <a
         className="btn primary"
-        href={primary.url || '#install'}
-        target={primary.url ? '_blank' : '_self'}
-        rel="noopener"
-        style={{ padding: '12px 18px', fontSize: 13, opacity: primary.url ? 1 : 0.75 }}
+        href="/signup.html"
+        style={{ padding: '12px 22px', fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}
       >
         <LIcon name="down" size={14} color={LT.bg0} />
-        {primary.url ? `Download ${primary.label}` : 'Loading latest release…'}
-        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· {primary.arch} · {primary.size}</span>
+        Start free trial
+        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· 30 days · 3 seats</span>
       </a>
-      <a className="btn" href="#install" style={{ padding: '12px 16px', fontSize: 12 }}>
-        other platforms
-        <span className="mono" style={{ color: LT.dim, marginLeft: 4, fontSize: 10 }}>({macWinLabel})</span>
+      <a className="btn" href="/pricing.html" style={{ padding: '12px 16px', fontSize: 12 }}>
+        Pricing
+        <span className="mono" style={{ color: LT.dim, marginLeft: 4, fontSize: 10 }}>($25 / $55 / $95+)</span>
       </a>
       {releases.version && (
         <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>
-          v{releases.version} · {releases.publishedAt || ''}
+          latest v{releases.version}{releases.publishedAt ? ' · ' + releases.publishedAt : ''}
         </div>
       )}
     </div>
@@ -1289,63 +1275,78 @@ function SectionInstall() {
       disabled: !releases.exeUrl,
     },
   ];
+  // Gated download: removed direct GitHub Release links from the landing.
+  // Trial signup at /signup.html is now the only public surface that
+  // exposes download URLs (delivered via verify-email). This is by design —
+  // see docs/LEGAL_BRIEF.md §1 (positioning) and product decision: every
+  // download lead must be visible in the admin dashboard. The "rows" data
+  // above is retained as informational specs only (no clickable URLs).
+  const platformSpecs = [
+    { platform: 'Linux', detail: 'Ubuntu 22+, Debian 12+, Fedora 38+ · x64', formats: '.deb · .AppImage' },
+    { platform: 'macOS', detail: 'Apple Silicon · macOS 12+', formats: '.dmg' },
+    { platform: 'Windows', detail: 'Windows 10 / 11 · x64', formats: '.exe installer' },
+  ];
   return (
     <section id="install" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
       <div className="wrap-wide">
         <SecTag n="08" label="Install" meta="linux · macos · windows" />
-        <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 48 }}>
+        <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 48 }}>
           <div>
             <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-              Download it.<br />
-              <span style={{ color: LT.muted }}>Install it.</span>
+              Get the app.<br />
+              <span style={{ color: LT.muted }}>30 days free.</span>
             </h2>
             <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 460 }}>
-              No account. No license key for local use. No telemetry on first launch. Native builds for Linux, macOS, and Windows.
+              Sign up with your work email and we'll send you the download links along with your trial license key. No credit card. Verify your email and you're running.
             </p>
             <div className="mono" style={{ marginTop: 24, fontSize: 11, color: LT.dim, lineHeight: 1.8 }}>
-              → requires ollama 0.4+ (https://ollama.com)<br />
+              → requires ollama 0.4+ (auto-install on linux)<br />
               → linux: glibc 2.35+ (Ubuntu 22.04+, Debian 12+, Fedora 38+)<br />
               → macos: 12.0+ · apple silicon<br />
               → windows: 10 / 11 · x64<br />
               → 16 GB ram minimum (48 GB recommended for 32B models)<br />
-              → version {releases.version || '0.10.0'} · {releases.publishedAt || 'apr 2026'}
+              → latest version {releases.version || '0.21.0'}{releases.publishedAt ? ' · ' + releases.publishedAt : ''}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-            {rows.map((r, i) => (
-              <div key={i} className="install-row" style={{ background: LT.bg1, padding: '16px 18px', display: 'grid', gridTemplateColumns: '110px 1fr 90px 140px', gap: 16, alignItems: 'center', opacity: r.disabled ? 0.45 : 1 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>{r.platform}</div>
-                  <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 2 }}>{r.arch}</div>
-                </div>
-                <div className="mono mono-cmd" style={{ fontSize: 12, color: LT.text, padding: '8px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <span style={{ color: LT.cyan }}>$</span> {r.cmd}
-                </div>
-                <div className="mono" style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{r.size}</div>
-                {r.disabled ? (
-                  <span className="mono" style={{ fontSize: 10, color: LT.dim, textAlign: 'center', letterSpacing: '.08em' }}>soon</span>
-                ) : (
-                  <a
-                    className={`btn${r.primary ? ' primary' : ''}`}
-                    href={r.url || '#'}
-                    target="_blank"
-                    rel="noopener"
-                    style={{ justifyContent: 'center', opacity: r.url ? 1 : 0.6, pointerEvents: r.url ? 'auto' : 'none' }}
-                  >
-                    <LIcon name="down" size={12} color={r.primary ? LT.bg0 : LT.text} />
-                    {r.url ? 'Download' : 'Loading…'}
-                  </a>
-                )}
+          <div>
+            {/* Single CTA card replacing the download grid. */}
+            <div style={{ background: LT.bg1, border: `1px solid ${LT.cyan}`, padding: 32 }}>
+              <div className="mono" style={{ fontSize: 11, color: LT.cyan, letterSpacing: '.14em', marginBottom: 12 }}>FREE TRIAL · 30 DAYS · 3 SEATS</div>
+              <h3 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 12 }}>
+                Get download link via email
+              </h3>
+              <p style={{ color: LT.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 22 }}>
+                We send <strong style={{ color: LT.text }}>installers for all 3 platforms</strong> + your <strong style={{ color: LT.text }}>30-day trial license key</strong> in one email. Verify and you're done.
+              </p>
+              <a className="btn primary" href="/signup.html" style={{ padding: '13px 22px', fontSize: 13, fontWeight: 700, width: '100%', justifyContent: 'center' }}>
+                <LIcon name="down" size={13} color={LT.bg0} />
+                START FREE TRIAL →
+              </a>
+              <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${LT.border}`, fontSize: 11, color: LT.dim, lineHeight: 1.7 }}>
+                Already have a license key? <a href="/login.html" style={{ color: LT.cyan }}>Sign in →</a><br />
+                Want pricing? <a href="/pricing.html" style={{ color: LT.cyan }}>$25 / $55 / $95+ per seat →</a>
               </div>
-            ))}
+            </div>
+            {/* Platform specs (info, not links) */}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
+              {platformSpecs.map((s, i) => (
+                <div key={i} style={{ background: LT.bg1, padding: '13px 16px', display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 12, alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>{s.platform}</div>
+                  </div>
+                  <div className="mono" style={{ fontSize: 11, color: LT.dim }}>{s.detail}</div>
+                  <div className="mono" style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.04em' }}>{s.formats}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         <div style={{ marginTop: 40, padding: '16px 18px', border: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }} className="mono">
-          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● LOCAL-FIRST</span>
+          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● LOCAL-FIRST INFERENCE</span>
           <span style={{ color: LT.border }}>/</span>
-          <span style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>● PRO FEATURES COMING</span>
+          <span style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>● TRIAL VIA EMAIL</span>
           <span style={{ color: LT.border }}>/</span>
-          <span style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.1em' }}>NO ACCOUNT REQUIRED</span>
+          <span style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.1em' }}>NO CREDIT CARD</span>
           <div style={{ flex: 1 }} />
           <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>signed builds · sha256 verified</span>
         </div>
@@ -1371,7 +1372,7 @@ function Footer() {
               local-first · no telemetry · no account
             </div>
           </div>
-          {[['PRODUCT',[['download','#install'],['release notes','#'],['roadmap','#']]],['RESOURCES',[['docs','#'],['mcp servers','#'],['model guide','#'],['privacy','#']]],['COMMUNITY',[['twitter / x','#'],['youtube','#'],['telegram','#']]]].map(([title,links],i) => (
+          {[['PRODUCT',[['download','#install'],['release notes','/changelog.html'],['roadmap','#']]],['RESOURCES',[['docs','/docs.html'],['mcp servers','#'],['model guide','#'],['privacy','/privacy.html'],['privacy (ru)','/privacy-ru.html'],['terms','/terms.html'],['terms (ru)','/terms-ru.html'],['public offer (kz)','/public-offer.html'],['dpa (template)','/dpa.html'],['consent & ui texts','/cross-border-consent.html']]],['COMMUNITY',[['twitter / x','#'],['youtube','#'],['telegram','#']]]].map(([title,links],i) => (
             <div key={i}>
               <div className="mono" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.16em', marginBottom: 14 }}>{title}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
