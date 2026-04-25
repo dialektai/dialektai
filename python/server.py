@@ -141,8 +141,25 @@ _active_interpreters: dict = {}  # ws_id → interpreter instance
 # (e.g. uvicorn --workers 2+) without a Redis-backed future registry.
 _pending_consents: dict[str, asyncio.Future] = {}
 
-# Timeout before a consent prompt auto-denies. Overridable from tests.
-_CONSENT_TIMEOUT_SECONDS = 30.0
+# Timeout before a consent prompt auto-denies. Overridable from tests
+# (monkeypatch the constant) and from production via the
+# DIALEKT_MCP_CONSENT_TIMEOUT env var (seconds). Pilots running thin
+# laptops with slow models may want to bump this past 30s without a
+# code edit.
+def _read_consent_timeout() -> float:
+    raw = os.environ.get("DIALEKT_MCP_CONSENT_TIMEOUT")
+    if raw is None:
+        return 30.0
+    try:
+        v = float(raw)
+        if v <= 0:
+            return 30.0
+        return v
+    except (TypeError, ValueError):
+        return 30.0
+
+
+_CONSENT_TIMEOUT_SECONDS = _read_consent_timeout()
 
 
 def _build_consent_prompt_fn(ws, ws_id: str, loop):
@@ -237,6 +254,11 @@ def _cancel_pending_consents(ws_id: str) -> None:
 # declares mcp_servers, popped in ws_chat finally. Test introspection only;
 # do not use for runtime logic — the agent reaches the runtime via
 # bind_mcp_runtime + the `ctx.mcp` namespace, not by looking it up here.
+#
+# Single-process assumption: do NOT enable uvicorn `--workers 2+` for the
+# desktop binary. Pending consents AND active runtimes are process-local;
+# cross-process consent + cross-process tool dispatch would need a
+# Redis-backed registry (or similar) and is explicitly out of scope.
 _active_mcp_runtimes: dict = {}
 
 

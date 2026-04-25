@@ -390,8 +390,8 @@ autonomy:
 - "Close issue #42" → `update_issue` (destructive → consent)
 
 **Known limitations** (pre-validation):
-- Tool names depend on the MCP server build; the wizard's preview is "N tools discovered" only (full list deferred — see post-1.6 hardening backlog)
-- Per-tool allow/deny scoping not yet exposed in the UI (manifest schema 1.1.0 supports `mcp_servers[].allow_tools` / `deny_tools`; deferred to M2 Month 2)
+- Tool names depend on the MCP server build; the wizard's preview is "N tools discovered" only (full list deferred — see [`M2_POST_RC_BACKLOG.md`](M2_POST_RC_BACKLOG.md) F2)
+- Per-tool allow/deny scoping not yet exposed in the UI (manifest schema 1.1.0 supports `mcp_servers[].allow_tools` / `deny_tools`; see [`M2_POST_RC_BACKLOG.md`](M2_POST_RC_BACKLOG.md) F1)
 - Rate limit headers from GitHub are not surfaced as a chat toast yet — agent sees them as a tool error and decides how to recover
 
 ### 5.5.2 Slack Automation Agent — blueprint
