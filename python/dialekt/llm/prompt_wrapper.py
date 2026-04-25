@@ -37,6 +37,7 @@ def build_system_prompt(
     schema_summary: str | None = None,
     history_summary: str | None = None,
     few_shot_examples: list[dict] | None = None,
+    mcp_tools_summary: str | None = None,
     max_tokens: int = 8192,
 ) -> str:
     """
@@ -98,6 +99,13 @@ def build_system_prompt(
             ),
         }.get(output_format, f"Output format: {output_format}.")
         sections.append(_section("OUTPUT FORMAT", fmt_rules))
+
+    # MCP TOOLS — exposes the agent's bound servers + calling syntax. Without
+    # this section the LLM doesn't know about ctx.mcp.<server>.<tool>(...) and
+    # falls back to shell/python (v0.26.x E2E finding: gemma3-12b ran `mkdir`
+    # via shell instead of using filesystem MCP).
+    if mcp_tools_summary:
+        sections.append(_section("MCP TOOLS", mcp_tools_summary))
 
     # CONTEXT
     ctx_lines = [f"Current time: {now_utc}"]
