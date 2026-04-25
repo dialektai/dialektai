@@ -18,7 +18,7 @@ import os
 import re
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -1005,6 +1005,67 @@ async def audit_log_endpoint(body: dict):
         extra=body.get("extra"),
     )
     return {"id": row_id}
+
+
+@app.get("/audit/log")
+async def audit_log_query(
+    kind: str | None = None,
+    since: str | None = None,
+    limit: int = 100,
+):
+    """Read-side companion to POST /audit/log. Drives the v0.25
+    Settings → Admin → Usage → MCP dashboard.
+
+    Auth posture matches the POST: none. Single-user desktop on
+    localhost. Cloud / multi-user requires auth on both ends — tracked
+    as B7 in docs/M2_POST_RC_BACKLOG.md.
+    """
+    now_utc = datetime.now(timezone.utc)
+    floor = now_utc - timedelta(days=30)
+    if since is None:
+        since_dt = now_utc - timedelta(days=7)
+    else:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            raise HTTPException(400, "since must be ISO-8601")
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=timezone.utc)
+    since_dt = max(since_dt, floor)
+    n = max(1, min(int(limit), 500))
+
+    where_kind = ""
+    params: list = [since_dt.strftime("%Y-%m-%d %H:%M:%S")]
+    if kind:
+        if kind.endswith("*"):
+            where_kind = "AND kind LIKE ?"
+            params.append(kind[:-1] + "%")
+        else:
+            where_kind = "AND kind = ?"
+            params.append(kind)
+
+    sql = (
+        "SELECT id, ts, agent_id, binding_id, kind, target, action, "
+        "result, duration_ms, error_kind, extra_json "
+        f"FROM audit_log WHERE ts >= ? {where_kind} "
+        "ORDER BY ts DESC, id DESC LIMIT ?"
+    )
+    params.append(n + 1)
+    cur = await db.execute(sql, params)
+    raw = await cur.fetchall()
+    truncated = len(raw) > n
+    rows = []
+    for r in raw[:n]:
+        try:
+            extra = json.loads(r[10]) if r[10] else None
+        except (ValueError, TypeError):
+            extra = None
+        rows.append({
+            "id": r[0], "ts": r[1], "agent_id": r[2], "binding_id": r[3],
+            "kind": r[4], "target": r[5], "action": r[6], "result": r[7],
+            "duration_ms": r[8], "error_kind": r[9], "extra": extra,
+        })
+    return {"rows": rows, "truncated": truncated}
 
 
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
