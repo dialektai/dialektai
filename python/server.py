@@ -3199,15 +3199,46 @@ def make_interpreter(
         )
         manifest_yaml = agent.get("manifest_yaml", "")
         if should_wrap(manifest_yaml):
-            # Extract language and output format from manifest if present
+            # Extract language, output format, and MCP servers from manifest
             lang = None
             out_fmt = None
+            mcp_tools_summary = None
             if manifest_yaml:
                 import yaml as _yaml
                 try:
                     m_data = _yaml.safe_load(manifest_yaml)
                     lang = (m_data.get("metadata") or {}).get("language")
                     out_fmt = (m_data.get("output") or {}).get("format")
+                    # v0.26.x E2E fix: teach the LLM about ctx.mcp.<srv>.<tool>(...)
+                    # so agents with mcp_servers binding actually call MCP tools
+                    # instead of falling back to shell. Without this section, the
+                    # LLM has no way to know the MCP namespace exists.
+                    servers = m_data.get("mcp_servers") or []
+                    if servers:
+                        lines = [
+                            "You have MCP servers bound to you. Call their "
+                            "tools from inside Python code blocks via the "
+                            "`ctx.mcp` namespace:",
+                            "",
+                            "```python",
+                            "result = ctx.mcp.<server>.<tool>(<keyword args>)",
+                            "print(result)",
+                            "```",
+                            "",
+                            "Available servers:",
+                        ]
+                        for srv in servers:
+                            name = srv.get("name") or "unnamed"
+                            transport = srv.get("transport") or "stdio"
+                            lines.append(f"- `{name}` ({transport})")
+                        lines.append("")
+                        lines.append(
+                            "Prefer MCP tools over plain shell when the user "
+                            "asks for something an MCP server can do. Run "
+                            "exactly one tool call per turn unless asked for "
+                            "more."
+                        )
+                        mcp_tools_summary = "\n".join(lines)
                 except Exception:
                     pass
             system_message = build_system_prompt(
@@ -3218,6 +3249,7 @@ def make_interpreter(
                 schema_summary=ctx.get("schema_summary"),
                 history_summary=history_summary,
                 few_shot_examples=few_shot_examples,
+                mcp_tools_summary=mcp_tools_summary,
                 max_tokens=interpreter.llm.context_window,
             )
         else:
