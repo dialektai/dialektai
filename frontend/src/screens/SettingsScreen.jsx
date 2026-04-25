@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
 import { getCloudApi } from '../lib/cloud.js';
+import McpTemplateModal from '../components/McpTemplateModal.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -1158,6 +1159,9 @@ function MCPSection() {
   const [form, setForm] = useState(EMPTY_MCP_FORM);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  // v0.21: Quick Add catalog + which template tile is open in the modal
+  const [templates, setTemplates] = useState([]);
+  const [openTemplate, setOpenTemplate] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -1172,6 +1176,17 @@ function MCPSection() {
   }, [addToast]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Load the Quick Add catalog once. Failure is non-fatal — Quick Add
+  // hides itself and the freeform form path stays available.
+  useEffect(() => {
+    fetch(`${API}/mcp-templates`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => {
+        if (Array.isArray(data?.templates)) setTemplates(data.templates);
+      })
+      .catch(() => { /* Quick Add unavailable; freeform CRUD still works */ });
+  }, []);
 
   const fset = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -1383,9 +1398,40 @@ function MCPSection() {
   const isFormOpen = adding || editingId != null;
   const formTitle = editingId ? 'Edit MCP server' : 'New MCP server';
 
+  // v0.21: Quick Add tile row, rendered above the configured-servers list.
+  const QuickAddRow = () => {
+    if (!templates.length) return null;
+    return (
+      <Card title="Quick add from template" n="01">
+        <div style={{ padding: '12px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {templates.map((t) => {
+            const badge = t.validated
+              ? { color: T.green, mark: '✓' }
+              : { color: T.amber, mark: '⚠' };
+            return (
+              <button key={t.id} onClick={() => setOpenTemplate(t)} style={{
+                background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                padding: '8px 12px', fontSize: 12, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span className="mono" style={{ fontSize: 10, color: badge.color }}>{badge.mark}</span>
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ padding: '0 14px 12px', fontSize: 10, color: T.dim }}>
+          ✓ validated · ⚠ untested community package — verify with [Test] before pilot rollout
+        </div>
+      </Card>
+    );
+  };
+
   return (
     <BodyShell crumb="02 / CAPABILITIES → MCP SERVERS" title="MCP Servers"
       desc="External MCP servers agents can call. Credentials are stored in your OS keychain — never in config files or logs.">
+
+      <QuickAddRow />
 
       {loading ? (
         <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
@@ -1393,11 +1439,11 @@ function MCPSection() {
         <Card>
           <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <Icon name="cog" size={28} color={T.dim} />
-            <div style={{ color: T.dim, fontSize: 13 }}>No MCP servers yet. Add one to expose external tools to your agents.</div>
+            <div style={{ color: T.dim, fontSize: 13 }}>No MCP servers yet. Pick a template above or add a custom server.</div>
             <button onClick={() => setAdding(true)} style={{
               background: T.cyan, color: '#000', border: 'none', padding: '8px 18px',
               fontSize: 12, fontWeight: 600, cursor: 'pointer', letterSpacing: '.04em',
-            }}>+ ADD SERVER</button>
+            }}>+ ADD CUSTOM SERVER</button>
           </div>
         </Card>
       ) : (
@@ -1407,10 +1453,20 @@ function MCPSection() {
             <button onClick={() => setAdding(true)} style={{
               background: 'transparent', border: `1px dashed ${T.border}`, color: T.muted,
               padding: '10px', width: '100%', fontSize: 12, cursor: 'pointer', marginTop: 8, letterSpacing: '.04em',
-            }}>+ ADD SERVER</button>
+            }}>+ ADD CUSTOM SERVER</button>
           )}
         </>
       )}
+
+      <McpTemplateModal
+        template={openTemplate}
+        onClose={() => setOpenTemplate(null)}
+        onSaved={(created) => {
+          addToast(`Server "${created.name}" added`, 'ok');
+          refresh();
+        }}
+      />
+
 
       {isFormOpen && (
         <Card title={formTitle} n={editingId ? 'EDIT' : 'NEW'}>
