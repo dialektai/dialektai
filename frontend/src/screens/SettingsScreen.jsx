@@ -5,6 +5,7 @@ import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
 import { getCloudApi } from '../lib/cloud.js';
 import McpTemplateModal from '../components/McpTemplateModal.jsx';
+import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -1162,6 +1163,7 @@ function MCPSection() {
   // v0.21: Quick Add catalog + which template tile is open in the modal
   const [templates, setTemplates] = useState([]);
   const [openTemplate, setOpenTemplate] = useState(null);
+  const [openImport, setOpenImport] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -1431,6 +1433,23 @@ function MCPSection() {
     <BodyShell crumb="02 / CAPABILITIES → MCP SERVERS" title="MCP Servers"
       desc="External MCP servers agents can call. Credentials are stored in your OS keychain — never in config files or logs.">
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8 }}>
+        <button onClick={() => setOpenImport(true)} style={{
+          background: 'transparent', border: `1px solid ${T.border}`, color: T.text,
+          padding: '6px 14px', fontSize: 11, cursor: 'pointer', letterSpacing: '.04em',
+        }}>IMPORT BUNDLE</button>
+        <button onClick={async () => {
+          const r = await fetch(`${API}/mcp-servers/export`);
+          const blob = await r.blob();
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = u; a.download = 'dialekt-mcp-servers.json'; a.click();
+          URL.revokeObjectURL(u);
+        }} disabled={servers.length === 0} style={{
+          background: 'transparent', border: `1px solid ${T.border}`, color: servers.length ? T.text : T.dim,
+          padding: '6px 14px', fontSize: 11, cursor: servers.length ? 'pointer' : 'default', letterSpacing: '.04em',
+        }}>EXPORT JSON</button>
+      </div>
       <QuickAddRow />
 
       {loading ? (
@@ -1466,6 +1485,15 @@ function MCPSection() {
           refresh();
         }}
       />
+      {openImport && (
+        <McpBulkImportModal existingNames={servers.map((s) => s.name)}
+          onClose={() => setOpenImport(false)}
+          onImported={(body) => {
+            const n = (body?.imported || []).length, m = (body?.secrets_needed || []).length;
+            addToast(`Imported ${n} server${n === 1 ? '' : 's'}` + (m > 0 ? `. ${m} credential${m === 1 ? '' : 's'} required — open each server to add them.` : '.'), 'ok');
+            refresh();
+          }} />
+      )}
 
 
       {isFormOpen && (
