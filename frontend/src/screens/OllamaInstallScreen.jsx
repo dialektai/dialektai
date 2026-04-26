@@ -253,9 +253,10 @@ export default function OllamaInstallScreen({ onNav, checkInfo }) {
 
           <div style={{ flex: 1 }} />
           <button
-            onClick={() => onNav('main')}
+            onClick={() => onNav('onboarding-step3')}
             style={{ background: 'none', border: `1px solid ${T.border}`, color: T.dim, padding: '8px 16px', fontSize: 11, cursor: 'pointer', letterSpacing: '.08em' }}
-          >SKIP SETUP</button>
+            title="Skip Ollama install — you can use a cloud provider instead"
+          >SKIP STEP →</button>
         </div>
 
         {/* Main */}
