@@ -2203,23 +2203,56 @@ async def ollama_start():
 
 @app.get("/ollama/check")
 async def ollama_check():
-    import subprocess, shutil, httpx, platform
-    installed = shutil.which("ollama") is not None
-    version: str | None = None
+    import os, subprocess, shutil, httpx, platform
+    sys_platform = platform.system().lower()
+    # Step 1: locate the binary. On macOS, Tauri-launched processes inherit
+    # a stripped PATH that doesn't include /usr/local/bin or Homebrew, so
+    # `which` misses Ollama even when it's installed. Fall back to the
+    # well-known absolute paths (Intel + Apple Silicon Homebrew + .app
+    # bundle) before declaring "not installed".
+    candidate_paths = [
+        "/usr/local/bin/ollama",
+        "/opt/homebrew/bin/ollama",
+        "/Applications/Ollama.app/Contents/Resources/ollama",  # bundled binary
+    ] if sys_platform == "darwin" else (
+        ["C:\\Program Files\\Ollama\\ollama.exe", "C:\\Users\\Public\\Ollama\\ollama.exe"]
+        if sys_platform == "windows" else
+        ["/usr/local/bin/ollama", "/usr/bin/ollama"]
+    )
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        for p in candidate_paths:
+            if os.path.exists(p):
+                ollama_bin = p
+                break
+    # The macOS .app bundle counts as "installed" even if the Resources
+    # binary path doesn't exist exactly where we expect.
+    bundle_installed = sys_platform == "darwin" and os.path.exists("/Applications/Ollama.app")
+    installed = ollama_bin is not None or bundle_installed
+
+    # Step 2: probe the daemon. This works regardless of PATH and is the
+    # only signal that actually matters for "can dialekt talk to it".
     running = False
-    if installed:
+    try:
+        async with httpx.AsyncClient(timeout=3) as c:
+            r = await c.get("http://localhost:11434/api/tags")
+            running = r.status_code == 200
+    except Exception:
+        running = False
+
+    # If the daemon answers, we know it's installed by definition —
+    # this rescues the macOS-from-Dock PATH case described above.
+    if running:
+        installed = True
+
+    # Step 3: read version (best effort — only useful for display).
+    version: str | None = None
+    if ollama_bin:
         try:
-            result = subprocess.run(["ollama", "--version"], capture_output=True, text=True, timeout=3)
+            result = subprocess.run([ollama_bin, "--version"], capture_output=True, text=True, timeout=3)
             version = result.stdout.strip().split()[-1] if result.returncode == 0 else None
         except Exception:
             pass
-        try:
-            async with httpx.AsyncClient(timeout=3) as c:
-                r = await c.get("http://localhost:11434/api/tags")
-                running = r.status_code == 200
-        except Exception:
-            running = False
-    sys_platform = platform.system().lower()
     # Lower-case platform path — capitalised variants (Mac/Linux/Windows)
     # 307-redirect to a github.com asset URL that 404s, breaking the
     # DOWNLOAD OLLAMA button. /mac, /linux, /windows resolve to the real
