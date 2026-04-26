@@ -308,10 +308,15 @@ jobs:
   # ── 3b. macOS Intel build (.dmg + .app) ──────────────────────────────────
   # macos-13 runner is the last Intel-based GitHub-hosted macOS image. Needed
   # for users on pre-Apple-Silicon Macs (2019 MBP, 2018 Mac mini, etc.).
+  # Marked continue-on-error: macos-13 runner allocation is unreliable on
+  # weekends (saw a 1h+ queue on v0.26.3 attempt), so a missing Intel build
+  # shouldn't block the rest of the release. Intel users wait for the next tag.
 
   build-macos-intel:
     needs: test
     runs-on: macos-13
+    continue-on-error: true
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
