@@ -354,7 +354,16 @@ export default function LeftPanel({
                 return (
                   <div
                     key={a.id}
-                    onClick={() => selectAgent(selectedAgentId === a.id ? null : a.id)}
+                    onClick={() => {
+                      // Click on an agent always opens a fresh chat scoped to
+                      // that agent. From Settings or any non-chat screen this
+                      // also closes the current screen (onNav switches).
+                      // Selection state is still updated for the brief
+                      // moment before navigation, in case the screen is
+                      // already EmptyChatScreen and onNav is a no-op.
+                      selectAgent(a.id);
+                      onNav?.('empty', { agentId: a.id });
+                    }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8,
                       padding: '6px 8px',

@@ -28,7 +28,7 @@ function parseRequiredConnTypes(manifestYaml) {
   return Array.from(types);
 }
 
-export default function MainScreen({ onNav, initialMessage, sessionId: initSessionId }) {
+export default function MainScreen({ onNav, initialMessage, initialAgentId, sessionId: initSessionId }) {
   const {
     messages, streaming, connected, ollamaOnline,
     sessionId, sessionTitle, models, activeModel, autonomy,
@@ -39,7 +39,10 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
 
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [localTitle, setLocalTitle] = useState(null);
-  const [selectedAgentId, setSelectedAgentId] = useState(null);
+  // Seed from initialAgentId so a fresh chat opened from the sidebar
+  // starts already scoped to the chosen agent. Subsequent in-screen
+  // selection still works through onAgentSelect → setSelectedAgentId.
+  const [selectedAgentId, setSelectedAgentId] = useState(initialAgentId || null);
   const [agentDetails, setAgentDetails] = useState(null); // {id, name, requiredTypes}
   const [hasBinding, setHasBinding] = useState(null); // null=unknown, true/false when checked
   const didInit = useRef(false);
@@ -89,7 +92,7 @@ export default function MainScreen({ onNav, initialMessage, sessionId: initSessi
   useEffect(() => {
     if (!connected || didInit.current) return;
     didInit.current = true;
-    if (initialMessage) send(initialMessage);
+    if (initialMessage) send(initialMessage, initialAgentId || undefined);
     else if (initSessionId) switchSession(initSessionId);
   }, [connected]); // eslint-disable-line react-hooks/exhaustive-deps
 

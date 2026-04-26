@@ -23,10 +23,11 @@ function timeAgo(iso) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export default function EmptyChatScreen({ onNav }) {
+export default function EmptyChatScreen({ onNav, agentId }) {
   const [text, setText] = useState('');
   const [recents, setRecents] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [agent, setAgent] = useState(null);
   const fileRef = useRef(null);
   const folderRef = useRef(null);
 
@@ -37,9 +38,21 @@ export default function EmptyChatScreen({ onNav }) {
       .catch(() => {});
   }, []);
 
+  // Pull agent metadata so the empty-state shows whose chat this is.
+  useEffect(() => {
+    if (!agentId) { setAgent(null); return; }
+    fetch(`${API}/agents/${agentId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setAgent)
+      .catch(() => setAgent(null));
+  }, [agentId]);
+
   const go = (msg) => {
     if (!msg.trim()) return;
-    onNav('main', { initialMessage: msg.trim() });
+    // Pass agentId forward so MainScreen seeds its selectedAgentId state
+    // when the first message is sent — keeps the chat scoped to the
+    // agent the user picked from the sidebar.
+    onNav('main', { initialMessage: msg.trim(), initialAgentId: agentId });
   };
 
   const appendText = (str) => setText(t => t ? t + '\n' + str : str);
