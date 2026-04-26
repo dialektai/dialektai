@@ -2220,8 +2220,12 @@ async def ollama_check():
         except Exception:
             running = False
     sys_platform = platform.system().lower()
-    platform_map = {"darwin": "Mac", "linux": "Linux", "windows": "Windows"}
-    install_url = "https://ollama.com/download/" + platform_map.get(sys_platform, "Mac")
+    # Lower-case platform path — capitalised variants (Mac/Linux/Windows)
+    # 307-redirect to a github.com asset URL that 404s, breaking the
+    # DOWNLOAD OLLAMA button. /mac, /linux, /windows resolve to the real
+    # picker page with proper installers.
+    platform_map = {"darwin": "mac", "linux": "linux", "windows": "windows"}
+    install_url = "https://ollama.com/download/" + platform_map.get(sys_platform, "")
     return {
         "installed": installed,
         "running": running,
