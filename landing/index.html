@@ -134,6 +134,21 @@
         "form.ok.h": "Received.",
         "form.ok.p": "We review every application personally. You will hear from us within three business days. If the pilot is not a fit, we will say so directly.",
         "form.ok.signature": "— Dias, founder",
+
+        "dl.foot.latest":  "Latest release ",
+        "dl.foot.signup":  "Need a trial license? Sign up →",
+        "dl.req.min":      "Minimum requirements",
+        "dl.req.min.os":   "macOS 12+, Ubuntu 22.04+ / glibc 2.35+, or Windows 10/11",
+        "dl.req.min.cpu":  "x86_64 or ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)",
+        "dl.req.min.ram":  "16 GB RAM",
+        "dl.req.min.disk": "10 GB free disk for the app + a starter 7B model",
+        "dl.req.min.net":  "Internet on first launch (license verification only — chats run offline)",
+        "dl.req.rec":      "Recommended for 32B+ models",
+        "dl.req.rec.ram":  "48 GB RAM (or 32 GB unified memory on Apple Silicon)",
+        "dl.req.rec.gpu":  "NVIDIA GPU with 12 GB+ VRAM, Apple Silicon M-series, or AMD ROCm-capable GPU",
+        "dl.req.rec.disk": "100 GB+ disk for keeping multiple models on hand",
+        "dl.req.rec.ollama":"Ollama 0.4+ running locally for the local-LLM path (cloud providers don't need it)",
+        "dl.req.rec.net":  "Stable connection if you'll be using cloud providers (Anthropic, OpenAI, …)",
       },
       ru: {
         "hero.eyebrow": "Корпоративный пилот · Когорта 01 · 2026",
@@ -260,6 +275,21 @@
         "form.ok.h": "Заявка получена.",
         "form.ok.p": "Мы лично рассматриваем каждую заявку. Ответим в течение трёх рабочих дней. Если пилот не подходит — скажем об этом прямо.",
         "form.ok.signature": "— Диас, основатель",
+
+        "dl.foot.latest":  "Последний релиз ",
+        "dl.foot.signup":  "Нужен пробный ключ? Зарегистрироваться →",
+        "dl.req.min":      "Минимальные требования",
+        "dl.req.min.os":   "macOS 12+, Ubuntu 22.04+ / glibc 2.35+ или Windows 10/11",
+        "dl.req.min.cpu":  "x86_64 или ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)",
+        "dl.req.min.ram":  "16 ГБ оперативной памяти",
+        "dl.req.min.disk": "10 ГБ свободного места на диске для приложения + стартовая модель 7B",
+        "dl.req.min.net":  "Интернет при первом запуске (только для проверки лицензии — чаты работают офлайн)",
+        "dl.req.rec":      "Рекомендуется для моделей 32B+",
+        "dl.req.rec.ram":  "48 ГБ RAM (или 32 ГБ единой памяти на Apple Silicon)",
+        "dl.req.rec.gpu":  "GPU NVIDIA с VRAM от 12 ГБ, Apple Silicon серии M или AMD-GPU с поддержкой ROCm",
+        "dl.req.rec.disk": "100 ГБ+ диска, чтобы держать несколько моделей одновременно",
+        "dl.req.rec.ollama":"Ollama 0.4+ запущена локально для режима локальных LLM (облачным провайдерам она не нужна)",
+        "dl.req.rec.net":  "Стабильное соединение, если планируете использовать облачных провайдеров (Anthropic, OpenAI, …)",
       }
     };
   </script>
@@ -571,6 +601,35 @@
     .dl-foot a:hover { color: var(--primary-ink); }
     .dl-foot .dl-sep { color: var(--rule-strong); }
     .dl-foot strong { color: var(--ink-2); font-weight: 500; font-family: var(--sans); }
+
+    .dl-req {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      margin-top: 36px; padding-top: 32px; border-top: 1px solid var(--rule);
+    }
+    @media (max-width: 720px) { .dl-req { grid-template-columns: 1fr; } }
+    .dl-req-col {
+      padding: 22px;
+      background: var(--bg-elev);
+      border: 1px solid var(--rule);
+    }
+    .dl-req-head {
+      font-family: var(--sans); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary);
+      margin-bottom: 14px;
+    }
+    .dl-req-list {
+      list-style: none; padding: 0; margin: 0;
+      font-size: 13.5px; line-height: 1.6; color: var(--ink-2);
+    }
+    .dl-req-list li {
+      padding: 6px 0 6px 18px; position: relative;
+      border-top: 1px dashed var(--rule);
+    }
+    .dl-req-list li:first-child { border-top: none; }
+    .dl-req-list li::before {
+      content: "›"; position: absolute; left: 0; top: 5px;
+      color: var(--primary); font-weight: 700; font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -893,9 +952,32 @@
     <div id="dl-content" class="dl-content" hidden>
       <div id="dl-grid" class="dl-grid"></div>
       <div class="dl-foot">
-        <span>Latest release <strong id="dl-version">—</strong></span>
+        <span data-i18n="dl.foot.latest">Latest release </span><strong id="dl-version">—</strong>
         <span class="dl-sep" aria-hidden="true">·</span>
-        <a href="/signup.html">Need a trial license? Sign up →</a>
+        <a href="/signup.html" data-i18n="dl.foot.signup">Need a trial license? Sign up →</a>
+      </div>
+    </div>
+
+    <div class="dl-req">
+      <div class="dl-req-col">
+        <div class="dl-req-head" data-i18n="dl.req.min">Minimum requirements</div>
+        <ul class="dl-req-list">
+          <li data-i18n="dl.req.min.os">macOS 12+, Ubuntu 22.04+ / glibc 2.35+, or Windows 10/11</li>
+          <li data-i18n="dl.req.min.cpu">x86_64 or ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)</li>
+          <li data-i18n="dl.req.min.ram">16 GB RAM</li>
+          <li data-i18n="dl.req.min.disk">10 GB free disk for the app + a starter 7B model</li>
+          <li data-i18n="dl.req.min.net">Internet on first launch (license verification only — chats run offline)</li>
+        </ul>
+      </div>
+      <div class="dl-req-col">
+        <div class="dl-req-head" data-i18n="dl.req.rec">Recommended for 32B+ models</div>
+        <ul class="dl-req-list">
+          <li data-i18n="dl.req.rec.ram">48 GB RAM (or 32 GB unified memory on Apple Silicon)</li>
+          <li data-i18n="dl.req.rec.gpu">NVIDIA GPU with 12 GB+ VRAM, Apple Silicon M-series, or AMD ROCm-capable GPU</li>
+          <li data-i18n="dl.req.rec.disk">100 GB+ disk for keeping multiple models on hand</li>
+          <li data-i18n="dl.req.rec.ollama">Ollama 0.4+ running locally for the local-LLM path (cloud providers don't need it)</li>
+          <li data-i18n="dl.req.rec.net">Stable connection if you'll be using cloud providers (Anthropic, OpenAI, …)</li>
+        </ul>
       </div>
     </div>
   </div>
