@@ -23,7 +23,12 @@ asyncpg>=0.29.0
 aiomysql>=0.2.0
 clickhouse-connect>=0.7.0
 keyring>=25.0.0
-sqlite-vec>=0.1.9
+# All published sqlite-vec versions cap at python<3.12. On most platforms
+# pip pulls a prebuilt wheel that ignores that bound, but Windows ARM64
+# has no wheel, so pip falls back to the metadata-respecting sdist and
+# fails. Skip on win-arm64 — sqlite_vec is only present as a
+# precautionary hidden import for PyInstaller, no source code uses it yet.
+sqlite-vec>=0.1.9; platform_machine != "ARM64"
 # Model Context Protocol SDK — consumed by dialekt.mcp.client to talk to
 # external MCP servers and by dialekt.mcp.server to expose dialekt as one.
 # Pinned <1.27 because 1.27 transitively pulls starlette>=1.0 via

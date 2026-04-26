@@ -12,10 +12,16 @@
 
 import os
 import sys
+import importlib.util
 from pathlib import Path
 
 BINARY_NAME = "dialekt-server"
 HERE = Path(os.path.abspath(SPECPATH))
+
+# sqlite_vec is skipped on windows-arm64 (no wheel + sdist requires py<3.12).
+# Probe whether it's actually installed before listing it as a hidden import,
+# otherwise PyInstaller emits a hard error on missing modules in some configs.
+HAS_SQLITE_VEC = importlib.util.find_spec("sqlite_vec") is not None
 
 block_cipher = None
 
@@ -102,7 +108,7 @@ a = Analysis(
         "httpx",
         "psutil",
         "yaml",
-        "sqlite_vec",
+        *(["sqlite_vec"] if HAS_SQLITE_VEC else []),
     ],
     hookspath=[],
     hooksconfig={},
