@@ -168,3 +168,26 @@ async def root():
 async def admin_redirect():
     # convenience: /admin → /admin/ui/ (people will type the short form)
     return RedirectResponse("/admin/ui/", status_code=307)
+
+
+@app.get("/releases/latest")
+async def releases_latest():
+    """Proxy of the latest release feed used by the landing `#download`
+    section AND by the in-app updater banner. Centralising the call
+    here means dias.now / the app HTML never references the upstream
+    source-of-truth URL — that stays hidden in the cloud server.
+
+    Asset URLs in the response still point at the upstream CDN;
+    mirroring those onto a dial-now-owned domain is a follow-up.
+    """
+    from .services.releases import get_latest_releases, releases_summary
+    data = await get_latest_releases()
+    return {
+        "tag": data.get("version", "latest"),
+        "published_at": data.get("published_at"),
+        # Where to point users for the human-readable release page. We
+        # send them back to the landing's own download section instead
+        # of the upstream — the landing fetches THIS endpoint to render.
+        "url": settings.LANDING_URL.rstrip("/") + "/#download",
+        "downloads": releases_summary(data),
+    }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { T } from '../tokens.js';
 
-const REPO = 'dialektai/dialektai';
+const FEED = 'https://api.dias.now/releases/latest';
 
 // Strip leading "v" + any pre-release suffix; compare numeric x.y.z.
 // Returns 1 if a > b, -1 if a < b, 0 if equal. Pilot-stage simple — no
@@ -17,9 +17,13 @@ function cmpVer(a, b) {
 }
 
 /**
- * Top-of-window nag banner shown when GitHub's `releases/latest` advertises
- * a newer version than the running desktop bundle. Dismissal is keyed by
- * the new tag so each release re-prompts exactly once per machine.
+ * Top-of-window nag banner shown when the cloud release feed advertises
+ * a newer version than the running desktop bundle. Dismissal is keyed
+ * by the new tag so each release re-prompts exactly once per machine.
+ *
+ * The Download button takes the user to the dialekt landing's #download
+ * section (where the same cloud feed is rendered); the source-of-truth
+ * URL is hidden behind the cloud proxy.
  *
  * No-ops outside Tauri (dev / web preview) — `__TAURI_INTERNALS__` gate.
  */
@@ -37,18 +41,16 @@ export default function UpdateBanner() {
         const cur = await getVersion();
         if (cancelled) return;
         setCurrent(cur);
-        const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-          headers: { 'Accept': 'application/vnd.github+json' },
-        });
+        const r = await fetch(FEED);
         if (!r.ok) return;
         const data = await r.json();
-        const tag = data.tag_name;
+        const tag = data.tag;
         if (cancelled || !tag) return;
         if (cmpVer(tag, cur) > 0) {
           if (localStorage.getItem(`update-banner-dismissed:${tag}`)) {
             setDismissed(true);
           }
-          setLatest({ tag, url: data.html_url });
+          setLatest({ tag, url: data.url || 'https://dias.now/#download' });
         }
       } catch {
         // network / parse — silent

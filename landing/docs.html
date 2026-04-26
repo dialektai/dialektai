@@ -82,8 +82,8 @@
 
         <h2 id="mcp">MCP servers</h2>
         <p>dialekt speaks the Model Context Protocol. Add servers from Settings → MCP → Add server. Common ones:</p>
-        <pre><code>npx -y @modelcontextprotocol/server-github
-npx -y @modelcontextprotocol/server-filesystem
+        <pre><code>npx -y @modelcontextprotocol/server-filesystem
+npx -y @modelcontextprotocol/server-slack
 uvx mcp-server-postgres</code></pre>
         <p>Per-tool consent: any MCP tool that writes / executes / spends money asks before the first call, with a "remember for this session" option.</p>
 

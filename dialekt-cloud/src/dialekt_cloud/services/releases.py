@@ -83,6 +83,7 @@ async def get_latest_releases(force: bool = False) -> dict:
                 "version": payload.get("tag_name", "latest"),
                 "published_at": payload.get("published_at"),
                 "page_url": payload.get("html_url", RELEASES_PAGE),
+                "_sizes": {},  # parallel size map keyed the same as PATTERNS
             }
             for asset in payload.get("assets", []):
                 name = asset.get("name", "")
@@ -92,6 +93,7 @@ async def get_latest_releases(force: bool = False) -> dict:
                 for key, pat in _PATTERNS.items():
                     if key not in data and pat.search(name):
                         data[key] = url
+                        data["_sizes"][key] = asset.get("size", 0)
                         break
             _cache["data"] = data
             _cache["at"] = time.time()
@@ -118,21 +120,29 @@ def releases_summary(releases: dict) -> list:
     macOS → Windows → Linux, ARM64 within each OS rendered alongside
     x86_64 so users can pick what matches their hardware.
     """
+    sizes = releases.get("_sizes") or {}
+    rows = [
+        ("macos_dmg_arm64",   "macOS",   "Apple Silicon", "Download .dmg",       ".dmg"),
+        ("macos_dmg_x86_64",  "macOS",   "Intel",         "Download .dmg",       ".dmg"),
+        ("windows_exe_x64",   "Windows", "x64",           "Download installer",  ".exe"),
+        ("windows_exe_arm64", "Windows", "ARM64",         "Download installer",  ".exe"),
+        ("linux_deb_x86_64",  "Linux",   "x86_64",        "Download .deb",       ".deb"),
+        ("linux_deb_arm64",   "Linux",   "ARM64",         "Download .deb",       ".deb"),
+        ("linux_app_x86_64",  "Linux",   "x86_64",        "Download AppImage",   ".AppImage"),
+        ("linux_app_arm64",   "Linux",   "ARM64",         "Download AppImage",   ".AppImage"),
+    ]
     out = []
-    if releases.get("macos_dmg_arm64"):
-        out.append({"platform": "macOS (Apple Silicon)", "label": "Download .dmg", "url": releases["macos_dmg_arm64"], "ext": ".dmg"})
-    if releases.get("macos_dmg_x86_64"):
-        out.append({"platform": "macOS (Intel)", "label": "Download .dmg", "url": releases["macos_dmg_x86_64"], "ext": ".dmg"})
-    if releases.get("windows_exe_x64"):
-        out.append({"platform": "Windows x64", "label": "Download installer", "url": releases["windows_exe_x64"], "ext": ".exe"})
-    if releases.get("windows_exe_arm64"):
-        out.append({"platform": "Windows ARM64", "label": "Download installer", "url": releases["windows_exe_arm64"], "ext": ".exe"})
-    if releases.get("linux_deb_x86_64"):
-        out.append({"platform": "Linux x86_64 (.deb)", "label": "Download .deb", "url": releases["linux_deb_x86_64"], "ext": ".deb"})
-    if releases.get("linux_deb_arm64"):
-        out.append({"platform": "Linux ARM64 (.deb)", "label": "Download .deb", "url": releases["linux_deb_arm64"], "ext": ".deb"})
-    if releases.get("linux_app_x86_64"):
-        out.append({"platform": "Linux x86_64 (AppImage)", "label": "Download AppImage", "url": releases["linux_app_x86_64"], "ext": ".AppImage"})
-    if releases.get("linux_app_arm64"):
-        out.append({"platform": "Linux ARM64 (AppImage)", "label": "Download AppImage", "url": releases["linux_app_arm64"], "ext": ".AppImage"})
+    for key, os_name, arch, label, ext in rows:
+        url = releases.get(key)
+        if not url:
+            continue
+        out.append({
+            "platform": f"{os_name} ({arch})" if arch else os_name,
+            "os": os_name,
+            "arch": arch,
+            "label": label,
+            "url": url,
+            "ext": ext,
+            "size": sizes.get(key, 0),
+        })
     return out
