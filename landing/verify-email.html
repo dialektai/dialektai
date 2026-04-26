@@ -25,46 +25,88 @@
   </style>
 </head>
 <body>
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "ve.loading.h":   "Verifying your email…",
+        "ve.loading.p":   "One moment.",
+        "ve.ok.h":        "Email verified",
+        "ve.ok.p":        "Your trial license is now active. Paste this key into the desktop app's license screen.",
+        "ve.ok.label":    "YOUR LICENSE KEY",
+        "ve.ok.copy":     "COPY KEY",
+        "ve.ok.download": "DOWNLOAD APP →",
+        "ve.already.h":   "Already verified",
+        "ve.already.p":   "This account has already been verified. Use the desktop app or sign in below.",
+        "ve.already.cta": "SIGN IN WITH LICENSE KEY →",
+        "ve.err.h":       "Link is invalid or expired",
+        "ve.err.p":       "The verification link doesn't match any pending signup.",
+        "ve.err.cta":     "START A NEW TRIAL →",
+        "ve.err.notoken": "No verification token in the URL.",
+        "ve.err.failed":  "Verification failed.",
+        "ve.err.network": "Network error: ",
+        "ve.ok.copied":   "COPIED ✓",
+      },
+      ru: {
+        "ve.loading.h":   "Проверяем вашу почту…",
+        "ve.loading.p":   "Секундочку.",
+        "ve.ok.h":        "Email подтверждён",
+        "ve.ok.p":        "Ваша пробная лицензия активирована. Вставьте этот ключ в окно лицензии в десктоп-приложении.",
+        "ve.ok.label":    "ВАШ ЛИЦЕНЗИОННЫЙ КЛЮЧ",
+        "ve.ok.copy":     "СКОПИРОВАТЬ",
+        "ve.ok.download": "СКАЧАТЬ ПРИЛОЖЕНИЕ →",
+        "ve.already.h":   "Уже подтверждён",
+        "ve.already.p":   "Эта учётная запись уже подтверждена. Откройте десктоп-приложение или войдите по ключу ниже.",
+        "ve.already.cta": "ВОЙТИ ПО ЛИЦЕНЗИОННОМУ КЛЮЧУ →",
+        "ve.err.h":       "Ссылка недействительна или истекла",
+        "ve.err.p":       "Эта ссылка не совпадает ни с одной активной регистрацией.",
+        "ve.err.cta":     "НАЧАТЬ НОВЫЙ ПРОБНЫЙ ПЕРИОД →",
+        "ve.err.notoken": "В ссылке нет токена подтверждения.",
+        "ve.err.failed":  "Подтверждение не прошло.",
+        "ve.err.network": "Ошибка сети: ",
+        "ve.ok.copied":   "СКОПИРОВАНО ✓",
+      },
+    };
+  </script>
   <div data-layout="nav"></div>
 
   <div class="verify-wrap">
     <div class="verify-card">
       <div class="card card-pad-lg" id="state-loading">
         <div class="icon pending">⟳</div>
-        <h1 style="font-size:22px;margin-bottom:12px">Verifying your email…</h1>
-        <p class="text-muted" style="font-size:13px">One moment.</p>
+        <h1 style="font-size:22px;margin-bottom:12px" data-i18n="ve.loading.h">Verifying your email…</h1>
+        <p class="text-muted" style="font-size:13px" data-i18n="ve.loading.p">One moment.</p>
       </div>
 
       <div class="card card-pad-lg" id="state-ok" style="display:none">
         <div class="icon ok">✓</div>
-        <h1 style="font-size:24px;margin-bottom:12px">Email verified</h1>
-        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6">
+        <h1 style="font-size:24px;margin-bottom:12px" data-i18n="ve.ok.h">Email verified</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6" data-i18n="ve.ok.p">
           Your trial license is now active. Paste this key into the desktop app's license screen.
         </p>
-        <div class="upper" style="color:var(--dim);text-align:left;margin-bottom:6px">YOUR LICENSE KEY</div>
+        <div class="upper" style="color:var(--dim);text-align:left;margin-bottom:6px" data-i18n="ve.ok.label">YOUR LICENSE KEY</div>
         <div class="key-display" id="r-key" style="text-align:left">—</div>
         <div style="display:flex;gap:10px;justify-content:center;margin-top:18px">
-          <button class="btn" id="copy-btn">COPY KEY</button>
-          <a class="btn primary" href="/#download">DOWNLOAD APP →</a>
+          <button class="btn" id="copy-btn" data-i18n="ve.ok.copy">COPY KEY</button>
+          <a class="btn primary" href="/#download" data-i18n="ve.ok.download">DOWNLOAD APP →</a>
         </div>
       </div>
 
       <div class="card card-pad-lg" id="state-already" style="display:none">
         <div class="icon ok">✓</div>
-        <h1 style="font-size:22px;margin-bottom:12px">Already verified</h1>
-        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6">
+        <h1 style="font-size:22px;margin-bottom:12px" data-i18n="ve.already.h">Already verified</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6" data-i18n="ve.already.p">
           This account has already been verified. Use the desktop app or sign in below.
         </p>
-        <a class="btn primary full" href="/login.html">SIGN IN WITH LICENSE KEY →</a>
+        <a class="btn primary full" href="/login.html" data-i18n="ve.already.cta">SIGN IN WITH LICENSE KEY →</a>
       </div>
 
       <div class="card card-pad-lg" id="state-err" style="display:none">
         <div class="icon err">✗</div>
-        <h1 style="font-size:22px;margin-bottom:12px">Link is invalid or expired</h1>
-        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6" id="err-msg">
+        <h1 style="font-size:22px;margin-bottom:12px" data-i18n="ve.err.h">Link is invalid or expired</h1>
+        <p class="text-muted" style="font-size:13px;margin-bottom:20px;line-height:1.6" id="err-msg" data-i18n="ve.err.p">
           The verification link doesn't match any pending signup.
         </p>
-        <a class="btn primary full" href="/signup.html">START A NEW TRIAL →</a>
+        <a class="btn primary full" href="/signup.html" data-i18n="ve.err.cta">START A NEW TRIAL →</a>
       </div>
     </div>
   </div>
@@ -74,6 +116,16 @@
   <script src="/_layout.js" defer></script>
   <script>
     const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+
+    // Pull localized strings via window.dlkI18n (set up by /_i18n.js).
+    // The lookup falls back to the English literal so this keeps working
+    // even if i18n hasn't initialised yet (e.g. very early DOM-ready).
+    const t = (key, fallback) => {
+      const lang = window.dlkI18n?.getLang?.() || 'en';
+      return window.__I18N_PAGE__?.[lang]?.[key]
+        || window.__I18N_PAGE__?.en?.[key]
+        || fallback;
+    };
 
     document.addEventListener('DOMContentLoaded', async () => {
       const params = new URLSearchParams(location.search);
@@ -85,7 +137,7 @@
 
       if (!token) {
         showState('state-err');
-        document.getElementById('err-msg').textContent = 'No verification token in the URL.';
+        document.getElementById('err-msg').textContent = t('ve.err.notoken', 'No verification token in the URL.');
         return;
       }
 
@@ -94,7 +146,7 @@
         const body = await r.json();
         if (!r.ok) {
           showState('state-err');
-          document.getElementById('err-msg').textContent = body.detail || 'Verification failed.';
+          document.getElementById('err-msg').textContent = body.detail || t('ve.err.failed', 'Verification failed.');
           return;
         }
 
@@ -107,14 +159,14 @@
             navigator.clipboard.writeText(body.license_key || '').then(() => {
               const btn = document.getElementById('copy-btn');
               const orig = btn.textContent;
-              btn.textContent = 'COPIED ✓';
+              btn.textContent = t('ve.ok.copied', 'COPIED ✓');
               setTimeout(() => btn.textContent = orig, 1800);
             });
           });
         }
       } catch (err) {
         showState('state-err');
-        document.getElementById('err-msg').textContent = 'Network error: ' + err.message;
+        document.getElementById('err-msg').textContent = t('ve.err.network', 'Network error: ') + err.message;
       }
     });
   </script>

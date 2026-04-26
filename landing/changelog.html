@@ -29,44 +29,132 @@
   </style>
 </head>
 <body>
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "cl.kicker":  "RELEASES",
+        "cl.h1":      "Changelog",
+        "cl.intro.a": "Every shipped version. Tagged for severity. Subscribe via ",
+        "cl.intro.tg":"Telegram",
+        "cl.intro.b": " for release pings.",
+        "cl.tag.major":"MAJOR",
+        "cl.tag.minor":"MINOR",
+        "cl.tag.patch":"PATCH",
+        "cl.h.added":  "Added",
+        "cl.h.changed":"Changed",
+        "cl.h.fixed":  "Fixed",
+        "cl.21.sum":   "Cloud-LLM expansion: <strong style=\"color:var(--text)\">18 providers</strong> joined Ollama. New onboarding picker with search, categories, Linux auto-install. Self-serve trial signup launched.",
+        "cl.21.add.1": "18 cloud LLM providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
+        "cl.21.add.2": "33 curated Ollama models with category filters and RAM-fit indicators",
+        "cl.21.add.3": "Linux auto-install for Ollama with SHA-256 verified script and live SSE log stream",
+        "cl.21.add.4": "Self-serve 30-day trial via <code>/signup</code> — verify email, get a real cloud-issued license",
+        "cl.21.add.5": "Admin <code>/admin/tenants/:id/extend</code> — combined extend + grant-free-year",
+        "cl.21.add.6": "<code>regulated_mode</code> setting hides cloud tab for KZ ПДн compliance",
+        "cl.21.chg.1": "Settings model_provider field — backward-compatible migration",
+        "cl.21.chg.2": "Open Interpreter routing now goes through <code>resolve_litellm_model</code> (P0 bug fix: cloud selections used to silently revert to Ollama)",
+        "cl.21.chg.3": "Onboarding screen rewritten with tabs and live filters",
+        "cl.21.fix.1": "Live model swap on websocket honours the current provider",
+        "cl.21.fix.2": "<code>pick_model_for_agent</code> short-circuits in cloud mode",
+        "cl.20.sum":   "M2 Month 1 — MCP production integration. External MCP server real-server E2E pass.",
+        "cl.20.add.1": "MCP-enabled agent class — agents can declare required MCP servers in their manifest",
+        "cl.20.add.2": "Per-tool consent UI in the desktop app — destructive tools ask first",
+        "cl.20.add.3": "MCP indicator on agent rows",
+        "cl.20.add.4": "13 external MCP tools verified end-to-end",
+        "cl.19.sum":   "Schema RAG embeddings, ComfyUI integration for image generation, audit log baseline.",
+        "cl.19.add.1": "Schema RAG via <code>nomic-embed-text</code> — semantic search over connected database schemas",
+        "cl.19.add.2": "ComfyUI bridge — <code>POST /comfy/txt2img</code> with Flux Schnell, ~10s latency",
+        "cl.19.add.3": "<code>founder_admin_log</code> audit trail for all admin actions",
+        "cl.18.sum":   "Per-tenant licensing, invoice PDF generation, founder admin dashboard.",
+        "cl.18.add.1": "dialekt-cloud service launched — tenant CRUD, license validation, invite flow",
+        "cl.18.add.2": "KZT invoice PDF generation with seller details from env",
+        "cl.18.add.3": "Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates",
+        "cl.10.sum":   "First public beta. Local Ollama + 9 hardcoded models + permissions sandbox.",
+        "cl.foot.a":   "Want a feature, or older release archives? ",
+        "cl.foot.tell":"Tell us",
+        "cl.foot.b":   ".",
+      },
+      ru: {
+        "cl.kicker":  "РЕЛИЗЫ",
+        "cl.h1":      "История релизов",
+        "cl.intro.a": "Каждая выпущенная версия с пометкой важности. Подписывайтесь на ",
+        "cl.intro.tg":"Telegram",
+        "cl.intro.b": " — пинги о новых релизах.",
+        "cl.tag.major":"MAJOR",
+        "cl.tag.minor":"MINOR",
+        "cl.tag.patch":"PATCH",
+        "cl.h.added":  "Добавлено",
+        "cl.h.changed":"Изменено",
+        "cl.h.fixed":  "Исправлено",
+        "cl.21.sum":   "Расширение облачных LLM: <strong style=\"color:var(--text)\">18 провайдеров</strong> в дополнение к Ollama. Новый онбординг с поиском, категориями и авто-установкой на Linux. Самостоятельная регистрация на пробный период.",
+        "cl.21.add.1": "18 провайдеров облачных LLM — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
+        "cl.21.add.2": "33 кураторских Ollama-модели с фильтром по категориям и индикатором соответствия RAM",
+        "cl.21.add.3": "Авто-установка Ollama на Linux со SHA-256-проверенным скриптом и live SSE-логом",
+        "cl.21.add.4": "Самостоятельная регистрация на 30-дневный пробный период через <code>/signup</code> — подтверждаете email и получаете настоящий облачный ключ",
+        "cl.21.add.5": "Admin <code>/admin/tenants/:id/extend</code> — продление лицензии плюс выдача бесплатного года одним вызовом",
+        "cl.21.add.6": "Настройка <code>regulated_mode</code> прячет облачную вкладку для соответствия закону РК «О ПДн»",
+        "cl.21.chg.1": "Поле model_provider в настройках — миграция с обратной совместимостью",
+        "cl.21.chg.2": "Маршрутизация Open Interpreter теперь идёт через <code>resolve_litellm_model</code> (фикс P0: облачные выборы молча откатывались к Ollama)",
+        "cl.21.chg.3": "Экран онбординга переписан с вкладками и живыми фильтрами",
+        "cl.21.fix.1": "Смена модели на живом WebSocket уважает текущего провайдера",
+        "cl.21.fix.2": "<code>pick_model_for_agent</code> короткозамыкается в облачном режиме",
+        "cl.20.sum":   "M2 Месяц 1 — MCP в проде. Real-server E2E с внешними MCP-серверами.",
+        "cl.20.add.1": "Класс агента с поддержкой MCP — в манифесте можно объявить требуемые MCP-серверы",
+        "cl.20.add.2": "UI per-tool consent в десктоп-приложении — разрушительные инструменты спрашивают разрешения",
+        "cl.20.add.3": "MCP-индикатор на строках агентов",
+        "cl.20.add.4": "13 внешних MCP-инструментов проверены end-to-end",
+        "cl.19.sum":   "Schema RAG-эмбеддинги, интеграция с ComfyUI для генерации изображений, базовый аудит-лог.",
+        "cl.19.add.1": "Schema RAG через <code>nomic-embed-text</code> — семантический поиск по схемам подключённых БД",
+        "cl.19.add.2": "Мост к ComfyUI — <code>POST /comfy/txt2img</code> с Flux Schnell, латентность ~10с",
+        "cl.19.add.3": "<code>founder_admin_log</code> — аудит-трейл всех действий администратора",
+        "cl.18.sum":   "Лицензирование по арендаторам, генерация PDF-счетов, founder-админка.",
+        "cl.18.add.1": "Запущен сервис dialekt-cloud — CRUD арендаторов, валидация лицензий, флоу инвайтов",
+        "cl.18.add.2": "Генерация PDF-счетов в тенге с реквизитами продавца из переменных окружения",
+        "cl.18.add.3": "Админ-дашборд на <code>admin.dias.now</code> — Alpine.js + FastAPI-шаблоны",
+        "cl.10.sum":   "Первая публичная бета. Локальный Ollama + 9 захардкоженных моделей + песочница разрешений.",
+        "cl.foot.a":   "Хотите фичу или архив старых релизов? ",
+        "cl.foot.tell":"Напишите нам",
+        "cl.foot.b":   ".",
+      },
+    };
+  </script>
   <div data-layout="nav"></div>
 
   <div class="wrap">
     <div class="changelog-wrap">
-      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">RELEASES</div>
-      <h1 style="font-size:clamp(28px,4vw,40px);margin-bottom:14px">Changelog</h1>
+      <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px" data-i18n="cl.kicker">RELEASES</div>
+      <h1 style="font-size:clamp(28px,4vw,40px);margin-bottom:14px" data-i18n="cl.h1">Changelog</h1>
       <p class="text-muted" style="font-size:14px;line-height:1.6;max-width:580px;margin-bottom:48px">
-        Every shipped version. Tagged for severity. Subscribe via <a href="/" style="color:var(--cyan)">Telegram</a> for release pings.
+        <span data-i18n="cl.intro.a">Every shipped version. Tagged for severity. Subscribe via </span><a href="/" style="color:var(--cyan)" data-i18n="cl.intro.tg">Telegram</a><span data-i18n="cl.intro.b"> for release pings.</span>
       </p>
 
       <article class="release">
         <div class="release-head">
           <span class="release-version">v0.21<span class="major">.0</span></span>
           <span class="release-date">25 APR 2026</span>
-          <span class="release-tag major">MAJOR</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
         </div>
-        <p class="release-summary">
+        <p class="release-summary" data-i18n-html="cl.21.sum">
           Cloud-LLM expansion: <strong style="color:var(--text)">18 providers</strong> joined Ollama. New onboarding picker with search, categories, Linux auto-install. Self-serve trial signup launched.
         </p>
-        <h3>Added</h3>
+        <h3 data-i18n="cl.h.added">Added</h3>
         <ul>
-          <li>18 cloud LLM providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate</li>
-          <li>33 curated Ollama models with category filters and RAM-fit indicators</li>
-          <li>Linux auto-install for Ollama with SHA-256 verified script and live SSE log stream</li>
-          <li>Self-serve 30-day trial via <code>/signup</code> — verify email, get a real cloud-issued license</li>
-          <li>Admin <code>/admin/tenants/:id/extend</code> — combined extend + grant-free-year</li>
-          <li><code>regulated_mode</code> setting hides cloud tab for KZ ПДн compliance</li>
+          <li data-i18n-html="cl.21.add.1">18 cloud LLM providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate</li>
+          <li data-i18n-html="cl.21.add.2">33 curated Ollama models with category filters and RAM-fit indicators</li>
+          <li data-i18n-html="cl.21.add.3">Linux auto-install for Ollama with SHA-256 verified script and live SSE log stream</li>
+          <li data-i18n-html="cl.21.add.4">Self-serve 30-day trial via <code>/signup</code> — verify email, get a real cloud-issued license</li>
+          <li data-i18n-html="cl.21.add.5">Admin <code>/admin/tenants/:id/extend</code> — combined extend + grant-free-year</li>
+          <li data-i18n-html="cl.21.add.6"><code>regulated_mode</code> setting hides cloud tab for KZ ПДн compliance</li>
         </ul>
-        <h3>Changed</h3>
+        <h3 data-i18n="cl.h.changed">Changed</h3>
         <ul>
-          <li>Settings model_provider field — backward-compatible migration</li>
-          <li>Open Interpreter routing now goes through <code>resolve_litellm_model</code> (P0 bug fix: cloud selections used to silently revert to Ollama)</li>
-          <li>Onboarding screen rewritten with tabs and live filters</li>
+          <li data-i18n-html="cl.21.chg.1">Settings model_provider field — backward-compatible migration</li>
+          <li data-i18n-html="cl.21.chg.2">Open Interpreter routing now goes through <code>resolve_litellm_model</code> (P0 bug fix: cloud selections used to silently revert to Ollama)</li>
+          <li data-i18n-html="cl.21.chg.3">Onboarding screen rewritten with tabs and live filters</li>
         </ul>
-        <h3>Fixed</h3>
+        <h3 data-i18n="cl.h.fixed">Fixed</h3>
         <ul>
-          <li>Live model swap on websocket honours the current provider</li>
-          <li><code>pick_model_for_agent</code> short-circuits in cloud mode</li>
+          <li data-i18n-html="cl.21.fix.1">Live model swap on websocket honours the current provider</li>
+          <li data-i18n-html="cl.21.fix.2"><code>pick_model_for_agent</code> short-circuits in cloud mode</li>
         </ul>
       </article>
 
@@ -74,15 +162,15 @@
         <div class="release-head">
           <span class="release-version">v0.20<span class="major">.0</span></span>
           <span class="release-date">15 APR 2026</span>
-          <span class="release-tag major">MAJOR</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
         </div>
-        <p class="release-summary">M2 Month 1 — MCP production integration. External MCP server real-server E2E pass.</p>
-        <h3>Added</h3>
+        <p class="release-summary" data-i18n="cl.20.sum">M2 Month 1 — MCP production integration. External MCP server real-server E2E pass.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
         <ul>
-          <li>MCP-enabled agent class — agents can declare required MCP servers in their manifest</li>
-          <li>Per-tool consent UI in the desktop app — destructive tools ask first</li>
-          <li>MCP indicator on agent rows</li>
-          <li>13 external MCP tools verified end-to-end</li>
+          <li data-i18n="cl.20.add.1">MCP-enabled agent class — agents can declare required MCP servers in their manifest</li>
+          <li data-i18n="cl.20.add.2">Per-tool consent UI in the desktop app — destructive tools ask first</li>
+          <li data-i18n="cl.20.add.3">MCP indicator on agent rows</li>
+          <li data-i18n="cl.20.add.4">13 external MCP tools verified end-to-end</li>
         </ul>
       </article>
 
@@ -90,14 +178,14 @@
         <div class="release-head">
           <span class="release-version">v0.19<span class="major">.0</span></span>
           <span class="release-date">02 APR 2026</span>
-          <span class="release-tag minor">MINOR</span>
+          <span class="release-tag minor" data-i18n="cl.tag.minor">MINOR</span>
         </div>
-        <p class="release-summary">Schema RAG embeddings, ComfyUI integration for image generation, audit log baseline.</p>
-        <h3>Added</h3>
+        <p class="release-summary" data-i18n="cl.19.sum">Schema RAG embeddings, ComfyUI integration for image generation, audit log baseline.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
         <ul>
-          <li>Schema RAG via <code>nomic-embed-text</code> — semantic search over connected database schemas</li>
-          <li>ComfyUI bridge — <code>POST /comfy/txt2img</code> with Flux Schnell, ~10s latency</li>
-          <li><code>founder_admin_log</code> audit trail for all admin actions</li>
+          <li data-i18n-html="cl.19.add.1">Schema RAG via <code>nomic-embed-text</code> — semantic search over connected database schemas</li>
+          <li data-i18n-html="cl.19.add.2">ComfyUI bridge — <code>POST /comfy/txt2img</code> with Flux Schnell, ~10s latency</li>
+          <li data-i18n-html="cl.19.add.3"><code>founder_admin_log</code> audit trail for all admin actions</li>
         </ul>
       </article>
 
@@ -105,14 +193,14 @@
         <div class="release-head">
           <span class="release-version">v0.18<span class="major">.0</span></span>
           <span class="release-date">14 MAR 2026</span>
-          <span class="release-tag minor">MINOR</span>
+          <span class="release-tag minor" data-i18n="cl.tag.minor">MINOR</span>
         </div>
-        <p class="release-summary">Per-tenant licensing, invoice PDF generation, founder admin dashboard.</p>
-        <h3>Added</h3>
+        <p class="release-summary" data-i18n="cl.18.sum">Per-tenant licensing, invoice PDF generation, founder admin dashboard.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
         <ul>
-          <li>dialekt-cloud service launched — tenant CRUD, license validation, invite flow</li>
-          <li>KZT invoice PDF generation with seller details from env</li>
-          <li>Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates</li>
+          <li data-i18n="cl.18.add.1">dialekt-cloud service launched — tenant CRUD, license validation, invite flow</li>
+          <li data-i18n="cl.18.add.2">KZT invoice PDF generation with seller details from env</li>
+          <li data-i18n-html="cl.18.add.3">Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates</li>
         </ul>
       </article>
 
@@ -120,13 +208,13 @@
         <div class="release-head">
           <span class="release-version">v0.10<span class="major">.0</span></span>
           <span class="release-date">12 FEB 2026</span>
-          <span class="release-tag major">MAJOR</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
         </div>
-        <p class="release-summary">First public beta. Local Ollama + 9 hardcoded models + permissions sandbox.</p>
+        <p class="release-summary" data-i18n="cl.10.sum">First public beta. Local Ollama + 9 hardcoded models + permissions sandbox.</p>
       </article>
 
       <p class="text-center text-muted mt-32" style="font-size:12px;padding:32px 0;border-top:1px solid var(--border)">
-        Want a feature, or older release archives? <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">Tell us</a>.
+        <span data-i18n="cl.foot.a">Want a feature, or older release archives? </span><a href="mailto:hello@dialekt.ai" style="color:var(--cyan)" data-i18n="cl.foot.tell">Tell us</a><span data-i18n="cl.foot.b">.</span>
       </p>
     </div>
   </div>

@@ -23,67 +23,161 @@
   </style>
 </head>
 <body>
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "sec.kicker":      "SECURITY · v0.21-draft",
+        "sec.h1":          "Security at dialekt.ai",
+        "sec.updated":     "Last updated: 25 April 2026 · Status: ",
+        "sec.status":      "DRAFT — pending audit completion",
+        "sec.draft.head":  "This page is a placeholder.",
+        "sec.draft.body":  " Independent security audit and SOC 2 path TBD. The architecture below is verifiable on request under NDA.",
+        "sec.threat.h":    "Threat model",
+        "sec.threat.intro":"dialekt is a desktop application with optional cloud licensing. The threat model has two halves:",
+        "sec.threat.local.t": "Local:",
+        "sec.threat.local":  " the app runs on your machine. We protect your API keys (cloud LLM credentials) in your OS keychain, sandbox the agent's filesystem and shell access, and require explicit consent for destructive operations.",
+        "sec.threat.cloud.t":"Cloud:",
+        "sec.threat.cloud":  " the licensing service stores tenant metadata (company, email, plan, expiry, invoices) — no prompts, no agent outputs, no source code. Compromise impact: tenant list disclosure, not user data.",
+        "sec.local.h":     "Local security measures",
+        "sec.local.1":     "API keys for cloud LLM providers stored in OS keychain (GNOME Keyring / KDE Wallet on Linux, macOS Keychain, Windows Credential Manager). Fallback: AES-256-GCM file with scrypt-derived key from hostname+user.",
+        "sec.local.2":     "Local backend listens on localhost:8765 only — no network exposure.",
+        "sec.local.3":     "Tri-state permission system (allow / ask / deny) for filesystem, shell, browser, screen capture, mouse/keyboard, keychain.",
+        "sec.local.4":     "Per-tool MCP consent: any destructive call asks before first use, with optional session-scoped trust.",
+        "sec.local.5":     "Code execution in sandboxed Python/shell environments via Open Interpreter.",
+        "sec.cloud.h":     "Cloud security measures",
+        "sec.cloud.1":     "Postgres encrypted at rest (filesystem-level on the host).",
+        "sec.cloud.2":     "Cloudflare Tunnel for transport — no public ingress on the origin.",
+        "sec.cloud.3":     "HTTPS everywhere (TLS 1.3).",
+        "sec.cloud.4":     "Bearer tokens (JWT, HS256) with 24h TTL; secret rotation supported.",
+        "sec.cloud.5":     "Role-based access (admin / owner / user).",
+        "sec.cloud.6":     "Founder admin actions logged with full audit trail (3-year retention).",
+        "sec.cloud.7":     "Daily Postgres backups, 7-day rolling.",
+        "sec.build.h":     "Build & supply chain",
+        "sec.build.1":     "Releases built reproducibly in CI; artifacts SHA-256-tagged.",
+        "sec.build.2":     "Signed builds for macOS (Apple Developer) and Windows (Authenticode) — in progress.",
+        "sec.build.3":     "Linux installer fetches the upstream Ollama install.sh with SHA-256 pin verification before exec.",
+        "sec.build.4":     "npm audit / pip audit run on every PR.",
+        "sec.vd.h":        "Vulnerability disclosure",
+        "sec.vd.body":     "Found a vulnerability? Email ",
+        "sec.vd.tail":     ". We respond within 72h. Coordinated disclosure preferred — give us 90 days before public write-up.",
+        "sec.compl.h":     "Compliance roadmap",
+        "sec.compl.1":     "KZ ПДн (Law №94-V) — covered by regulated_mode setting and the Privacy Policy. Notification to КНБ РК pending.",
+        "sec.compl.2":     "GDPR — covered for EU pilot tenants by the Privacy Policy and DPO contact.",
+        "sec.compl.3":     "SOC 2 — Type II audit planned for 2026 H2 once paid customer base supports the spend.",
+        "sec.compl.4":     "ISO 27001 — under evaluation for 2027.",
+        "sec.bb.h":        "Bug bounty",
+        "sec.bb.body":     "No formal program yet. Significant findings get a public credit and a Pro plan year on the house. Inquire via ",
+        "sec.bb.tail":     ".",
+        "sec.foot":        "Architecture is auditable on request — the desktop app, cloud service, and manifest validator are reviewable under NDA during pilot scoping.",
+      },
+      ru: {
+        "sec.kicker":      "БЕЗОПАСНОСТЬ · v0.21-черновик",
+        "sec.h1":          "Безопасность dialekt.ai",
+        "sec.updated":     "Обновлено: 25 апреля 2026 · Статус: ",
+        "sec.status":      "ЧЕРНОВИК — ждёт окончания аудита",
+        "sec.draft.head":  "Эта страница — заглушка.",
+        "sec.draft.body":  " Независимый аудит безопасности и путь к SOC 2 пока в работе. Описанная ниже архитектура доступна для проверки по запросу под NDA.",
+        "sec.threat.h":    "Модель угроз",
+        "sec.threat.intro":"dialekt — десктоп-приложение с опциональным облачным лицензированием. Модель угроз состоит из двух половин:",
+        "sec.threat.local.t": "Локально:",
+        "sec.threat.local":  " приложение работает на вашей машине. Мы храним ключи к облачным LLM в системной связке ключей ОС, ограничиваем доступ агента к файловой системе и шеллу, а на любые разрушительные действия требуем явного согласия.",
+        "sec.threat.cloud.t":"Облако:",
+        "sec.threat.cloud":  " сервис лицензирования хранит метаданные арендатора (компания, email, тариф, срок, счета) — без промптов, без вывода агентов, без исходников. Последствие компрометации: раскрытие списка арендаторов, не пользовательских данных.",
+        "sec.local.h":     "Локальные меры безопасности",
+        "sec.local.1":     "Ключи API облачных LLM хранятся в связке ключей ОС (GNOME Keyring / KDE Wallet на Linux, macOS Keychain, Windows Credential Manager). Фолбэк: файл AES-256-GCM с ключом, выведенным через scrypt из hostname+пользователь.",
+        "sec.local.2":     "Локальный backend слушает только localhost:8765 — наружу не выставлен.",
+        "sec.local.3":     "Трёхпозиционная система разрешений (разрешить / спросить / запретить) для файловой системы, шелла, браузера, захвата экрана, мыши/клавиатуры, связки ключей.",
+        "sec.local.4":     "Подтверждение на каждый MCP-инструмент: любой разрушительный вызов спрашивает разрешения перед первым использованием, опционально на сессию.",
+        "sec.local.5":     "Исполнение кода в песочницах Python/shell через Open Interpreter.",
+        "sec.cloud.h":     "Облачные меры безопасности",
+        "sec.cloud.1":     "Postgres зашифрован в покое (на уровне файловой системы хоста).",
+        "sec.cloud.2":     "Cloudflare Tunnel для транспорта — на источнике нет публичного входа.",
+        "sec.cloud.3":     "HTTPS везде (TLS 1.3).",
+        "sec.cloud.4":     "Bearer-токены (JWT, HS256) с TTL 24 часа; ротация секретов поддерживается.",
+        "sec.cloud.5":     "Доступ по ролям (admin / owner / user).",
+        "sec.cloud.6":     "Действия founder-admin логируются с полным аудит-трейлом (хранение 3 года).",
+        "sec.cloud.7":     "Ежедневные бэкапы Postgres, скользящее окно 7 дней.",
+        "sec.build.h":     "Сборка и цепочка поставок",
+        "sec.build.1":     "Релизы собираются воспроизводимо в CI; артефакты помечены SHA-256.",
+        "sec.build.2":     "Подписанные сборки для macOS (Apple Developer) и Windows (Authenticode) — в работе.",
+        "sec.build.3":     "Linux-инсталлятор скачивает upstream-скрипт Ollama с проверкой пин-кода SHA-256 перед запуском.",
+        "sec.build.4":     "npm audit / pip audit запускаются на каждый PR.",
+        "sec.vd.h":        "Раскрытие уязвимостей",
+        "sec.vd.body":     "Нашли уязвимость? Напишите на ",
+        "sec.vd.tail":     ". Мы отвечаем в течение 72 часов. Предпочитаем согласованное раскрытие — дайте нам 90 дней до публичного отчёта.",
+        "sec.compl.h":     "Соответствие требованиям",
+        "sec.compl.1":     "Закон РК «О персональных данных» (№94-V) — обеспечивается настройкой regulated_mode и политикой конфиденциальности. Уведомление КНБ РК — в работе.",
+        "sec.compl.2":     "GDPR — для EU pilot-клиентов покрыто политикой конфиденциальности и контактом DPO.",
+        "sec.compl.3":     "SOC 2 — аудит Type II запланирован на H2 2026, как только база платных клиентов оправдает расход.",
+        "sec.compl.4":     "ISO 27001 — на оценке на 2027 год.",
+        "sec.bb.h":        "Bug bounty",
+        "sec.bb.body":     "Формальной программы пока нет. За значимые находки — публичная благодарность и год Pro-тарифа за наш счёт. Пишите на ",
+        "sec.bb.tail":     ".",
+        "sec.foot":        "Архитектура доступна для проверки по запросу — десктоп-приложение, облачный сервис и валидатор манифестов можно ревьюить под NDA в рамках пилотного скоупинга.",
+      },
+    };
+  </script>
   <div data-layout="nav"></div>
 
   <div class="legal">
-    <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">SECURITY · v0.21-draft</div>
-    <h1>Security at dialekt.ai</h1>
-    <p class="text-muted" style="font-size:13px">Last updated: 25 April 2026 · Status: <strong style="color:var(--amber)">DRAFT — pending audit completion</strong></p>
+    <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px" data-i18n="sec.kicker">SECURITY · v0.21-draft</div>
+    <h1 data-i18n="sec.h1">Security at dialekt.ai</h1>
+    <p class="text-muted" style="font-size:13px"><span data-i18n="sec.updated">Last updated: 25 April 2026 · Status: </span><strong style="color:var(--amber)" data-i18n="sec.status">DRAFT — pending audit completion</strong></p>
 
     <div class="draft-banner mt-24">
-      <strong>This page is a placeholder.</strong> Independent security audit and SOC 2 path TBD. The architecture below is verifiable in our public repository now.
+      <strong data-i18n="sec.draft.head">This page is a placeholder.</strong><span data-i18n="sec.draft.body"> Independent security audit and SOC 2 path TBD. The architecture below is verifiable on request under NDA.</span>
     </div>
 
-    <h2>Threat model</h2>
-    <p>dialekt is a desktop application with optional cloud licensing. The threat model has two halves:</p>
+    <h2 data-i18n="sec.threat.h">Threat model</h2>
+    <p data-i18n="sec.threat.intro">dialekt is a desktop application with optional cloud licensing. The threat model has two halves:</p>
     <ul>
-      <li><strong style="color:var(--text)">Local:</strong> the app runs on your machine. We protect your API keys (cloud LLM credentials) in your OS keychain, sandbox the agent's filesystem and shell access, and require explicit consent for destructive operations.</li>
-      <li><strong style="color:var(--text)">Cloud:</strong> the licensing service stores tenant metadata (company, email, plan, expiry, invoices) — no prompts, no agent outputs, no source code. Compromise impact: tenant list disclosure, not user data.</li>
+      <li><strong style="color:var(--text)" data-i18n="sec.threat.local.t">Local:</strong><span data-i18n="sec.threat.local"> the app runs on your machine. We protect your API keys (cloud LLM credentials) in your OS keychain, sandbox the agent's filesystem and shell access, and require explicit consent for destructive operations.</span></li>
+      <li><strong style="color:var(--text)" data-i18n="sec.threat.cloud.t">Cloud:</strong><span data-i18n="sec.threat.cloud"> the licensing service stores tenant metadata (company, email, plan, expiry, invoices) — no prompts, no agent outputs, no source code. Compromise impact: tenant list disclosure, not user data.</span></li>
     </ul>
 
-    <h2>Local security measures</h2>
+    <h2 data-i18n="sec.local.h">Local security measures</h2>
     <ul>
-      <li>API keys for cloud LLM providers stored in OS keychain (GNOME Keyring / KDE Wallet on Linux, macOS Keychain, Windows Credential Manager). Fallback: AES-256-GCM file with scrypt-derived key from hostname+user.</li>
-      <li>Local backend listens on <code>localhost:8765</code> only — no network exposure.</li>
-      <li>Tri-state permission system (allow / ask / deny) for filesystem, shell, browser, screen capture, mouse/keyboard, keychain.</li>
-      <li>Per-tool MCP consent: any destructive call asks before first use, with optional session-scoped trust.</li>
-      <li>Code execution in sandboxed Python/shell environments via Open Interpreter.</li>
+      <li data-i18n="sec.local.1">API keys for cloud LLM providers stored in OS keychain (GNOME Keyring / KDE Wallet on Linux, macOS Keychain, Windows Credential Manager). Fallback: AES-256-GCM file with scrypt-derived key from hostname+user.</li>
+      <li data-i18n="sec.local.2">Local backend listens on localhost:8765 only — no network exposure.</li>
+      <li data-i18n="sec.local.3">Tri-state permission system (allow / ask / deny) for filesystem, shell, browser, screen capture, mouse/keyboard, keychain.</li>
+      <li data-i18n="sec.local.4">Per-tool MCP consent: any destructive call asks before first use, with optional session-scoped trust.</li>
+      <li data-i18n="sec.local.5">Code execution in sandboxed Python/shell environments via Open Interpreter.</li>
     </ul>
 
-    <h2>Cloud security measures</h2>
+    <h2 data-i18n="sec.cloud.h">Cloud security measures</h2>
     <ul>
-      <li>Postgres encrypted at rest (filesystem-level on the host).</li>
-      <li>Cloudflare Tunnel for transport — no public ingress on the origin.</li>
-      <li>HTTPS everywhere (TLS 1.3).</li>
-      <li>Bearer tokens (JWT, HS256) with 24h TTL; secret rotation supported.</li>
-      <li>Role-based access (admin / owner / user).</li>
-      <li>Founder admin actions logged to <code>founder_admin_log</code> with full audit trail (3-year retention).</li>
-      <li>Daily Postgres backups, 7-day rolling.</li>
+      <li data-i18n="sec.cloud.1">Postgres encrypted at rest (filesystem-level on the host).</li>
+      <li data-i18n="sec.cloud.2">Cloudflare Tunnel for transport — no public ingress on the origin.</li>
+      <li data-i18n="sec.cloud.3">HTTPS everywhere (TLS 1.3).</li>
+      <li data-i18n="sec.cloud.4">Bearer tokens (JWT, HS256) with 24h TTL; secret rotation supported.</li>
+      <li data-i18n="sec.cloud.5">Role-based access (admin / owner / user).</li>
+      <li data-i18n="sec.cloud.6">Founder admin actions logged with full audit trail (3-year retention).</li>
+      <li data-i18n="sec.cloud.7">Daily Postgres backups, 7-day rolling.</li>
     </ul>
 
-    <h2>Build & supply chain</h2>
+    <h2 data-i18n="sec.build.h">Build &amp; supply chain</h2>
     <ul>
-      <li>Releases built reproducibly on GitHub Actions; artifacts SHA-256-tagged.</li>
-      <li>Signed builds for macOS (Apple Developer) and Windows (Authenticode) — in progress.</li>
-      <li>Linux installer fetches the upstream Ollama install.sh with SHA-256 pin verification before exec.</li>
-      <li>npm audit / pip audit run on every PR.</li>
+      <li data-i18n="sec.build.1">Releases built reproducibly in CI; artifacts SHA-256-tagged.</li>
+      <li data-i18n="sec.build.2">Signed builds for macOS (Apple Developer) and Windows (Authenticode) — in progress.</li>
+      <li data-i18n="sec.build.3">Linux installer fetches the upstream Ollama install.sh with SHA-256 pin verification before exec.</li>
+      <li data-i18n="sec.build.4">npm audit / pip audit run on every PR.</li>
     </ul>
 
-    <h2>Vulnerability disclosure</h2>
-    <p>Found a vulnerability? Email <a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a>. We respond within 72h. Coordinated disclosure preferred — give us 90 days before public write-up.</p>
+    <h2 data-i18n="sec.vd.h">Vulnerability disclosure</h2>
+    <p><span data-i18n="sec.vd.body">Found a vulnerability? Email </span><a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a><span data-i18n="sec.vd.tail">. We respond within 72h. Coordinated disclosure preferred — give us 90 days before public write-up.</span></p>
 
-    <h2>Compliance roadmap</h2>
+    <h2 data-i18n="sec.compl.h">Compliance roadmap</h2>
     <ul>
-      <li>KZ ПДн (Law №94-V) — covered by <code>regulated_mode</code> setting and the Privacy Policy. Notification to КНБ РК pending.</li>
-      <li>GDPR — covered for EU pilot tenants by the Privacy Policy and DPO contact.</li>
-      <li>SOC 2 — Type II audit planned for 2026 H2 once paid customer base supports the spend.</li>
-      <li>ISO 27001 — under evaluation for 2027.</li>
+      <li data-i18n="sec.compl.1">KZ ПДн (Law №94-V) — covered by regulated_mode setting and the Privacy Policy. Notification to КНБ РК pending.</li>
+      <li data-i18n="sec.compl.2">GDPR — covered for EU pilot tenants by the Privacy Policy and DPO contact.</li>
+      <li data-i18n="sec.compl.3">SOC 2 — Type II audit planned for 2026 H2 once paid customer base supports the spend.</li>
+      <li data-i18n="sec.compl.4">ISO 27001 — under evaluation for 2027.</li>
     </ul>
 
-    <h2>Bug bounty</h2>
-    <p>No formal program yet. Significant findings get a public credit and a Pro plan year on the house. Inquire via <a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a>.</p>
+    <h2 data-i18n="sec.bb.h">Bug bounty</h2>
+    <p><span data-i18n="sec.bb.body">No formal program yet. Significant findings get a public credit and a Pro plan year on the house. Inquire via </span><a href="mailto:security@dialekt.ai" style="color:var(--cyan)">security@dialekt.ai</a><span data-i18n="sec.bb.tail">.</span></p>
 
-    <p class="text-dim mt-32" style="font-size:12px;padding-top:24px;border-top:1px solid var(--border)">
+    <p class="text-dim mt-32" style="font-size:12px;padding-top:24px;border-top:1px solid var(--border)" data-i18n="sec.foot">
       Architecture is auditable on request — the desktop app, cloud service, and manifest validator are reviewable under NDA during pilot scoping.
     </p>
   </div>
