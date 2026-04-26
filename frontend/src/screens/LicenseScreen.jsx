@@ -10,6 +10,9 @@ export default function LicenseScreen({ onNav }) {
   const [status, setStatus] = useState('idle'); // idle | checking | ok | error | trial
   const [errorMsg, setErrorMsg] = useState('');
   const [tenantInfo, setTenantInfo] = useState(null);
+  // Trial is the default path now; the license-key input is a secondary flow
+  // revealed by clicking "I already have a license key →".
+  const [showKeyInput, setShowKeyInput] = useState(false);
 
   const validate = async () => {
     const trimmed = key.trim();
@@ -120,64 +123,77 @@ export default function LicenseScreen({ onNav }) {
             <>
               <div style={{ marginBottom: 32 }}>
                 <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: T.text, marginBottom: 8 }}>
-                  Enter your license key
+                  Welcome to dialekt
                 </div>
                 <div style={{ fontSize: 14, color: T.muted, lineHeight: 1.6 }}>
-                  Received your license via email? Paste it below.
-                  To purchase, contact <span style={{ color: T.cyan }}>hello@dialekt.ai</span>
+                  Start with a 30-day free trial — no key needed. Already paid? Use your license key instead.
                 </div>
               </div>
 
-              <div style={{ background: T.bg1, border: `1px solid ${T.border}`, padding: 24, marginBottom: 16 }}>
-                <label style={{ fontSize: 11, letterSpacing: '.1em', color: T.dim, display: 'block', marginBottom: 8 }}>
-                  LICENSE KEY
-                </label>
-                <input
-                  value={key}
-                  onChange={e => setKey(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && validate()}
-                  placeholder="dialekt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  disabled={status === 'checking'}
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: T.bg0, border: `1px solid ${status === 'error' ? T.red : T.border}`,
-                    color: T.text, padding: '10px 14px', fontSize: 13,
-                    fontFamily: T.mono, outline: 'none',
-                  }}
-                />
-                {status === 'error' && (
-                  <div style={{ color: T.red, fontSize: 12, marginTop: 8 }}>{errorMsg}</div>
-                )}
+              <button
+                onClick={startTrial}
+                disabled={status === 'checking'}
+                style={{
+                  width: '100%', padding: '16px 24px', marginBottom: 14,
+                  background: T.cyan, color: T.bg0, border: 'none',
+                  fontSize: 14, fontWeight: 800, letterSpacing: '.04em',
+                  cursor: status === 'checking' ? 'wait' : 'pointer',
+                  opacity: status === 'checking' ? 0.6 : 1,
+                }}>
+                START 30-DAY FREE TRIAL →
+              </button>
+              <div style={{ fontSize: 11, color: T.dim, textAlign: 'center', marginBottom: 24, letterSpacing: '.04em' }}>
+                3 seats · all features · no credit card · no email signup required
               </div>
 
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
-                <button
-                  onClick={validate}
-                  disabled={!key.trim() || status === 'checking'}
-                  style={{
-                    flex: 1, padding: '11px 24px',
-                    background: (!key.trim() || status === 'checking') ? T.bg3 : T.cyan,
-                    color: (!key.trim() || status === 'checking') ? T.dim : T.bg0,
-                    border: 'none', fontSize: 13, fontWeight: 700,
-                    cursor: (!key.trim() || status === 'checking') ? 'not-allowed' : 'pointer',
-                    letterSpacing: '.06em',
-                  }}
-                >
-                  {status === 'checking' ? 'VALIDATING…' : 'ACTIVATE LICENSE'}
-                </button>
-              </div>
-
-              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 12, color: T.dim }}>
-                  Don't have a license yet?
+              {!showKeyInput ? (
+                <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 20, textAlign: 'center' }}>
+                  <button
+                    onClick={() => setShowKeyInput(true)}
+                    style={{ background: 'none', border: 'none', color: T.muted, fontSize: 12, cursor: 'pointer', letterSpacing: '.04em' }}>
+                    I already have a license key →
+                  </button>
                 </div>
-                <button
-                  onClick={startTrial}
-                  style={{ background: 'none', border: `1px solid ${T.border}`, color: T.muted, padding: '8px 18px', fontSize: 12, cursor: 'pointer' }}
-                >
-                  Start 30-day free trial
-                </button>
-              </div>
+              ) : (
+                <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, letterSpacing: '.1em', color: T.dim }}>LICENSE KEY</label>
+                    <button onClick={() => setShowKeyInput(false)}
+                      style={{ background: 'none', border: 'none', color: T.dim, fontSize: 11, cursor: 'pointer' }}>
+                      ← back to trial
+                    </button>
+                  </div>
+                  <input
+                    value={key}
+                    onChange={e => setKey(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && validate()}
+                    placeholder="dialekt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    disabled={status === 'checking'}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: T.bg0, border: `1px solid ${status === 'error' ? T.red : T.border}`,
+                      color: T.text, padding: '10px 14px', fontSize: 13,
+                      fontFamily: T.mono, outline: 'none', marginBottom: 12,
+                    }}
+                  />
+                  {status === 'error' && (
+                    <div style={{ color: T.red, fontSize: 12, marginBottom: 10 }}>{errorMsg}</div>
+                  )}
+                  <button
+                    onClick={validate}
+                    disabled={!key.trim() || status === 'checking'}
+                    style={{
+                      width: '100%', padding: '11px 24px',
+                      background: (!key.trim() || status === 'checking') ? T.bg3 : T.cyan,
+                      color: (!key.trim() || status === 'checking') ? T.dim : T.bg0,
+                      border: 'none', fontSize: 13, fontWeight: 700,
+                      cursor: (!key.trim() || status === 'checking') ? 'not-allowed' : 'pointer',
+                      letterSpacing: '.06em',
+                    }}>
+                    {status === 'checking' ? 'VALIDATING…' : 'ACTIVATE LICENSE'}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
