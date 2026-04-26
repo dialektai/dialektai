@@ -18,7 +18,103 @@ import AdminDashboardScreen from './screens/AdminDashboardScreen.jsx';
 
 const API = 'http://localhost:8765';
 
+// ── Backend boot gate ──────────────────────────────────────────────────────
+// PyInstaller-frozen Python sidecar takes 5-20s to boot (cold start +
+// FastAPI startup + SQLite migrations). Until /health responds, fetches
+// from screens silently fail and components like the onboarding model
+// picker render with empty data — the Continue button stays disabled
+// because the catalog never loaded. Gate the whole app on /health so
+// nothing renders until the sidecar is reachable.
+function BackendBootGate({ children }) {
+  const [ready, setReady] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const start = Date.now();
+    const poll = async () => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 2000);
+        const r = await fetch(`${API}/health`, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (r.ok && !cancelled) { setReady(true); return; }
+      } catch { /* keep polling */ }
+      if (cancelled) return;
+      const now = Date.now() - start;
+      setElapsedMs(now);
+      if (now > 60_000) { setError('Backend did not start within 60 seconds.'); return; }
+      timer = setTimeout(poll, 500);
+    };
+    poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
+
+  if (ready) return children;
+
+  // First 1.5s show nothing — most boots finish before the user notices.
+  // After that, surface the loading state so the window doesn't look frozen.
+  if (!error && elapsedMs < 1500) {
+    return <div style={{ width: '100%', height: '100%', background: '#0a0d12' }} />;
+  }
+
+  const hint =
+    error                  ? error :
+    elapsedMs < 5000       ? 'Starting local agent…' :
+    elapsedMs < 12000      ? 'Loading models…' :
+    elapsedMs < 25000      ? 'Running first-launch migrations…' :
+                             'Still working — first launch can take a while.';
+
+  return (
+    <div style={{
+      width: '100%', height: '100%', background: '#0a0d12',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 22,
+    }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: '50%',
+        border: '1px solid #1f2a37',
+        background: 'radial-gradient(circle at 50% 40%, #38bdf8 0%, #0a0d12 70%)',
+        boxShadow: '0 0 30px rgba(56,189,248,0.25)',
+        animation: error ? 'none' : 'dlk-boot-pulse 1.6s ease-in-out infinite',
+      }} />
+      <div style={{
+        fontFamily: 'ui-monospace, SF Mono, Consolas, monospace',
+        fontSize: 11, color: '#94a3b8', letterSpacing: '.14em', textTransform: 'uppercase',
+      }}>
+        DIALEKT · LOCAL AGENT
+      </div>
+      <div style={{ fontSize: 13, color: error ? '#f87171' : '#cbd5e1', maxWidth: 360, textAlign: 'center', lineHeight: 1.5 }}>
+        {hint}
+      </div>
+      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: '#475569', letterSpacing: '.08em' }}>
+        {error ? 'CHECK ~/.dialekt/server.log' : `${(elapsedMs / 1000).toFixed(1)}s`}
+      </div>
+      {error && (
+        <button
+          onClick={() => location.reload()}
+          style={{
+            marginTop: 4, padding: '8px 18px', background: 'transparent',
+            border: '1px solid #38bdf8', color: '#38bdf8',
+            fontFamily: 'ui-monospace, monospace', fontSize: 11, letterSpacing: '.12em',
+            cursor: 'pointer',
+          }}>RETRY</button>
+      )}
+      <style>{`@keyframes dlk-boot-pulse { 0%,100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1); } }`}</style>
+    </div>
+  );
+}
+
 export default function App() {
+  return (
+    <BackendBootGate>
+      <AppRoutes />
+    </BackendBootGate>
+  );
+}
+
+function AppRoutes() {
   const [screen, setScreen] = useState('main');
   const [screenProps, setScreenProps] = useState({});
 

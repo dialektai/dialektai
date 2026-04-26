@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
@@ -326,6 +326,172 @@ function ErrMsg({ msg }) {
   return <div style={{ fontFamily: T.mono, fontSize: 11, color: T.red, marginTop: 4 }}>{msg}</div>;
 }
 
+// ── ModelCombobox: searchable single-select with manual-entry escape hatch ────
+// Used for Preferred Model. Lists installed Ollama tags + configured cloud
+// provider models; if the user types something not in the list we still let
+// them commit it (covers exotic tags, custom Modelfiles, etc.).
+function ModelCombobox({ value, onChange, options, loading, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [hover, setHover] = useState(0);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = options.filter(o => !q || o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q));
+  const selected = options.find(o => o.id === value);
+  const showManualEntry = q && !filtered.some(o => o.id === q || o.label === q);
+
+  const commit = (id) => { onChange(id); setOpen(false); setQuery(''); };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          ...INPUT,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          textAlign: 'left', cursor: 'pointer', padding: '9px 12px',
+          fontFamily: T.mono,
+          background: open ? T.bg2 : T.bg1,
+          borderColor: open ? T.cyan : T.border,
+        }}>
+        <span style={{ color: value ? T.text : T.dim }}>
+          {selected ? selected.label : (value || placeholder)}
+          {selected && (
+            <span style={{ marginLeft: 10, fontSize: 10, color: selected.installed ? T.green : T.amber, letterSpacing: '.06em' }}>
+              {selected.installed ? '● INSTALLED' : '◌ WILL PULL'}
+            </span>
+          )}
+        </span>
+        <span style={{ color: T.dim, fontSize: 10, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+          background: T.bg1, border: `1px solid ${T.cyan}66`, maxHeight: 320, overflowY: 'auto',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+        }}>
+          <div style={{ padding: 8, borderBottom: `1px solid ${T.border}`, position: 'sticky', top: 0, background: T.bg1 }}>
+            <input
+              autoFocus
+              value={query}
+              onChange={e => { setQuery(e.target.value); setHover(0); }}
+              onKeyDown={e => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setHover(h => Math.min(h + 1, filtered.length - 1)); }
+                if (e.key === 'ArrowUp')   { e.preventDefault(); setHover(h => Math.max(h - 1, 0)); }
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (filtered[hover]) commit(filtered[hover].id);
+                  else if (showManualEntry) commit(query.trim());
+                }
+                if (e.key === 'Escape') setOpen(false);
+              }}
+              placeholder="search · or type a custom tag"
+              style={{ ...INPUT, padding: '7px 10px', fontFamily: T.mono, fontSize: 12, background: T.bg0 }}
+            />
+          </div>
+          {loading && (
+            <div style={{ padding: 14, color: T.dim, fontSize: 12 }}>Loading model catalog…</div>
+          )}
+          {!loading && filtered.length === 0 && !showManualEntry && (
+            <div style={{ padding: 14, color: T.dim, fontSize: 12 }}>No models match.</div>
+          )}
+          {filtered.map((o, i) => {
+            const active = i === hover;
+            return (
+              <div
+                key={o.id}
+                onMouseEnter={() => setHover(i)}
+                onClick={() => commit(o.id)}
+                style={{
+                  padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+                  cursor: 'pointer', background: active ? T.bg2 : 'transparent',
+                  borderLeft: `2px solid ${active ? T.cyan : 'transparent'}`,
+                }}>
+                <div>
+                  <div style={{ fontFamily: T.mono, fontSize: 13, color: T.text }}>{o.label}</div>
+                  <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 2 }}>{o.hint}</div>
+                </div>
+                <span style={{
+                  fontSize: 10, fontFamily: T.mono, letterSpacing: '.08em',
+                  color: o.installed ? T.green : T.amber,
+                }}>
+                  {o.installed ? '● READY' : '◌ PULL'}
+                </span>
+              </div>
+            );
+          })}
+          {showManualEntry && (
+            <div
+              onClick={() => commit(query.trim())}
+              style={{
+                padding: '9px 12px', cursor: 'pointer', borderTop: `1px solid ${T.border}`,
+                background: T.bg0, fontSize: 12, color: T.muted,
+              }}>
+              + Use custom tag <span style={{ color: T.cyan, fontFamily: T.mono }}>{query.trim()}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ModelMultiPicker: chip-based multi-select for fallback models ─────────────
+function ModelMultiPicker({ values, onChange, options, loading, placeholder }) {
+  const add = (id) => {
+    if (!id || values.includes(id)) return;
+    onChange([...values, id]);
+  };
+  const remove = (id) => onChange(values.filter(v => v !== id));
+
+  return (
+    <div>
+      <ModelCombobox
+        value=""
+        onChange={add}
+        options={options.filter(o => !values.includes(o.id))}
+        loading={loading}
+        placeholder={placeholder}
+      />
+      {values.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+          {values.map(v => {
+            const o = options.find(x => x.id === v);
+            return (
+              <span key={v} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '5px 4px 5px 10px', fontFamily: T.mono, fontSize: 11.5,
+                background: T.bg2, border: `1px solid ${T.border}`,
+                color: o?.installed === false ? T.amber : T.text,
+              }}>
+                <span>{o?.label || v}</span>
+                <button
+                  type="button"
+                  onClick={() => remove(v)}
+                  style={{
+                    width: 18, height: 18, lineHeight: '16px', textAlign: 'center',
+                    background: 'transparent', border: 'none', color: T.dim,
+                    cursor: 'pointer', fontSize: 14,
+                  }}
+                  title="Remove"
+                >×</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Step 0: Identity ──────────────────────────────────────────────────────────
 
 function StepIdentity({ data, setData, errors }) {
@@ -401,28 +567,91 @@ function StepIdentity({ data, setData, errors }) {
 // ── Step 1: Model ─────────────────────────────────────────────────────────────
 
 function StepModel({ data, setData }) {
+  const [installed, setInstalled] = useState([]);   // [{ id, label, kind, hint, installed }]
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([
+      fetch('http://127.0.0.1:11434/api/tags').then(r => r.ok ? r.json() : { models: [] }),
+      fetch(`${API}/llm/catalog`).then(r => r.json()),
+      fetch(`${API}/llm/providers`).then(r => r.json()),
+    ]).then(([tagsRes, catRes, provRes]) => {
+      if (cancelled) return;
+      const installedTags = new Set(((tagsRes.value?.models) || []).map(m => m.name));
+      const opts = [];
+      // Ollama: every locally installed tag (always pickable, no extra cost).
+      for (const t of installedTags) {
+        opts.push({
+          id: t,
+          label: t.replace(/:latest$/, ''),
+          kind: 'ollama',
+          hint: 'Local · installed',
+          installed: true,
+        });
+      }
+      // Ollama catalog (suggested but not yet pulled). Skip duplicates.
+      for (const m of (catRes.value?.ollama || [])) {
+        const tag = `${m.name}:${(m.tag || '').split('-')[0] || 'latest'}`;
+        if (installedTags.has(tag) || installedTags.has(`${m.name}:latest`)) continue;
+        opts.push({
+          id: tag,
+          label: tag,
+          kind: 'ollama',
+          hint: `Local · ${m.size_gb ? m.size_gb + ' GB download' : 'will pull on first run'}`,
+          installed: false,
+        });
+      }
+      // Cloud providers — only those configured (have credentials saved).
+      for (const p of (provRes.value?.providers || [])) {
+        if (!p.configured) continue;
+        for (const m of (p.models || [])) {
+          opts.push({
+            id: `${p.id}/${m}`,
+            label: `${p.id}/${m}`,
+            kind: 'cloud',
+            hint: `Cloud · ${p.label || p.id}`,
+            installed: true,
+          });
+        }
+      }
+      setInstalled(opts);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const acceptable = (data.model_acceptable || '')
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const updateAcceptable = (next) => {
+    setData(d => ({ ...d, model_acceptable: next.join('\n') }));
+  };
+
   return (
     <div>
       <Field label="Preferred Model">
-        <TextInput
+        <ModelCombobox
           value={data.model_preferred}
           onChange={v => setData(d => ({ ...d, model_preferred: v }))}
-          placeholder="llama3.2:3b"
+          options={installed}
+          loading={loading}
+          placeholder="Pick a model…"
         />
-        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
-          e.g. qwen2.5-coder:32b, llama3.1:70b, gemma3-12b
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+          {loading ? 'Loading model catalog…'
+            : `${installed.filter(o => o.kind === 'ollama' && o.installed).length} installed locally · ${installed.filter(o => o.kind === 'cloud').length} cloud · ${installed.filter(o => !o.installed).length} pullable`}
         </div>
       </Field>
-      <Field label="Acceptable Models (one per line)">
-        <textarea
-          value={data.model_acceptable}
-          onChange={e => setData(d => ({ ...d, model_acceptable: e.target.value }))}
-          placeholder={"llama3.2:1b\ngemma3:2b"}
-          rows={4}
-          style={{ ...INPUT, resize: 'vertical', fontFamily: T.mono }}
+      <Field label="Acceptable Models (fallbacks)">
+        <ModelMultiPicker
+          values={acceptable}
+          onChange={updateAcceptable}
+          options={installed.filter(o => o.id !== data.model_preferred)}
+          loading={loading}
+          placeholder="Add a fallback model…"
         />
-        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
-          Fallback models if preferred is unavailable
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+          Used in order if the preferred model isn't available at runtime.
         </div>
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

@@ -429,25 +429,37 @@ export default function OnboardingScreen({ onNav }) {
   const [credModalProvider, setCredModalProvider] = useState(null);
 
   // ── Fetch catalog + system state on mount ────────────────────────────────
+  // BackendBootGate already waited for /health, but the catalog endpoint can
+  // still race with later sidecar warm-up steps (LLM provider registry init
+  // runs after /health goes green). Retry until we get a non-empty ollama
+  // catalog or the user gives up — the previous one-shot fetch left the
+  // Continue button permanently disabled when the catalog came back empty.
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/llm/catalog`).then(r => r.json()).then(d => {
-      if (!cancelled) setCatalog(d);
-    }).catch(() => {});
-    fetch(`${API}/llm/providers`).then(r => r.json()).then(d => {
-      if (!cancelled) setProvidersStatus(d.providers || []);
-    }).catch(() => {});
-    fetch('http://127.0.0.1:11434/api/tags')
-      .then(r => r.ok ? r.json() : { models: [] })
-      .then(data => {
+    let timer = null;
+    let attempts = 0;
+    const tick = () => {
+      attempts++;
+      Promise.allSettled([
+        fetch(`${API}/llm/catalog`).then(r => r.json()),
+        fetch(`${API}/llm/providers`).then(r => r.json()),
+        fetch('http://127.0.0.1:11434/api/tags').then(r => r.ok ? r.json() : { models: [] }),
+        fetch(`${API}/system`).then(r => r.ok ? r.json() : null),
+      ]).then(([cat, prov, tags, sys]) => {
         if (cancelled) return;
-        setInstalledTags(new Set((data.models || []).map(m => m.name)));
-      }).catch(() => {});
-    fetch(`${API}/system`).then(r => r.ok ? r.json() : null).then(d => {
-      if (cancelled || !d) return;
-      if (typeof d.ram_total_gb === 'number') setRamTotalGB(d.ram_total_gb);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+        const catOk = cat.status === 'fulfilled' && (cat.value?.ollama?.length > 0 || cat.value?.providers?.length > 0);
+        if (catOk) setCatalog(cat.value);
+        if (prov.status === 'fulfilled') setProvidersStatus(prov.value?.providers || []);
+        if (tags.status === 'fulfilled') setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
+        if (sys.status === 'fulfilled' && sys.value && typeof sys.value.ram_total_gb === 'number') {
+          setRamTotalGB(sys.value.ram_total_gb);
+        }
+        // Re-poll until catalog populated, capped at 20 attempts (~30s wall).
+        if (!catOk && attempts < 20) timer = setTimeout(tick, 1500);
+      });
+    };
+    tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, []);
 
   const reloadProviders = () => {
@@ -814,8 +826,14 @@ function Footer({ tab, selectedOllama, ollamaAnnotated, selectedProvider, select
   let label, disabled = false, action = onContinue;
 
   if (tab === 'local') {
-    label = ollamaInstalled ? 'Use this model →' : 'Download & continue →';
-    disabled = !selectedOllama;
+    if (ollamaAnnotated.length === 0) {
+      // Catalog still warming up — make it obvious why Continue is grey.
+      label = 'Loading models…';
+      disabled = true;
+    } else {
+      label = ollamaInstalled ? 'Use this model →' : 'Download & continue →';
+      disabled = !selectedOllama;
+    }
   } else {
     if (!selectedProvider) {
       label = 'Pick a provider';
