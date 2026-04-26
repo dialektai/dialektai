@@ -139,11 +139,15 @@ async def app(pool):
         "data": {
             "version": "v0.21.0",
             "published_at": "2026-04-25T00:00:00Z",
-            "page_url": "https://github.com/dialektai/dialekt/releases/latest",
-            "linux_deb": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt_0.21.0_amd64.deb",
-            "linux_app": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0.AppImage",
-            "macos_dmg": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0.dmg",
-            "windows_exe": "https://github.com/dialektai/dialekt/releases/download/v0.21.0/dialekt-0.21.0-setup.exe",
+            "page_url": "https://github.com/dialektai/dialektai/releases/latest",
+            "linux_deb_x86_64":  "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_amd64.deb",
+            "linux_deb_arm64":   "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_arm64.deb",
+            "linux_app_x86_64":  "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_amd64.AppImage",
+            "linux_app_arm64":   "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_arm64.AppImage",
+            "macos_dmg_arm64":   "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_aarch64.dmg",
+            "macos_dmg_x86_64":  "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_x86_64.dmg",
+            "windows_exe_x64":   "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_x64-setup.exe",
+            "windows_exe_arm64": "https://github.com/dialektai/dialektai/releases/download/v0.21.0/dialekt_0.21.0_arm64-setup.exe",
         },
     }
     return _app
