@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Repo coords. Override via env if you fork or rename.
 import os as _os
-GITHUB_REPO = _os.environ.get("DIALEKT_GITHUB_REPO", "dialektai/dialekt")
+GITHUB_REPO = _os.environ.get("DIALEKT_GITHUB_REPO", "dialektai/dialektai")
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
@@ -29,13 +29,23 @@ _cache: dict = {"at": 0, "data": None}
 _lock = asyncio.Lock()
 
 
-# Asset name patterns. Order matters — first match wins per platform.
+# Asset name patterns — keyed by (platform, arch). The release workflow
+# names files like dialekt_<ver>_<arch>.<ext>:
+#   linux .deb / .AppImage    →  amd64 | arm64
+#   macOS .dmg                →  aarch64 | x86_64
+#   windows installers        →  x64 | arm64
+# First match wins per key, so per-arch keys never collide.
 _PATTERNS = {
-    "linux_deb":     re.compile(r"\.deb$",          re.I),
-    "linux_app":     re.compile(r"\.AppImage$",     re.I),
-    "macos_dmg":     re.compile(r"\.dmg$",          re.I),
-    "windows_exe":   re.compile(r"-setup\.exe$|installer\.exe$|\.exe$", re.I),
-    "windows_msi":   re.compile(r"\.msi$",          re.I),
+    "linux_deb_x86_64":   re.compile(r"_amd64\.deb$",        re.I),
+    "linux_deb_arm64":    re.compile(r"_arm64\.deb$",        re.I),
+    "linux_app_x86_64":   re.compile(r"_amd64\.AppImage$",   re.I),
+    "linux_app_arm64":    re.compile(r"_arm64\.AppImage$",   re.I),
+    "macos_dmg_arm64":    re.compile(r"_aarch64\.dmg$",      re.I),
+    "macos_dmg_x86_64":   re.compile(r"_x86_64\.dmg$",       re.I),
+    "windows_exe_x64":    re.compile(r"_x64-setup\.exe$",    re.I),
+    "windows_exe_arm64":  re.compile(r"_arm64-setup\.exe$",  re.I),
+    "windows_msi_x64":    re.compile(r"_x64\.msi$",          re.I),
+    "windows_msi_arm64":  re.compile(r"_arm64\.msi$",        re.I),
 }
 
 
@@ -101,18 +111,28 @@ async def get_latest_releases(force: bool = False) -> dict:
             return fallback
 
 
-def releases_summary(releases: dict) -> dict:
-    """Email-template friendly view: per-platform tuples (label, url).
+def releases_summary(releases: dict) -> list:
+    """Email-template friendly view: one row per (platform, arch) asset.
 
-    Returns a list of dicts so Jinja can iterate cleanly.
+    Returns a list of dicts so Jinja can iterate cleanly. Order is
+    macOS → Windows → Linux, ARM64 within each OS rendered alongside
+    x86_64 so users can pick what matches their hardware.
     """
     out = []
-    if releases.get("macos_dmg"):
-        out.append({"platform": "macOS", "label": "Download for macOS", "url": releases["macos_dmg"], "ext": ".dmg"})
-    if releases.get("windows_exe"):
-        out.append({"platform": "Windows", "label": "Download for Windows", "url": releases["windows_exe"], "ext": ".exe"})
-    if releases.get("linux_deb"):
-        out.append({"platform": "Linux (deb)", "label": "Download .deb", "url": releases["linux_deb"], "ext": ".deb"})
-    if releases.get("linux_app"):
-        out.append({"platform": "Linux (AppImage)", "label": "Download AppImage", "url": releases["linux_app"], "ext": ".AppImage"})
+    if releases.get("macos_dmg_arm64"):
+        out.append({"platform": "macOS (Apple Silicon)", "label": "Download .dmg", "url": releases["macos_dmg_arm64"], "ext": ".dmg"})
+    if releases.get("macos_dmg_x86_64"):
+        out.append({"platform": "macOS (Intel)", "label": "Download .dmg", "url": releases["macos_dmg_x86_64"], "ext": ".dmg"})
+    if releases.get("windows_exe_x64"):
+        out.append({"platform": "Windows x64", "label": "Download installer", "url": releases["windows_exe_x64"], "ext": ".exe"})
+    if releases.get("windows_exe_arm64"):
+        out.append({"platform": "Windows ARM64", "label": "Download installer", "url": releases["windows_exe_arm64"], "ext": ".exe"})
+    if releases.get("linux_deb_x86_64"):
+        out.append({"platform": "Linux x86_64 (.deb)", "label": "Download .deb", "url": releases["linux_deb_x86_64"], "ext": ".deb"})
+    if releases.get("linux_deb_arm64"):
+        out.append({"platform": "Linux ARM64 (.deb)", "label": "Download .deb", "url": releases["linux_deb_arm64"], "ext": ".deb"})
+    if releases.get("linux_app_x86_64"):
+        out.append({"platform": "Linux x86_64 (AppImage)", "label": "Download AppImage", "url": releases["linux_app_x86_64"], "ext": ".AppImage"})
+    if releases.get("linux_app_arm64"):
+        out.append({"platform": "Linux ARM64 (AppImage)", "label": "Download AppImage", "url": releases["linux_app_arm64"], "ext": ".AppImage"})
     return out

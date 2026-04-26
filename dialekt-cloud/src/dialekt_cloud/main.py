@@ -90,7 +90,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://dialekt.dias.now", "tauri://localhost", "http://localhost:5173"],
+    allow_origins=["https://dias.now", "https://dialekt.dias.now", "tauri://localhost", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

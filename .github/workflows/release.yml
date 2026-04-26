@@ -130,6 +130,85 @@ jobs:
           path: release/*
           if-no-files-found: error
 
+  # ── 2b. Linux ARM64 build (.deb + .AppImage) ─────────────────────────────
+  # ubuntu-22.04-arm runner — same GLIBC 2.35 baseline, native aarch64.
+
+  build-linux-arm64:
+    needs: test
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip/wheels
+          key: pip-wheels-linux-arm64-py3.12-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            pip-wheels-linux-arm64-py3.12-
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: System deps (GTK + WebKit + appindicator)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev \
+            file
+
+      - name: Build Python sidecar (native aarch64)
+        timeout-minutes: 25
+        run: |
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip wheel
+          # Allow sdist fallback on ARM64 — fewer prebuilt wheels available
+          # for some heavy C-extensions on linux-aarch64 vs x86_64.
+          pip install --prefer-binary -r requirements.txt pyinstaller
+          DIALEKT_BUILD_MODE=native DIALEKT_SKIP_SMOKE=1 bash build_sidecar.sh
+          TRIPLE="aarch64-unknown-linux-gnu"
+          test -f "../frontend/src-tauri/binaries/dialekt-server-$TRIPLE"
+          file "../frontend/src-tauri/binaries/dialekt-server-$TRIPLE"
+
+      - name: Build Tauri bundles (.deb + .AppImage, arm64)
+        run: |
+          cd frontend
+          npm ci
+          npm run tauri -- build --bundles deb appimage
+
+      - name: Collect + hash artifacts
+        run: |
+          VERSION="$(grep -oP '"version":\s*"\K[0-9.]+' frontend/src-tauri/tauri.conf.json)"
+          mkdir -p release
+          cp frontend/src-tauri/target/release/bundle/deb/*.deb      "release/dialekt_${VERSION}_arm64.deb"
+          cp frontend/src-tauri/target/release/bundle/appimage/*.AppImage "release/dialekt_${VERSION}_arm64.AppImage"
+          cd release
+          for f in *.deb *.AppImage; do
+            sha256sum "$f" > "${f}.sha256"
+          done
+          ls -la
+
+      - name: Upload Linux ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-artifacts
+          path: release/*
+          if-no-files-found: error
+
   # ── 3. macOS build (.dmg + .app) ─────────────────────────────────────────
   # macos-latest is Apple Silicon by default on GitHub Actions runners as of
   # 2024+. Code signing is skipped — users will see a Gatekeeper "unidentified
@@ -226,6 +305,88 @@ jobs:
           path: release/*
           if-no-files-found: error
 
+  # ── 3b. macOS Intel build (.dmg + .app) ──────────────────────────────────
+  # macos-13 runner is the last Intel-based GitHub-hosted macOS image. Needed
+  # for users on pre-Apple-Silicon Macs (2019 MBP, 2018 Mac mini, etc.).
+
+  build-macos-intel:
+    needs: test
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip/wheels
+          key: pip-wheels-macos-intel-py3.12-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            pip-wheels-macos-intel-py3.12-
+
+      - name: Build Python sidecar (native, Intel x86_64)
+        timeout-minutes: 25
+        run: |
+          set -x
+          cd python
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip wheel
+          python -m pip install --prefer-binary -r requirements.txt pyinstaller
+          echo "::group::pyinstaller"
+          pyinstaller --clean --log-level=WARN dialekt_server.spec
+          echo "::endgroup::"
+          test -f dist/dialekt-server
+          mkdir -p ../frontend/src-tauri/binaries
+          cp dist/dialekt-server \
+            ../frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin
+          chmod +x ../frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin
+          file ../frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin
+
+      - name: Build Tauri bundles (.dmg + .app, Intel)
+        run: |
+          cd frontend
+          npm ci
+          npm run tauri -- build --bundles dmg app --target x86_64-apple-darwin
+
+      - name: Collect + hash artifacts
+        run: |
+          VERSION="$(grep -oE '"version":[[:space:]]*"[0-9.]+"' frontend/src-tauri/tauri.conf.json | head -1 | grep -oE '[0-9.]+')"
+          mkdir -p release
+          cp frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg \
+            "release/dialekt_${VERSION}_x86_64.dmg"
+          cd frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/macos
+          APP_NAME="$(ls | grep '\.app$' | head -1)"
+          zip -rqy "$GITHUB_WORKSPACE/release/dialekt_${VERSION}_x86_64.app.zip" "$APP_NAME"
+          cd -
+          cd release
+          for f in *.dmg *.app.zip; do
+            shasum -a 256 "$f" > "${f}.sha256"
+          done
+          ls -la
+
+      - name: Upload macOS Intel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel-artifacts
+          path: release/*
+          if-no-files-found: error
+
   # ── 4. Windows build (.msi + NSIS .exe) ──────────────────────────────────
   # windows-latest runner. Code signing is skipped — users will see a
   # SmartScreen warning on first open. Add EV certificate signing later.
@@ -312,10 +473,93 @@ jobs:
           path: release/*
           if-no-files-found: error
 
+  # ── 4b. Windows ARM64 build (.msi + NSIS .exe) ───────────────────────────
+  # windows-11-arm runner. Marked continue-on-error: many Python C-extension
+  # wheels (tokenizers, tiktoken, …) lack windows-arm64 prebuilts as of 2026,
+  # forcing slow source builds that may fail. We still attempt every release;
+  # a failure here doesn't block the rest of the matrix.
+
+  build-windows-arm64:
+    needs: test
+    runs-on: windows-11-arm
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/requirements.txt
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Cache pip wheels
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/pip/Cache/wheels
+          key: pip-wheels-windows-arm64-py3.12-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            pip-wheels-windows-arm64-py3.12-
+
+      - name: Build Python sidecar (native, Windows ARM64)
+        timeout-minutes: 40
+        run: |
+          cd python
+          python -m venv venv
+          source venv/Scripts/activate
+          python -m pip install --upgrade pip wheel
+          # No --only-binary fallback: many deps lack windows-arm64 wheels
+          # and must build from source. Slower but more likely to complete.
+          python -m pip install --prefer-binary -r requirements.txt pyinstaller
+          pyinstaller --clean --log-level=WARN dialekt_server.spec
+          test -f dist/dialekt-server.exe
+          mkdir -p ../frontend/src-tauri/binaries
+          cp dist/dialekt-server.exe \
+            ../frontend/src-tauri/binaries/dialekt-server-aarch64-pc-windows-msvc.exe
+
+      - name: Build Tauri bundles (.msi + NSIS .exe, ARM64)
+        run: |
+          cd frontend
+          npm ci
+          npm run tauri -- build --bundles msi nsis --target aarch64-pc-windows-msvc
+
+      - name: Collect + hash artifacts
+        run: |
+          VERSION="$(grep -oE '"version":[[:space:]]*"[0-9.]+"' frontend/src-tauri/tauri.conf.json | head -1 | grep -oE '[0-9.]+')"
+          mkdir -p release
+          cp frontend/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi \
+            "release/dialekt_${VERSION}_arm64.msi"
+          cp frontend/src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*-setup.exe \
+            "release/dialekt_${VERSION}_arm64-setup.exe"
+          cd release
+          for f in *.msi *-setup.exe; do
+            sha256sum "$f" > "${f}.sha256"
+          done
+          ls -la
+
+      - name: Upload Windows ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64-artifacts
+          path: release/*
+          if-no-files-found: error
+
   # ── 5. Publish release ───────────────────────────────────────────────────
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-linux-arm64, build-macos, build-macos-intel, build-windows, build-windows-arm64]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -344,16 +588,37 @@ jobs:
           name: linux-artifacts
           path: release
 
+      - name: Download Linux ARM64 artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: linux-arm64-artifacts
+          path: release
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: macos-artifacts
           path: release
 
+      - name: Download macOS Intel artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: macos-intel-artifacts
+          path: release
+
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows-artifacts
+          path: release
+
+      - name: Download Windows ARM64 artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: windows-arm64-artifacts
           path: release
 
       - name: Create GitHub Release
@@ -370,23 +635,37 @@ jobs:
 
             ### Installation
 
-            **Linux — Ubuntu / Debian / Mint**:
+            **Linux x86_64 — Ubuntu / Debian / Mint**:
             ```sh
             curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_amd64.deb
             sudo dpkg -i dialekt_*_amd64.deb
             sudo apt-get install -f
             ```
 
+            **Linux ARM64 — Raspberry Pi 5, ARM servers, Ampere**:
+            ```sh
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_arm64.deb
+            sudo dpkg -i dialekt_*_arm64.deb
+            sudo apt-get install -f
+            ```
+
             **Linux — Fedora / Arch / openSUSE / any glibc 2.35+**:
             ```sh
+            # x86_64
             curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_amd64.AppImage
+            # ARM64
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dialekt_*_arm64.AppImage
             chmod +x dialekt_*.AppImage
             ./dialekt_*.AppImage
             ```
 
-            **macOS — Apple Silicon (M1/M2/M3)**:
+            **macOS — Apple Silicon (M1/M2/M3/M4)**:
             Download `dialekt_*_aarch64.dmg`, open, drag to Applications.
-            First open: **right-click the app in Applications → Open → Open** in
+
+            **macOS — Intel (pre-2020 Macs)**:
+            Download `dialekt_*_x86_64.dmg`, open, drag to Applications.
+
+            On first open: **right-click the app in Applications → Open → Open** in
             the Gatekeeper prompt (build is ad-hoc signed, not notarized — an
             "unidentified developer" warning is expected on first launch only).
             If macOS still says the app is damaged, run once in Terminal:
@@ -395,15 +674,19 @@ jobs:
 
             **Windows — x64**:
             Download `dialekt_*_x64-setup.exe` (NSIS installer) or `dialekt_*_x64.msi`.
-            First open: SmartScreen will warn — click "More info" → "Run anyway".
+
+            **Windows — ARM64 (Surface Pro X, Snapdragon X laptops)**:
+            Download `dialekt_*_arm64-setup.exe` (NSIS installer) or `dialekt_*_arm64.msi`.
+
+            On first open Windows SmartScreen will warn — click "More info" → "Run anyway".
             The build is not yet code-signed; EV certificate signing is on the roadmap.
 
             ---
 
             **Requirements**:
-            - Linux: glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 38+)
-            - macOS: 12.0 (Monterey) or newer, Apple Silicon only for now
-            - Windows: Windows 10 or 11, x64
+            - Linux: glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 38+) — x86_64 or arm64
+            - macOS: 12.0 (Monterey) or newer — Apple Silicon or Intel
+            - Windows: Windows 10 or 11 — x64 or ARM64
             - Ollama 0.4+ running locally (https://ollama.com)
             - 16 GB RAM (48 GB recommended for 32B models)
 
