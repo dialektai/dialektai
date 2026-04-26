@@ -580,7 +580,15 @@ jobs:
   # ── 5. Publish release ───────────────────────────────────────────────────
 
   release:
-    needs: [build-linux, build-linux-arm64, build-macos, build-macos-intel, build-windows, build-windows-arm64]
+    # Best-effort jobs (build-macos-intel, build-windows-arm64) deliberately
+    # excluded from `needs:` — they have unreliable runner availability
+    # (macos-13 queues for hours, windows-11-arm has wheel-build issues), and
+    # `timeout-minutes` only counts running time, not queue time. So a job
+    # stuck in queue would block release indefinitely. The matching
+    # download-artifact steps in this job are `continue-on-error: true`,
+    # so if either job *does* finish before this job runs, its artifacts
+    # ride along; otherwise the release publishes without them.
+    needs: [build-linux, build-linux-arm64, build-macos, build-windows]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     steps:
