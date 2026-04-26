@@ -109,6 +109,17 @@ if [ "$PLATFORM" != "frontend-only" ]; then
     chmod +x "$BINARIES_DIR/$SIDECAR_NAME"
   fi
   echo "  Sidecar → $BINARIES_DIR/$SIDECAR_NAME"
+
+  # Sign the sidecar with hardened runtime on macOS (required for notarization)
+  if [ "$PLATFORM" = "macos" ] && [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+    echo "→ Signing sidecar with hardened runtime..."
+    codesign --force --options runtime \
+      --entitlements "$TAURI_DIR/src-tauri/Entitlements.plist" \
+      --sign "$APPLE_SIGNING_IDENTITY" \
+      --timestamp \
+      "$BINARIES_DIR/$SIDECAR_NAME"
+    echo "  Sidecar signed: $APPLE_SIGNING_IDENTITY"
+  fi
 fi
 
 # ── Step 3: Build Tauri desktop app ──────────────────────────────────────────
@@ -123,6 +134,25 @@ case "$PLATFORM" in
     npm run tauri build -- --target universal-apple-darwin
     echo ""
     echo "  Output: src-tauri/target/universal-apple-darwin/release/bundle/dmg/"
+
+    # Notarize the .dmg if Apple credentials are available
+    if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+      echo "→ Notarizing .dmg with Apple..."
+      DMG_PATH="$(ls "$TAURI_DIR/src-tauri/target/universal-apple-darwin/release/bundle/dmg/"*.dmg 2>/dev/null | head -1)"
+      if [ -n "$DMG_PATH" ]; then
+        xcrun notarytool submit "$DMG_PATH" \
+          --apple-id "$APPLE_ID" \
+          --password "$APPLE_PASSWORD" \
+          --team-id "$APPLE_TEAM_ID" \
+          --wait
+        xcrun stapler staple "$DMG_PATH"
+        echo "  ✓ Notarization complete — stapled to $DMG_PATH"
+      else
+        echo "  ⚠ No .dmg found to notarize"
+      fi
+    else
+      echo "  (Skipping notarization — APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID not set)"
+    fi
     ;;
   linux)
     npm run tauri build

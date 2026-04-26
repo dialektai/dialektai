@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hardened Runtime — required for notarization -->
+
+    <!-- PyInstaller sidecar uses mmap with PROT_EXEC for unpacking -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Sidecar loads bundled .dylibs not signed by the same team -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Backend serves on localhost (FastAPI :41337) -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- Connects to Ollama (:11434) and local services -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Sidecar spawns child processes (Python subprocess calls) -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

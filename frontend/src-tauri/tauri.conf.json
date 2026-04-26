@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": ["deb", "appimage", "dmg", "app"],
     "category": "DeveloperTool",
     "shortDescription": "Local-first AI agent platform for developers",
     "longDescription": "dialekt is a desktop AI agent platform that runs local LLMs via Ollama, lets you build and share SQL / data / workflow agents across a team, and keeps prompts, connections and data on the user's machine.",
@@ -45,8 +45,8 @@
     ],
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "signingIdentity": "-",
-      "entitlements": null
+      "signingIdentity": null,
+      "entitlements": "Entitlements.plist"
     },
     "linux": {
       "deb": {

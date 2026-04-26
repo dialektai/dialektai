@@ -210,10 +210,8 @@ jobs:
           if-no-files-found: error
 
   # ── 3. macOS build (.dmg + .app) ─────────────────────────────────────────
-  # macos-latest is Apple Silicon by default on GitHub Actions runners as of
-  # 2024+. Code signing is skipped — users will see a Gatekeeper "unidentified
-  # developer" warning on first open. Add Developer ID signing + notarization
-  # in a later milestone.
+  # macos-latest is Apple Silicon by default on GitHub Actions runners.
+  # Signed with Developer ID + notarized via Apple notarytool.
 
   build-macos:
     needs: test
@@ -245,12 +243,31 @@ jobs:
           restore-keys: |
             pip-wheels-macos-py3.12-
 
-      # Inline PyInstaller invocation (same shape as build-windows). Previous
-      # rc2 attempt called `bash build_sidecar.sh` which silently exited 1
-      # on macOS runners right after pip's "Successfully installed" message
-      # — cause was the script's inner `pip install --quiet --upgrade pip`
-      # interacting poorly with the runner's cached venv. Inlining bypasses
-      # it entirely and matches what build-windows already does successfully.
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Verify the identity is available
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
       - name: Build Python sidecar (native, Apple Silicon)
         timeout-minutes: 25
         run: |
@@ -270,11 +287,46 @@ jobs:
           chmod +x ../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin
           file ../frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin
 
+      - name: Sign sidecar with hardened runtime
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          SIDECAR="frontend/src-tauri/binaries/dialekt-server-aarch64-apple-darwin"
+          codesign --force --options runtime \
+            --entitlements frontend/src-tauri/Entitlements.plist \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --timestamp \
+            "$SIDECAR"
+          codesign -dv --verbose=4 "$SIDECAR"
+
       - name: Build Tauri bundles (.dmg + .app)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd frontend
           npm ci
           npm run tauri -- build --bundles dmg app --target aarch64-apple-darwin
+
+      - name: Notarize .dmg
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH="$(ls frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg | head -1)"
+          echo "Submitting $DMG_PATH for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "$DMG_PATH"
+          echo "Notarization complete — stapled to $DMG_PATH"
 
       - name: Collect + hash artifacts
         run: |
@@ -282,12 +334,6 @@ jobs:
           mkdir -p release
           cp frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
             "release/dialekt_${VERSION}_aarch64.dmg"
-          # .app is a directory — zip it for artifact upload. Use an
-          # absolute path via $GITHUB_WORKSPACE instead of relative
-          # ../ traversal (previous `../../../../../../release/...`
-          # undercounted by one level — it landed at frontend/release/
-          # which doesn't exist, breaking v0.11.0 on the first real
-          # release run).
           cd frontend/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
           APP_NAME="$(ls | grep '\.app$' | head -1)"
           zip -rqy "$GITHUB_WORKSPACE/release/dialekt_${VERSION}_aarch64.app.zip" "$APP_NAME"
@@ -297,6 +343,11 @@ jobs:
             shasum -a 256 "$f" > "${f}.sha256"
           done
           ls -la
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -308,9 +359,8 @@ jobs:
   # ── 3b. macOS Intel build (.dmg + .app) ──────────────────────────────────
   # macos-13 runner is the last Intel-based GitHub-hosted macOS image. Needed
   # for users on pre-Apple-Silicon Macs (2019 MBP, 2018 Mac mini, etc.).
-  # Marked continue-on-error: macos-13 runner allocation is unreliable on
-  # weekends (saw a 1h+ queue on v0.26.3 attempt), so a missing Intel build
-  # shouldn't block the rest of the release. Intel users wait for the next tag.
+  # Signed with Developer ID + notarized. Marked continue-on-error: macos-13
+  # runner allocation is unreliable on weekends.
 
   build-macos-intel:
     needs: test
@@ -344,6 +394,30 @@ jobs:
           restore-keys: |
             pip-wheels-macos-intel-py3.12-
 
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
       - name: Build Python sidecar (native, Intel x86_64)
         timeout-minutes: 25
         run: |
@@ -363,11 +437,46 @@ jobs:
           chmod +x ../frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin
           file ../frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin
 
+      - name: Sign sidecar with hardened runtime
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          SIDECAR="frontend/src-tauri/binaries/dialekt-server-x86_64-apple-darwin"
+          codesign --force --options runtime \
+            --entitlements frontend/src-tauri/Entitlements.plist \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --timestamp \
+            "$SIDECAR"
+          codesign -dv --verbose=4 "$SIDECAR"
+
       - name: Build Tauri bundles (.dmg + .app, Intel)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd frontend
           npm ci
           npm run tauri -- build --bundles dmg app --target x86_64-apple-darwin
+
+      - name: Notarize .dmg
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH="$(ls frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg | head -1)"
+          echo "Submitting $DMG_PATH for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 30m
+          xcrun stapler staple "$DMG_PATH"
+          echo "Notarization complete — stapled to $DMG_PATH"
 
       - name: Collect + hash artifacts
         run: |
@@ -384,6 +493,11 @@ jobs:
             shasum -a 256 "$f" > "${f}.sha256"
           done
           ls -la
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true
 
       - name: Upload macOS Intel artifacts
         uses: actions/upload-artifact@v4
@@ -694,12 +808,8 @@ jobs:
             **macOS — Intel (pre-2020 Macs)**:
             Download `dialekt_*_x86_64.dmg`, open, drag to Applications.
 
-            On first open: **right-click the app in Applications → Open → Open** in
-            the Gatekeeper prompt (build is ad-hoc signed, not notarized — an
-            "unidentified developer" warning is expected on first launch only).
-            If macOS still says the app is damaged, run once in Terminal:
-            `xattr -cr /Applications/dialekt.app` — this removes the download
-            quarantine flag. Developer ID signing + notarization is on the roadmap.
+            The macOS build is signed with a Developer ID certificate and notarized
+            by Apple — it should open without any Gatekeeper warnings.
 
             **Windows — x64**:
             Download `dialekt_*_x64-setup.exe` (NSIS installer) or `dialekt_*_x64.msi`.
