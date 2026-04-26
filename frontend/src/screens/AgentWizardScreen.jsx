@@ -3,6 +3,7 @@ import { T } from '../tokens.js';
 import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
 import McpToolList from '../components/McpToolList.jsx';
+import Select from '../components/Select.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -523,16 +524,17 @@ function StepIdentity({ data, setData, errors }) {
           />
         </Field>
         <Field label="Language">
-          <select
+          <Select
+            variant="full"
             value={data.language}
-            onChange={e => setData(d => ({ ...d, language: e.target.value }))}
-            style={{ ...INPUT, cursor: 'pointer' }}
-          >
-            <option value="en">English</option>
-            <option value="ru">Russian</option>
-            <option value="kk">Kazakh</option>
-            <option value="multi">Multilingual</option>
-          </select>
+            onChange={v => setData(d => ({ ...d, language: v }))}
+            options={[
+              { v: 'en', l: 'English' },
+              { v: 'ru', l: 'Russian' },
+              { v: 'kk', l: 'Kazakh' },
+              { v: 'multi', l: 'Multilingual' },
+            ]}
+          />
         </Field>
       </div>
       <Field label="Tags (comma-separated)">
@@ -825,6 +827,16 @@ function StepMcpServers({ data, setData }) {
   // toolsByServer keyed by server.id. Each: {loading, tools[], error}.
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [toolsByServer, setToolsByServer] = useState({});
+  // Inline "+ Add MCP server" — minimal form covering the two common transports.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [newSrv, setNewSrv] = useState({
+    name: '', transport: 'stdio',
+    command: '',          // stdio: full command line, e.g. "npx -y @mcp/foo"
+    url: '',              // http(s)
+    timeout_seconds: 30,
+  });
 
   const refresh = useCallback(async () => {
     setError('');
@@ -949,6 +961,54 @@ function StepMcpServers({ data, setData }) {
 
   const selectedCount = (data.mcp_server_names || []).length;
 
+  const saveServer = async () => {
+    setAddError('');
+    if (!newSrv.name.trim()) { setAddError('Name required'); return; }
+    if (newSrv.transport === 'stdio' && !newSrv.command.trim()) {
+      setAddError('Command required for stdio transport'); return;
+    }
+    if (newSrv.transport !== 'stdio' && !newSrv.url.trim()) {
+      setAddError('URL required for HTTP transport'); return;
+    }
+    setAdding(true);
+    try {
+      const body = {
+        name: newSrv.name.trim(),
+        transport: newSrv.transport,
+        timeout_seconds: parseInt(newSrv.timeout_seconds) || 30,
+        env_refs: {},
+        env_secrets: [],
+      };
+      if (newSrv.transport === 'stdio') {
+        // Split on whitespace — minimal stdio launcher. Advanced env/cwd
+        // configuration stays in Settings → MCP Servers.
+        body.command = newSrv.command.trim().split(/\s+/);
+      } else {
+        body.url = newSrv.url.trim();
+      }
+      const r = await fetch(`${API}/mcp-servers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        setAddError(`Save failed: ${txt.slice(0, 160) || r.status}`);
+        setAdding(false);
+        return;
+      }
+      const created = await r.json().catch(() => null);
+      await refresh();
+      // Auto-select the new server so it shows up checked in the list.
+      if (created?.name) toggle(created.name, true);
+      setNewSrv({ name: '', transport: 'stdio', command: '', url: '', timeout_seconds: 30 });
+      setAddOpen(false);
+    } catch (e) {
+      setAddError(`Network error: ${e.message || e}`);
+    }
+    setAdding(false);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={{
@@ -970,8 +1030,8 @@ function StepMcpServers({ data, setData }) {
           }}>RETRY</button>
         </div>
       ) : servers.length === 0 ? (
-        <div style={{ padding: '24px 0', fontSize: 13, color: T.dim, textAlign: 'center' }}>
-          No MCP servers configured. Open <span className="mono" style={{ color: T.muted }}>Settings → MCP Servers</span> to add one, then come back.
+        <div style={{ padding: '20px 16px', fontSize: 13, color: T.muted, textAlign: 'center', background: T.bg1, border: `1px solid ${T.border}` }}>
+          No MCP servers configured yet. Click <span style={{ color: T.cyan }}>+ Add MCP server</span> below to wire one in without leaving the wizard.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1081,6 +1141,90 @@ function StepMcpServers({ data, setData }) {
           {selectedCount} server{selectedCount === 1 ? '' : 's'} selected. The agent will be able to call tools from {selectedCount === 1 ? 'this server' : 'these servers'}; destructive calls will prompt for consent at runtime.
         </div>
       )}
+
+      {!addOpen && (
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          style={{
+            alignSelf: 'flex-start', padding: '8px 14px',
+            background: 'transparent', border: `1px dashed ${T.border}`,
+            color: T.cyan, fontFamily: T.mono, fontSize: 11, letterSpacing: '.08em',
+            cursor: 'pointer',
+          }}>+ ADD MCP SERVER</button>
+      )}
+
+      {addOpen && (
+        <div style={{ background: T.bg1, border: `1px solid ${T.cyan}55`, padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <span style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, letterSpacing: '.1em' }}>NEW MCP SERVER</span>
+            <button onClick={() => { setAddOpen(false); setAddError(''); }}
+              style={{ background: 'transparent', border: 'none', color: T.dim, cursor: 'pointer', fontSize: 14 }}>×</button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <Field label="Name">
+              <TextInput value={newSrv.name} onChange={v => setNewSrv(s => ({ ...s, name: v }))}
+                placeholder="my-mcp-server" />
+            </Field>
+            <Field label="Transport">
+              <Select
+                variant="full"
+                value={newSrv.transport}
+                onChange={v => setNewSrv(s => ({ ...s, transport: v }))}
+                options={[
+                  { v: 'stdio', l: 'stdio',         hint: 'local subprocess' },
+                  { v: 'http',  l: 'StreamableHTTP', hint: 'remote /mcp endpoint' },
+                  { v: 'sse',   l: 'SSE',            hint: 'remote /sse endpoint' },
+                ]}
+              />
+            </Field>
+          </div>
+
+          {newSrv.transport === 'stdio' ? (
+            <Field label="Command (executable + args)">
+              <TextInput
+                value={newSrv.command}
+                onChange={v => setNewSrv(s => ({ ...s, command: v }))}
+                placeholder="npx -y @modelcontextprotocol/server-filesystem /tmp"
+                style={{ fontFamily: T.mono }}
+              />
+            </Field>
+          ) : (
+            <Field label="URL">
+              <TextInput
+                value={newSrv.url}
+                onChange={v => setNewSrv(s => ({ ...s, url: v }))}
+                placeholder="https://my-mcp.example.com/mcp"
+                style={{ fontFamily: T.mono }}
+              />
+            </Field>
+          )}
+
+          <div style={{ fontSize: 10, color: T.dim, marginBottom: 12, fontFamily: T.mono, letterSpacing: '.04em' }}>
+            Need env vars / auth tokens / custom cwd? Save first, then edit in <span style={{ color: T.muted }}>Settings → MCP Servers</span>.
+          </div>
+
+          {addError && (
+            <div style={{ fontFamily: T.mono, fontSize: 11, color: T.red, marginBottom: 10 }}>{addError}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={saveServer} disabled={adding}
+              style={{
+                padding: '8px 16px', background: T.cyan, border: 'none', color: T.bg0,
+                fontFamily: T.mono, fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
+                cursor: adding ? 'wait' : 'pointer', opacity: adding ? 0.6 : 1,
+              }}>{adding ? 'SAVING…' : 'SAVE & CONNECT'}</button>
+            <button onClick={() => { setAddOpen(false); setAddError(''); }}
+              style={{
+                padding: '8px 16px', background: 'transparent',
+                border: `1px solid ${T.border}`, color: T.muted,
+                fontFamily: T.mono, fontSize: 11, cursor: 'pointer',
+              }}>CANCEL</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1091,6 +1235,12 @@ const CONN_ENDPOINTS = {
   postgres:   '/connections',
   mysql:      '/mysql-connections',
   clickhouse: '/ch-connections',
+};
+
+const CONN_DEFAULTS = {
+  postgres:   { port: '5432', label: 'PostgreSQL' },
+  mysql:      { port: '3306', label: 'MySQL' },
+  clickhouse: { port: '8123', label: 'ClickHouse' },
 };
 
 function StepConnections({ data, setData }) {
@@ -1112,19 +1262,79 @@ function StepConnections({ data, setData }) {
       .finally(() => setLoading(false));
   }, [data.connection_type]);
 
+  // Inline "+ Add connection" form state. Stays collapsed until the user
+  // explicitly opens it; on save, posts to the per-driver endpoint and
+  // refreshes the list so the new row is selectable in the same step.
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addError, setAddError] = useState('');
+  const driver = data.connection_type;
+  const defaults = CONN_DEFAULTS[driver] || CONN_DEFAULTS.postgres;
+  const [newConn, setNewConn] = useState({
+    name: '', host: 'localhost', port: defaults.port,
+    database: '', username: '', password: '', row_limit: '500',
+  });
+
+  useEffect(() => {
+    setNewConn(c => ({ ...c, port: (CONN_DEFAULTS[driver] || defaults).port }));
+  }, [driver]);
+
+  const saveConnection = async () => {
+    setAddError('');
+    const required = ['name', 'host', 'database', 'username'];
+    for (const f of required) {
+      if (!newConn[f]?.trim()) { setAddError(`${f} is required`); return; }
+    }
+    setSaving(true);
+    try {
+      const ep = CONN_ENDPOINTS[driver];
+      const r = await fetch(`${API}${ep}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newConn.name.trim(), host: newConn.host.trim(),
+          port: parseInt(newConn.port) || parseInt(defaults.port),
+          database: newConn.database.trim(),
+          username: newConn.username.trim(),
+          password: newConn.password,
+          row_limit: parseInt(newConn.row_limit) || 500,
+          ssl: 'prefer',
+        }),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        setAddError(`Save failed: ${txt.slice(0, 140) || r.status}`);
+        setSaving(false);
+        return;
+      }
+      const created = await r.json().catch(() => null);
+      // Refresh list and auto-select the new row.
+      const fresh = await fetch(`${API}${ep}`).then(r => r.json()).catch(() => []);
+      setConnList(Array.isArray(fresh) ? fresh : []);
+      const newId = created?.id || created?.name || newConn.name.trim();
+      setData(d => ({ ...d, connection_id: newId }));
+      setAdding(false);
+      setNewConn({ name: '', host: 'localhost', port: defaults.port, database: '', username: '', password: '', row_limit: '500' });
+    } catch (e) {
+      setAddError(`Network error: ${e.message || e}`);
+    }
+    setSaving(false);
+  };
+
   return (
     <div>
       <Field label="Connection Type">
-        <select
+        <Select
+          variant="full"
           value={data.connection_type}
-          onChange={e => setData(d => ({ ...d, connection_type: e.target.value, connection_id: '' }))}
-          style={{ ...INPUT, cursor: 'pointer' }}
-        >
-          <option value="none">None</option>
-          <option value="postgres">PostgreSQL</option>
-          <option value="mysql">MySQL</option>
-          <option value="clickhouse">ClickHouse</option>
-        </select>
+          onChange={v => setData(d => ({ ...d, connection_type: v, connection_id: '' }))}
+          options={[
+            { v: 'none', l: 'None' },
+            { v: 'postgres', l: 'PostgreSQL' },
+            { v: 'mysql', l: 'MySQL' },
+            { v: 'clickhouse', l: 'ClickHouse' },
+          ]}
+        />
       </Field>
 
       {data.connection_type !== 'none' && (
@@ -1140,34 +1350,100 @@ function StepConnections({ data, setData }) {
                 border: `1px solid ${T.border}`,
                 fontFamily: T.mono, fontSize: 11, color: T.dim,
               }}>
-                No connections saved — add one in{' '}
-                <span style={{ color: T.cyan }}>Settings → Connections</span>
+                No {defaults.label} connections saved yet. Click <span style={{ color: T.cyan }}>+ Add connection</span> below to create one.
               </div>
             ) : (
-              <select
+              <Select
+                variant="full"
                 value={data.connection_id}
-                onChange={e => setData(d => ({ ...d, connection_id: e.target.value }))}
-                style={{ ...INPUT, cursor: 'pointer' }}
-              >
-                <option value="">-- select connection --</option>
-                {connList.map(c => (
-                  <option key={c.id || c.name} value={c.id || c.name}>
-                    {c.name || c.id}
-                  </option>
-                ))}
-              </select>
+                onChange={v => setData(d => ({ ...d, connection_id: v }))}
+                options={[
+                  { v: '', l: '— select connection —' },
+                  ...connList.map(c => ({ v: c.id || c.name, l: c.name || c.id })),
+                ]}
+              />
             )}
           </Field>
+
+          {!adding && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              style={{
+                marginTop: -10, marginBottom: 18,
+                padding: '7px 12px', background: 'transparent',
+                border: `1px dashed ${T.border}`, color: T.cyan,
+                fontFamily: T.mono, fontSize: 11, cursor: 'pointer',
+                letterSpacing: '.06em',
+              }}>+ Add {defaults.label} connection</button>
+          )}
+
+          {adding && (
+            <div style={{
+              marginTop: -10, marginBottom: 18, padding: 16,
+              background: T.bg1, border: `1px solid ${T.cyan}55`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <span style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, letterSpacing: '.1em' }}>NEW {defaults.label.toUpperCase()} CONNECTION</span>
+                <button onClick={() => { setAdding(false); setAddError(''); }}
+                  style={{ background: 'transparent', border: 'none', color: T.dim, cursor: 'pointer', fontSize: 14 }}>×</button>
+              </div>
+              <Field label="Name">
+                <TextInput value={newConn.name} onChange={v => setNewConn(c => ({ ...c, name: v }))}
+                  placeholder="prod-analytics" />
+              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                <Field label="Host">
+                  <TextInput value={newConn.host} onChange={v => setNewConn(c => ({ ...c, host: v }))} placeholder="localhost" />
+                </Field>
+                <Field label="Port">
+                  <TextInput value={newConn.port} onChange={v => setNewConn(c => ({ ...c, port: v }))} placeholder={defaults.port} />
+                </Field>
+              </div>
+              <Field label="Database">
+                <TextInput value={newConn.database} onChange={v => setNewConn(c => ({ ...c, database: v }))} placeholder="my_db" />
+              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Username">
+                  <TextInput value={newConn.username} onChange={v => setNewConn(c => ({ ...c, username: v }))} placeholder="readonly_user" />
+                </Field>
+                <Field label="Password">
+                  <input type="password" value={newConn.password}
+                    onChange={e => setNewConn(c => ({ ...c, password: e.target.value }))}
+                    style={INPUT} placeholder="••••••••" />
+                </Field>
+              </div>
+              {addError && (
+                <div style={{ fontFamily: T.mono, fontSize: 11, color: T.red, marginBottom: 10 }}>{addError}</div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={saveConnection} disabled={saving}
+                  style={{
+                    padding: '8px 16px', background: T.cyan, border: 'none', color: T.bg0,
+                    fontFamily: T.mono, fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
+                    cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1,
+                  }}>{saving ? 'SAVING…' : 'SAVE CONNECTION'}</button>
+                <button onClick={() => { setAdding(false); setAddError(''); }}
+                  style={{
+                    padding: '8px 16px', background: 'transparent',
+                    border: `1px solid ${T.border}`, color: T.muted,
+                    fontFamily: T.mono, fontSize: 11, cursor: 'pointer',
+                  }}>CANCEL</button>
+              </div>
+            </div>
+          )}
+
           <Field label="Role">
-            <select
+            <Select
+              variant="full"
               value={data.connection_role}
-              onChange={e => setData(d => ({ ...d, connection_role: e.target.value }))}
-              style={{ ...INPUT, cursor: 'pointer' }}
-            >
-              <option value="readonly">Read only — SELECT queries</option>
-              <option value="readwrite">Read / write — SELECT + INSERT/UPDATE</option>
-              <option value="admin">Admin — DDL + all operations</option>
-            </select>
+              onChange={v => setData(d => ({ ...d, connection_role: v }))}
+              options={[
+                { v: 'readonly',  l: 'Read only',  hint: 'SELECT queries' },
+                { v: 'readwrite', l: 'Read / write', hint: 'SELECT + INSERT/UPDATE' },
+                { v: 'admin',     l: 'Admin', hint: 'DDL + all operations' },
+              ]}
+            />
           </Field>
           <Field label="Purpose">
             <TextInput
@@ -1272,16 +1548,17 @@ function StepVariables({ data, setData }) {
             </div>
             <div>
               <label style={LABEL}>Type</label>
-              <select
+              <Select
+                variant="full"
                 value={v.type || 'string'}
-                onChange={e => updateVar(idx, 'type', e.target.value)}
-                style={{ ...INPUT, cursor: 'pointer' }}
-              >
-                <option value="string">string</option>
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="list">list</option>
-              </select>
+                onChange={val => updateVar(idx, 'type', val)}
+                options={[
+                  { v: 'string',  l: 'string'  },
+                  { v: 'number',  l: 'number'  },
+                  { v: 'boolean', l: 'boolean' },
+                  { v: 'list',    l: 'list'    },
+                ]}
+              />
             </div>
             <div>
               <label style={LABEL}>Description</label>
@@ -1325,15 +1602,14 @@ function AutonomySelect({ label, value, onChange }) {
   const selected = AUTONOMY_OPTS.find(o => o.value === value);
   return (
     <Field label={label}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{ ...INPUT, cursor: 'pointer', marginBottom: 8 }}
-      >
-        {AUTONOMY_OPTS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <div style={{ marginBottom: 8 }}>
+        <Select
+          variant="full"
+          value={value}
+          onChange={onChange}
+          options={AUTONOMY_OPTS.map(o => ({ v: o.value, l: o.label }))}
+        />
+      </div>
       {selected && (
         <div style={{
           padding: '10px 12px', background: T.bg1,
