@@ -87,7 +87,19 @@ export function useChat() {
       const r = await fetch(`${API_URL}/health`);
       const d = await r.json();
       setOllamaOnline(d.ollama);
-      if (d.models?.length) setModels(d.models);
+      const list = Array.isArray(d.models) ? d.models : [];
+      if (list.length) setModels(list);
+      // Self-heal the active model. If the currently selected model isn't
+      // actually installed (e.g. the hardcoded "gemma3-12b" default on a
+      // machine that has different tags), fall back to the first installed
+      // model. Without this, the sidebar dropdown shows a model name that
+      // doesn't exist anywhere in Ollama and chat fails on first send.
+      setActiveModel(prev => {
+        const short = (s) => String(s || '').replace(/:latest$/, '');
+        const installed = new Set(list.map(short));
+        if (installed.has(short(prev))) return prev;
+        return list[0] || prev;
+      });
       return d;
     } catch {
       setOllamaOnline(false);
@@ -95,13 +107,27 @@ export function useChat() {
     }
   }, []);
 
+  // Pull the user's saved model from /settings so the sidebar dropdown
+  // reflects what was picked during onboarding instead of the hardcoded
+  // initial value. checkHealth's self-heal still kicks in if /settings
+  // points at a model that's no longer installed.
+  const loadSavedModel = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_URL}/settings`);
+      if (!r.ok) return;
+      const s = await r.json();
+      if (s?.model) setActiveModel(s.model);
+    } catch { /* offline — checkHealth retries */ }
+  }, []);
+
   useEffect(() => {
+    loadSavedModel();
     checkHealth();
     fetchSessions();
     // Goal 1.7: 30-second Ollama heartbeat
     const hb = setInterval(checkHealth, 30_000);
     return () => clearInterval(hb);
-  }, [checkHealth, fetchSessions]);
+  }, [loadSavedModel, checkHealth, fetchSessions]);
 
   // ── Chunk assembler ───────────────────────────────────────────────
 

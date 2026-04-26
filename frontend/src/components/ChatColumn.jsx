@@ -280,7 +280,7 @@ function AIGroup({ msgs, streaming, activeModel, streamingMsgId, onContextMenu }
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span className="upper" style={{ color: T.text }}>dialekt</span>
           <span className="mono" style={{ fontSize: 10, color: T.dim }}>
-            {activeModel || 'gemma3-12b'} · {firstTs}
+            {activeModel || '—'} · {firstTs}
           </span>
           {isLiveStream && (
             <>
@@ -980,7 +980,7 @@ export default function ChatColumn({
           </div>
           {messages.length > 0 && (
             <div className="mono" style={{ fontSize: 10, color: T.dim }}>
-              {activeModel || 'gemma3-12b'} · <span style={{ color: T.muted }}>local · ollama</span>
+              {activeModel || '—'} · <span style={{ color: T.muted }}>local · ollama</span>
             </div>
           )}
         </div>

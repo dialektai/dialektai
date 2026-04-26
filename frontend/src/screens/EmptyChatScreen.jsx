@@ -156,7 +156,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
                 <button className="dlk-btn" onClick={() => fileRef.current?.click()} disabled={uploading}><Icon name="file" size={12} color={T.muted} />File</button>
                 <button className="dlk-btn" onClick={handleScreenshot}><Icon name="screen" size={12} color={T.muted} />Screenshot</button>
                 <div style={{ flex: 1 }} />
-                <span className="mono" style={{ fontSize: 10, color: T.dim, marginRight: 6 }}>gemma3-12b · local</span>
+                <span className="mono" style={{ fontSize: 10, color: T.dim, marginRight: 6 }}>— · local</span>
                 <button
                   className="dlk-btn primary"
                   style={{ padding: '5px 12px', opacity: text.trim() ? 1 : 0.4 }}
@@ -216,7 +216,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
 
         <div style={{ borderTop: `1px solid ${T.border}`, padding: '10px 24px', background: T.bg1, display: 'flex', alignItems: 'center', gap: 14 }}>
           <span className="dlk-dot live" />
-          <span className="mono" style={{ fontSize: 10, color: T.muted }}>gemma3-12b · local</span>
+          <span className="mono" style={{ fontSize: 10, color: T.muted }}>— · local</span>
           <div style={{ flex: 1 }} />
           <span className="mono" style={{ fontSize: 10, color: T.dim }}>0 tokens sent to cloud · ever</span>
         </div>
