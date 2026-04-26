@@ -27,100 +27,228 @@
   </style>
 </head>
 <body>
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "doc.toc.h":         "Documentation",
+        "doc.toc.start":     "Getting started",
+        "doc.toc.install":   "Install",
+        "doc.toc.license":   "License & trial",
+        "doc.toc.models":    "Picking a model",
+        "doc.toc.mcp":       "MCP servers",
+        "doc.toc.agents":    "Building agents",
+        "doc.toc.perms":     "Permissions",
+        "doc.toc.cli":       "CLI",
+        "doc.toc.trouble":   "Troubleshooting",
+        "doc.kicker":        "DOCS · v0.21",
+        "doc.start.h":       "Getting started",
+        "doc.start.p":       "dialekt is a local-first desktop AI agent. The fastest path: install, paste your trial key, pick a model, give it a task. This page walks through that in ~5 minutes.",
+        "doc.install.h":     "Install",
+        "doc.install.p":     "Download links are sent to your inbox after you start a free trial. We deliver native builds for Linux, macOS, and Windows in one email — pick your platform, install, paste the trial key.",
+        "doc.install.linux": "Linux — <code>.deb</code> for Debian/Ubuntu, <code>.AppImage</code> for everything else",
+        "doc.install.mac":   "macOS — <code>.dmg</code> · Apple Silicon · 12.0+",
+        "doc.install.win":   "Windows — <code>.exe</code> installer · 10/11 · x64",
+        "doc.install.ram":   "16 GB RAM minimum. 48 GB recommended for 32B-class models.",
+        "doc.lic.h":         "License & trial",
+        "doc.lic.p":         "The first launch shows the License screen. Two paths:",
+        "doc.lic.have":      "Have a key — paste it. Validated against the licence service. The key arrives in the welcome email after signup.",
+        "doc.lic.none":      "Don't have one yet — go to /signup. 30 days, 3 seats, all features. Verify your email, paste the key, you're running.",
+        "doc.models.h":      "Picking a model",
+        "doc.models.p":      "The onboarding picker has two tabs:",
+        "doc.models.local.h":"Local · Ollama",
+        "doc.models.local.p":"33 models curated. Search by name, filter by category (General · Reasoning · Coding · Vision · Embeddings · Lightweight · Frontier). Each card shows RAM fit against your machine. We auto-rank: installed-and-fits → fits → unknown → too big.",
+        "doc.models.rec":    "Recommended starters by RAM:",
+        "doc.models.rec.8":  "8 GB — <code>llama3.1:8b</code> or <code>qwen3:8b</code>",
+        "doc.models.rec.16": "16 GB — <code>qwen3:14b</code> or <code>qwen2.5-coder:14b</code> for coding",
+        "doc.models.rec.32": "32 GB+ — <code>llama3.3:70b</code> or <code>qwen2.5-coder:32b</code>",
+        "doc.models.cloud.h":"Cloud · Providers",
+        "doc.models.cloud.p":"18 providers — Anthropic, OpenAI, Google Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM (build.nvidia.com), Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate.",
+        "doc.models.cloud.flow":"Click a provider → enter API key → \"Test connection\" sends a 1-token completion → \"Save & use\". Keys are stored in your OS keychain (GNOME Keyring / macOS Keychain / Windows Credential Manager). Never sent to dialekt-cloud.",
+        "doc.mcp.h":         "MCP servers",
+        "doc.mcp.p":         "dialekt speaks the Model Context Protocol. Add servers from Settings → MCP → Add server. Common ones:",
+        "doc.mcp.tail":      "Per-tool consent: any MCP tool that writes / executes / spends money asks before the first call, with a \"remember for this session\" option.",
+        "doc.agents.h":      "Building agents",
+        "doc.agents.p":      "Agents = a manifest YAML + a system prompt + a list of tool capabilities. Two ways to create:",
+        "doc.agents.wiz":    "9-step wizard — Settings → Agents → New. Walks through goal, model preference, MCPs, permissions, schedule.",
+        "doc.agents.imp":    "Import YAML — paste an existing manifest. Schema versioned via <code>dialekt-manifest-validator</code>.",
+        "doc.perms.h":       "Permissions",
+        "doc.perms.p":       "Six capabilities, tri-state per:",
+        "doc.perms.fs":      "Filesystem — paths you select; sandboxed by default",
+        "doc.perms.term":    "Terminal — shell access; ask-per-command by default",
+        "doc.perms.br":      "Browser — Chromium drive (coming v0.9)",
+        "doc.perms.scr":     "Screen capture — opt-in, ask-per-call",
+        "doc.perms.mk":      "Mouse & keyboard — off by default; powerful, stays sealed",
+        "doc.perms.kc":      "Keychain — sealed; never accessible to agents",
+        "doc.cli.h":         "CLI",
+        "doc.cli.p":         "Everything the desktop UI does is also a local HTTP API on <code>localhost:8765</code>. Useful for scripting:",
+        "doc.tr.h":          "Troubleshooting",
+        "doc.tr.ollama.h":   "Ollama not detected",
+        "doc.tr.ollama.p":   "The install screen auto-runs <code>curl -fsSL https://ollama.com/install.sh | sh</code> on Linux (with consent + SHA verify). On macOS/Windows it opens the download page and polls.",
+        "doc.tr.lic.h":      "License \"not valid\" right after signup",
+        "doc.tr.lic.p":      "You haven't clicked the verify-email link yet. Check your inbox; spam folder; resend from /signup if needed.",
+        "doc.tr.401.h":      "Cloud provider returns 401",
+        "doc.tr.401.p":      "Test connection in the credentials modal. Most common: API key has trailing whitespace, or wrong project ID for Vertex AI / Bedrock.",
+        "doc.foot.a":        "More docs coming. Found a gap? Email ",
+        "doc.foot.b":        ".",
+      },
+      ru: {
+        "doc.toc.h":         "Документация",
+        "doc.toc.start":     "Быстрый старт",
+        "doc.toc.install":   "Установка",
+        "doc.toc.license":   "Лицензия и пробный период",
+        "doc.toc.models":    "Выбор модели",
+        "doc.toc.mcp":       "MCP-серверы",
+        "doc.toc.agents":    "Создание агентов",
+        "doc.toc.perms":     "Разрешения",
+        "doc.toc.cli":       "CLI",
+        "doc.toc.trouble":   "Решение проблем",
+        "doc.kicker":        "ДОКУМЕНТАЦИЯ · v0.21",
+        "doc.start.h":       "Быстрый старт",
+        "doc.start.p":       "dialekt — это локальный десктоп-AI-агент. Самый быстрый путь: установить, вставить пробный ключ, выбрать модель, дать задачу. Эта страница проводит через всё это за ~5 минут.",
+        "doc.install.h":     "Установка",
+        "doc.install.p":     "Ссылки на скачивание приходят к вам в почту после регистрации на пробный период. В одном письме приходят сборки для Linux, macOS и Windows — выбираете платформу, ставите, вставляете пробный ключ.",
+        "doc.install.linux": "Linux — <code>.deb</code> для Debian/Ubuntu, <code>.AppImage</code> для остального",
+        "doc.install.mac":   "macOS — <code>.dmg</code> · Apple Silicon · 12.0+",
+        "doc.install.win":   "Windows — установщик <code>.exe</code> · 10/11 · x64",
+        "doc.install.ram":   "Минимум 16 ГБ оперативки. Для моделей класса 32B рекомендуется 48 ГБ.",
+        "doc.lic.h":         "Лицензия и пробный период",
+        "doc.lic.p":         "При первом запуске показывается экран лицензии. Два пути:",
+        "doc.lic.have":      "Есть ключ — вставьте его. Он проверится у сервиса лицензий. Ключ приходит в приветственном письме после регистрации.",
+        "doc.lic.none":      "Ключа ещё нет — заходите на /signup. 30 дней, 3 места, все функции. Подтверждаете email, вставляете ключ — всё работает.",
+        "doc.models.h":      "Выбор модели",
+        "doc.models.p":      "В онбординге две вкладки:",
+        "doc.models.local.h":"Локально · Ollama",
+        "doc.models.local.p":"33 кураторских модели. Поиск по имени, фильтр по категориям (Общие · Reasoning · Кодинг · Vision · Эмбеддинги · Лёгкие · Frontier). Каждая карточка показывает соответствие вашей RAM. Авто-сортировка: установлено-и-помещается → помещается → неизвестно → слишком большое.",
+        "doc.models.rec":    "Рекомендации по объёму RAM:",
+        "doc.models.rec.8":  "8 ГБ — <code>llama3.1:8b</code> или <code>qwen3:8b</code>",
+        "doc.models.rec.16": "16 ГБ — <code>qwen3:14b</code> или <code>qwen2.5-coder:14b</code> для кодинга",
+        "doc.models.rec.32": "32 ГБ+ — <code>llama3.3:70b</code> или <code>qwen2.5-coder:32b</code>",
+        "doc.models.cloud.h":"Облачные · Провайдеры",
+        "doc.models.cloud.p":"18 провайдеров — Anthropic, OpenAI, Google Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM (build.nvidia.com), Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate.",
+        "doc.models.cloud.flow":"Кликните провайдера → введите API-ключ → «Test connection» отправит тестовое 1-токеновое сообщение → «Save & use». Ключи хранятся в системной связке ключей ОС (GNOME Keyring / macOS Keychain / Windows Credential Manager). В dialekt-cloud не отправляются.",
+        "doc.mcp.h":         "MCP-серверы",
+        "doc.mcp.p":         "dialekt говорит на Model Context Protocol. Серверы добавляются через Settings → MCP → Add server. Распространённые:",
+        "doc.mcp.tail":      "Подтверждение per-tool: любой MCP-инструмент, который пишет / выполняет / тратит деньги, спросит разрешения перед первым вызовом, с опцией «запомнить на сессию».",
+        "doc.agents.h":      "Создание агентов",
+        "doc.agents.p":      "Агент = манифест YAML + системный промпт + список tool-возможностей. Два способа создания:",
+        "doc.agents.wiz":    "Мастер из 9 шагов — Settings → Agents → New. Проводит через цель, предпочитаемую модель, MCP, разрешения, расписание.",
+        "doc.agents.imp":    "Импорт YAML — вставьте готовый манифест. Версионирование схемы через <code>dialekt-manifest-validator</code>.",
+        "doc.perms.h":       "Разрешения",
+        "doc.perms.p":       "Шесть возможностей, по три состояния каждая:",
+        "doc.perms.fs":      "Файловая система — выбранные вами пути; по умолчанию в песочнице",
+        "doc.perms.term":    "Терминал — доступ к шеллу; по умолчанию спрашивает на каждую команду",
+        "doc.perms.br":      "Браузер — управление Chromium (появится в v0.9)",
+        "doc.perms.scr":     "Захват экрана — opt-in, спрашивает на каждый вызов",
+        "doc.perms.mk":      "Мышь и клавиатура — выключено по умолчанию; мощная штука, остаётся запечатанной",
+        "doc.perms.kc":      "Связка ключей — запечатана; для агентов недоступна",
+        "doc.cli.h":         "CLI",
+        "doc.cli.p":         "Всё, что делает десктоп-UI, доступно также как локальное HTTP API на <code>localhost:8765</code>. Удобно для скриптов:",
+        "doc.tr.h":          "Решение проблем",
+        "doc.tr.ollama.h":   "Ollama не обнаружена",
+        "doc.tr.ollama.p":   "Экран установки на Linux автоматически запускает <code>curl -fsSL https://ollama.com/install.sh | sh</code> (с подтверждением + проверкой SHA). На macOS/Windows открывает страницу скачивания и опрашивает.",
+        "doc.tr.lic.h":      "Лицензия «not valid» сразу после регистрации",
+        "doc.tr.lic.p":      "Вы ещё не кликнули по ссылке подтверждения email. Проверьте инбокс, спам-папку, при необходимости перезапросите письмо на /signup.",
+        "doc.tr.401.h":      "Облачный провайдер возвращает 401",
+        "doc.tr.401.p":      "Запустите Test connection в окне ввода ключей. Самое частое: в API-ключе хвостовой пробел или указан неправильный project ID для Vertex AI / Bedrock.",
+        "doc.foot.a":        "Доки в работе. Нашли пробел? Напишите на ",
+        "doc.foot.b":        ".",
+      },
+    };
+  </script>
   <div data-layout="nav"></div>
 
   <div class="wrap">
     <div class="docs-grid">
       <aside class="docs-toc">
-        <h4>Documentation</h4>
-        <a href="#start" class="active">Getting started</a>
-        <a href="#install">Install</a>
-        <a href="#license">License & trial</a>
-        <a href="#models">Picking a model</a>
-        <a href="#mcp">MCP servers</a>
-        <a href="#agents">Building agents</a>
-        <a href="#permissions">Permissions</a>
-        <a href="#cli">CLI</a>
-        <a href="#troubleshooting">Troubleshooting</a>
+        <h4 data-i18n="doc.toc.h">Documentation</h4>
+        <a href="#start" class="active" data-i18n="doc.toc.start">Getting started</a>
+        <a href="#install" data-i18n="doc.toc.install">Install</a>
+        <a href="#license" data-i18n="doc.toc.license">License & trial</a>
+        <a href="#models" data-i18n="doc.toc.models">Picking a model</a>
+        <a href="#mcp" data-i18n="doc.toc.mcp">MCP servers</a>
+        <a href="#agents" data-i18n="doc.toc.agents">Building agents</a>
+        <a href="#permissions" data-i18n="doc.toc.perms">Permissions</a>
+        <a href="#cli" data-i18n="doc.toc.cli">CLI</a>
+        <a href="#troubleshooting" data-i18n="doc.toc.trouble">Troubleshooting</a>
       </aside>
 
       <div class="docs-content">
-        <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px">DOCS · v0.21</div>
-        <h1 id="start">Getting started</h1>
-        <p>dialekt is a local-first desktop AI agent. The fastest path: install, paste your trial key, pick a model, give it a task. This page walks through that in ~5 minutes.</p>
+        <div class="mono" style="font-size:11px;color:var(--cyan);letter-spacing:.14em;margin-bottom:12px" data-i18n="doc.kicker">DOCS · v0.21</div>
+        <h1 id="start" data-i18n="doc.start.h">Getting started</h1>
+        <p data-i18n="doc.start.p">dialekt is a local-first desktop AI agent. The fastest path: install, paste your trial key, pick a model, give it a task. This page walks through that in ~5 minutes.</p>
 
-        <h2 id="install">Install</h2>
-        <p>Download links are sent to your inbox after you <a href="/signup.html" style="color:var(--cyan)">start a free trial</a>. We deliver native builds for Linux, macOS, and Windows in one email — pick your platform, install, paste the trial key.</p>
+        <h2 id="install" data-i18n="doc.install.h">Install</h2>
+        <p data-i18n="doc.install.p">Download links are sent to your inbox after you start a free trial. We deliver native builds for Linux, macOS, and Windows in one email — pick your platform, install, paste the trial key.</p>
         <ul>
-          <li>Linux — <code>.deb</code> for Debian/Ubuntu, <code>.AppImage</code> for everything else</li>
-          <li>macOS — <code>.dmg</code> · Apple Silicon · 12.0+</li>
-          <li>Windows — <code>.exe</code> installer · 10/11 · x64</li>
+          <li data-i18n-html="doc.install.linux">Linux — <code>.deb</code> for Debian/Ubuntu, <code>.AppImage</code> for everything else</li>
+          <li data-i18n-html="doc.install.mac">macOS — <code>.dmg</code> · Apple Silicon · 12.0+</li>
+          <li data-i18n-html="doc.install.win">Windows — <code>.exe</code> installer · 10/11 · x64</li>
         </ul>
-        <p>16 GB RAM minimum. 48 GB recommended for 32B-class models.</p>
+        <p data-i18n="doc.install.ram">16 GB RAM minimum. 48 GB recommended for 32B-class models.</p>
 
-        <h2 id="license">License & trial</h2>
-        <p>The first launch shows the License screen. Two paths:</p>
+        <h2 id="license" data-i18n="doc.lic.h">License & trial</h2>
+        <p data-i18n="doc.lic.p">The first launch shows the License screen. Two paths:</p>
         <ul>
-          <li><strong style="color:var(--text)">Have a key</strong> — paste it. Validated against the licence service. The key arrives in the welcome email after signup.</li>
-          <li><strong style="color:var(--text)">Don't have one yet</strong> — go to <a href="/signup.html" style="color:var(--cyan)">/signup</a>. 30 days, 3 seats, all features. Verify your email, paste the key, you're running.</li>
-        </ul>
-
-        <h2 id="models">Picking a model</h2>
-        <p>The onboarding picker has two tabs:</p>
-        <h3>Local · Ollama</h3>
-        <p>33 models curated. Search by name, filter by category (General · Reasoning · Coding · Vision · Embeddings · Lightweight · Frontier). Each card shows RAM fit against your machine. We auto-rank: installed-and-fits → fits → unknown → too big.</p>
-        <p>Recommended starters by RAM:</p>
-        <ul>
-          <li>8 GB — <code>llama3.1:8b</code> or <code>qwen3:8b</code></li>
-          <li>16 GB — <code>qwen3:14b</code> or <code>qwen2.5-coder:14b</code> for coding</li>
-          <li>32 GB+ — <code>llama3.3:70b</code> or <code>qwen2.5-coder:32b</code></li>
+          <li data-i18n-html="doc.lic.have"><strong style="color:var(--text)">Have a key</strong> — paste it. Validated against the licence service. The key arrives in the welcome email after signup.</li>
+          <li data-i18n-html="doc.lic.none"><strong style="color:var(--text)">Don't have one yet</strong> — go to <a href="/signup.html" style="color:var(--cyan)">/signup</a>. 30 days, 3 seats, all features. Verify your email, paste the key, you're running.</li>
         </ul>
 
-        <h3>Cloud · Providers</h3>
-        <p>18 providers — Anthropic, OpenAI, Google Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM (build.nvidia.com), Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate.</p>
-        <p>Click a provider → enter API key → "Test connection" sends a 1-token completion → "Save & use". Keys are stored in your OS keychain (GNOME Keyring / macOS Keychain / Windows Credential Manager). Never sent to dialekt-cloud.</p>
+        <h2 id="models" data-i18n="doc.models.h">Picking a model</h2>
+        <p data-i18n="doc.models.p">The onboarding picker has two tabs:</p>
+        <h3 data-i18n="doc.models.local.h">Local · Ollama</h3>
+        <p data-i18n="doc.models.local.p">33 models curated. Search by name, filter by category (General · Reasoning · Coding · Vision · Embeddings · Lightweight · Frontier). Each card shows RAM fit against your machine. We auto-rank: installed-and-fits → fits → unknown → too big.</p>
+        <p data-i18n="doc.models.rec">Recommended starters by RAM:</p>
+        <ul>
+          <li data-i18n-html="doc.models.rec.8">8 GB — <code>llama3.1:8b</code> or <code>qwen3:8b</code></li>
+          <li data-i18n-html="doc.models.rec.16">16 GB — <code>qwen3:14b</code> or <code>qwen2.5-coder:14b</code> for coding</li>
+          <li data-i18n-html="doc.models.rec.32">32 GB+ — <code>llama3.3:70b</code> or <code>qwen2.5-coder:32b</code></li>
+        </ul>
 
-        <h2 id="mcp">MCP servers</h2>
-        <p>dialekt speaks the Model Context Protocol. Add servers from Settings → MCP → Add server. Common ones:</p>
+        <h3 data-i18n="doc.models.cloud.h">Cloud · Providers</h3>
+        <p data-i18n="doc.models.cloud.p">18 providers — Anthropic, OpenAI, Google Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM (build.nvidia.com), Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate.</p>
+        <p data-i18n="doc.models.cloud.flow">Click a provider → enter API key → "Test connection" sends a 1-token completion → "Save & use". Keys are stored in your OS keychain (GNOME Keyring / macOS Keychain / Windows Credential Manager). Never sent to dialekt-cloud.</p>
+
+        <h2 id="mcp" data-i18n="doc.mcp.h">MCP servers</h2>
+        <p data-i18n="doc.mcp.p">dialekt speaks the Model Context Protocol. Add servers from Settings → MCP → Add server. Common ones:</p>
         <pre><code>npx -y @modelcontextprotocol/server-filesystem
 npx -y @modelcontextprotocol/server-slack
 uvx mcp-server-postgres</code></pre>
-        <p>Per-tool consent: any MCP tool that writes / executes / spends money asks before the first call, with a "remember for this session" option.</p>
+        <p data-i18n="doc.mcp.tail">Per-tool consent: any MCP tool that writes / executes / spends money asks before the first call, with a "remember for this session" option.</p>
 
-        <h2 id="agents">Building agents</h2>
-        <p>Agents = a manifest YAML + a system prompt + a list of tool capabilities. Two ways to create:</p>
+        <h2 id="agents" data-i18n="doc.agents.h">Building agents</h2>
+        <p data-i18n="doc.agents.p">Agents = a manifest YAML + a system prompt + a list of tool capabilities. Two ways to create:</p>
         <ul>
-          <li><strong style="color:var(--text)">9-step wizard</strong> — Settings → Agents → New. Walks through goal, model preference, MCPs, permissions, schedule.</li>
-          <li><strong style="color:var(--text)">Import YAML</strong> — paste an existing manifest. Schema versioned via <code>dialekt-manifest-validator</code>.</li>
+          <li data-i18n-html="doc.agents.wiz"><strong style="color:var(--text)">9-step wizard</strong> — Settings → Agents → New. Walks through goal, model preference, MCPs, permissions, schedule.</li>
+          <li data-i18n-html="doc.agents.imp"><strong style="color:var(--text)">Import YAML</strong> — paste an existing manifest. Schema versioned via <code>dialekt-manifest-validator</code>.</li>
         </ul>
 
-        <h2 id="permissions">Permissions</h2>
-        <p>Six capabilities, tri-state per:</p>
+        <h2 id="permissions" data-i18n="doc.perms.h">Permissions</h2>
+        <p data-i18n="doc.perms.p">Six capabilities, tri-state per:</p>
         <ul>
-          <li>Filesystem — paths you select; sandboxed by default</li>
-          <li>Terminal — shell access; ask-per-command by default</li>
-          <li>Browser — Chromium drive (coming v0.9)</li>
-          <li>Screen capture — opt-in, ask-per-call</li>
-          <li>Mouse & keyboard — off by default; powerful, stays sealed</li>
-          <li>Keychain — sealed; never accessible to agents</li>
+          <li data-i18n="doc.perms.fs">Filesystem — paths you select; sandboxed by default</li>
+          <li data-i18n="doc.perms.term">Terminal — shell access; ask-per-command by default</li>
+          <li data-i18n="doc.perms.br">Browser — Chromium drive (coming v0.9)</li>
+          <li data-i18n="doc.perms.scr">Screen capture — opt-in, ask-per-call</li>
+          <li data-i18n="doc.perms.mk">Mouse & keyboard — off by default; powerful, stays sealed</li>
+          <li data-i18n="doc.perms.kc">Keychain — sealed; never accessible to agents</li>
         </ul>
 
-        <h2 id="cli">CLI</h2>
-        <p>Everything the desktop UI does is also a local HTTP API on <code>localhost:8765</code>. Useful for scripting:</p>
+        <h2 id="cli" data-i18n="doc.cli.h">CLI</h2>
+        <p data-i18n-html="doc.cli.p">Everything the desktop UI does is also a local HTTP API on <code>localhost:8765</code>. Useful for scripting:</p>
         <pre><code>curl http://localhost:8765/llm/catalog | jq '.providers[].id'
 curl -X POST http://localhost:8765/settings -H 'Content-Type: application/json' \
   -d '{"model_provider":"anthropic","model":"claude-opus-4-7"}'</code></pre>
 
-        <h2 id="troubleshooting">Troubleshooting</h2>
-        <h3>Ollama not detected</h3>
-        <p>The install screen auto-runs <code>curl -fsSL https://ollama.com/install.sh | sh</code> on Linux (with consent + SHA verify). On macOS/Windows it opens the download page and polls.</p>
-        <h3>License "not valid" right after signup</h3>
-        <p>You haven't clicked the verify-email link yet. Check your inbox; spam folder; resend from /signup if needed.</p>
-        <h3>Cloud provider returns 401</h3>
-        <p>Test connection in the credentials modal. Most common: API key has trailing whitespace, or wrong project ID for Vertex AI / Bedrock.</p>
+        <h2 id="troubleshooting" data-i18n="doc.tr.h">Troubleshooting</h2>
+        <h3 data-i18n="doc.tr.ollama.h">Ollama not detected</h3>
+        <p data-i18n-html="doc.tr.ollama.p">The install screen auto-runs <code>curl -fsSL https://ollama.com/install.sh | sh</code> on Linux (with consent + SHA verify). On macOS/Windows it opens the download page and polls.</p>
+        <h3 data-i18n="doc.tr.lic.h">License "not valid" right after signup</h3>
+        <p data-i18n="doc.tr.lic.p">You haven't clicked the verify-email link yet. Check your inbox; spam folder; resend from /signup if needed.</p>
+        <h3 data-i18n="doc.tr.401.h">Cloud provider returns 401</h3>
+        <p data-i18n="doc.tr.401.p">Test connection in the credentials modal. Most common: API key has trailing whitespace, or wrong project ID for Vertex AI / Bedrock.</p>
 
         <p style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border);font-size:12px;color:var(--dim)">
-          More docs coming. Found a gap? Email <a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a>.
+          <span data-i18n="doc.foot.a">More docs coming. Found a gap? Email </span><a href="mailto:hello@dialekt.ai" style="color:var(--cyan)">hello@dialekt.ai</a><span data-i18n="doc.foot.b">.</span>
         </p>
       </div>
     </div>
