@@ -479,6 +479,98 @@
     .who-line {
       margin-top: 28px; font-size: 13.5px; color: var(--ink-3); line-height: 1.55;
     }
+
+    /* ── DOWNLOAD section ─────────────────────────────────────────────────── */
+    .dl-loading {
+      font-size: 14px; color: var(--ink-3); padding: 32px 0;
+      letter-spacing: 0.02em;
+    }
+    .dl-loading::before {
+      content: ""; display: inline-block; width: 9px; height: 9px;
+      margin-right: 12px; vertical-align: 1px;
+      background: var(--primary); border-radius: 50%;
+      animation: dl-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes dl-pulse {
+      0%, 100% { opacity: 0.25; transform: scale(0.85); }
+      50%      { opacity: 1;    transform: scale(1);    }
+    }
+    .dl-error {
+      padding: 16px 20px; border-left: 3px solid var(--err);
+      background: var(--bg-tint); color: var(--ink-2); font-size: 14px;
+      line-height: 1.6;
+    }
+    .dl-error a { color: var(--primary); border-bottom: 1px solid currentColor; }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    .dl-card {
+      position: relative;
+      display: flex; flex-direction: column; gap: 12px;
+      padding: 22px 22px 18px;
+      background: var(--bg-elev);
+      border: 1px solid var(--rule);
+      transition: border-color .15s ease, transform .15s ease;
+    }
+    .dl-card:hover { border-color: var(--ink-3); }
+    .dl-card.detected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary) inset;
+    }
+    .dl-card.detected::after {
+      content: "DETECTED"; position: absolute; top: 10px; right: 14px;
+      font-family: var(--sans); font-size: 9.5px; font-weight: 600;
+      letter-spacing: 0.18em; color: var(--primary);
+    }
+    .dl-os {
+      display: flex; align-items: baseline; gap: 8px;
+      font-family: var(--serif); font-size: 19px;
+      letter-spacing: -0.01em; color: var(--ink);
+    }
+    .dl-os .arch {
+      font-family: var(--sans); font-size: 11px; font-weight: 500;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-3); padding-bottom: 2px;
+    }
+    .dl-files {
+      display: flex; flex-direction: column; gap: 8px;
+      margin-top: 4px;
+    }
+    .dl-file {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; padding: 9px 12px;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      font-family: var(--sans); font-size: 13.5px;
+      color: var(--ink-2);
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .dl-file:hover {
+      background: var(--primary); color: #FFFFFF;
+      border-color: var(--primary);
+    }
+    .dl-file:hover .dl-size { color: rgba(255,255,255,0.78); }
+    .dl-file .dl-ext {
+      font-weight: 600; letter-spacing: 0.04em;
+    }
+    .dl-file .dl-size {
+      font-family: var(--sans); font-size: 11.5px; color: var(--ink-3);
+      letter-spacing: 0.04em; transition: color .12s ease;
+    }
+
+    .dl-foot {
+      font-size: 13px; color: var(--ink-3);
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+      padding-top: 14px; border-top: 1px solid var(--rule);
+    }
+    .dl-foot a { color: var(--primary); }
+    .dl-foot a:hover { color: var(--primary-ink); }
+    .dl-foot .dl-sep { color: var(--rule-strong); }
+    .dl-foot strong { color: var(--ink-2); font-weight: 500; font-family: var(--sans); }
   </style>
 </head>
 <body>
@@ -503,6 +595,7 @@
           <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
         </a>
         <a href="/signup.html" style="font-size:14px;color:var(--primary);border-bottom:1px solid var(--rule-strong);text-underline-offset:3px;padding:4px 0" data-i18n="hero.cta.secondary">Or start a free trial →</a>
+        <a href="#download" style="font-size:14px;color:var(--ink-3);border-bottom:1px solid var(--rule);text-underline-offset:3px;padding:4px 0">Or download →</a>
       </div>
       <div class="hero-meta">
         <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" stroke="currentColor" stroke-width="1"/><path d="M5 7l1.5 1.5L9 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta1">On-premises, private cloud, or air-gapped</span></span>
@@ -782,6 +875,36 @@
   </div>
 </section>
 
+<!-- ─── DOWNLOAD ─────────────────────────────────────────────────────────── -->
+<section id="download" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta">07 · Install</span>
+      <h2>Download dialekt for your platform.</h2>
+      <p>Local-first build. No telemetry, no cloud calls by default. Pick your OS — your trial license arrives by email after a 30-second signup.</p>
+    </div>
+
+    <div id="dl-loading" class="dl-loading">Fetching latest release…</div>
+    <div id="dl-error" class="dl-error" hidden>
+      Couldn't reach the GitHub API. Browse releases directly:
+      <a href="https://github.com/dialektai/dialektai/releases" target="_blank" rel="noopener">github.com/dialektai/dialektai/releases</a>.
+    </div>
+
+    <div id="dl-content" class="dl-content" hidden>
+      <div id="dl-grid" class="dl-grid"></div>
+      <div class="dl-foot">
+        <span>Latest release <strong id="dl-version">—</strong></span>
+        <span class="dl-sep" aria-hidden="true">·</span>
+        <a href="https://github.com/dialektai/dialektai/releases" target="_blank" rel="noopener">All releases →</a>
+        <span class="dl-sep" aria-hidden="true">·</span>
+        <a href="https://github.com/dialektai/dialektai" target="_blank" rel="noopener">Source on GitHub →</a>
+        <span class="dl-sep" aria-hidden="true">·</span>
+        <a href="/signup.html">Need a trial license? Sign up →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ─── PILOT + FORM ─────────────────────────────────────────────────────── -->
 <section id="pilot-form" class="section">
   <div class="wrap pilot">
@@ -945,6 +1068,128 @@
       }
     });
   });
+</script>
+
+<script>
+  /* Download section — pulls the latest GitHub Release at page load,
+     groups assets by (OS, arch), and highlights the card matching the
+     visitor's platform via UA-CH (with a UA-string fallback for older
+     browsers). All bytes flow visitor → github.com directly; we never
+     proxy the download. */
+  (function () {
+    const REPO = 'dialektai/dialektai';
+    const grid = document.getElementById('dl-grid');
+    if (!grid) return;
+    const loadingEl = document.getElementById('dl-loading');
+    const errorEl   = document.getElementById('dl-error');
+    const contentEl = document.getElementById('dl-content');
+    const versionEl = document.getElementById('dl-version');
+
+    /* asset-name → (key, os-row, ext-label).
+       Mirrors the regex set in dialekt-cloud/.../releases.py so the
+       landing and the welcome email always show the same buckets. */
+    const PATTERNS = [
+      { key: 'macos_arm64',   re: /_aarch64\.dmg$/i,        os: 'macOS',   arch: 'Apple Silicon', ext: '.dmg'      },
+      { key: 'macos_intel',   re: /_x86_64\.dmg$/i,         os: 'macOS',   arch: 'Intel',         ext: '.dmg'      },
+      { key: 'windows_x64',   re: /_x64-setup\.exe$/i,      os: 'Windows', arch: 'x64',           ext: '-setup.exe' },
+      { key: 'windows_msi',   re: /_x64\.msi$/i,            os: 'Windows', arch: 'x64',           ext: '.msi'      },
+      { key: 'windows_arm64', re: /_arm64-setup\.exe$/i,    os: 'Windows', arch: 'ARM64',         ext: '-setup.exe' },
+      { key: 'windows_arm64_msi', re: /_arm64\.msi$/i,      os: 'Windows', arch: 'ARM64',         ext: '.msi'      },
+      { key: 'linux_amd64_deb',  re: /_amd64\.deb$/i,       os: 'Linux',   arch: 'x86_64',        ext: '.deb'      },
+      { key: 'linux_amd64_app',  re: /_amd64\.AppImage$/i,  os: 'Linux',   arch: 'x86_64',        ext: '.AppImage' },
+      { key: 'linux_arm64_deb',  re: /_arm64\.deb$/i,       os: 'Linux',   arch: 'ARM64',         ext: '.deb'      },
+      { key: 'linux_arm64_app',  re: /_arm64\.AppImage$/i,  os: 'Linux',   arch: 'ARM64',         ext: '.AppImage' },
+    ];
+
+    function detectPlatform() {
+      const uad = navigator.userAgentData;
+      const ua = (navigator.userAgent || '').toLowerCase();
+      // UA-CH gives a clean tuple (Chromium-based browsers, mobile, recent FF/Safari often missing it).
+      let os = '', arch = '';
+      if (uad && uad.platform) {
+        const p = String(uad.platform).toLowerCase();
+        if (p.includes('mac'))     os = 'macOS';
+        else if (p.includes('win'))os = 'Windows';
+        else if (p.includes('linux') || p.includes('android')) os = 'Linux';
+      }
+      if (!os) {
+        if (ua.includes('mac os')) os = 'macOS';
+        else if (ua.includes('windows')) os = 'Windows';
+        else if (ua.includes('linux') || ua.includes('android')) os = 'Linux';
+      }
+      // Arch — UA-CH `architecture`+`bitness` is the only reliable signal.
+      // Fall back to defaults: macOS modern → Apple Silicon, Win/Linux → x64.
+      if (uad) {
+        const a = String(uad.architecture || '').toLowerCase();
+        if (a === 'arm') arch = (os === 'macOS') ? 'Apple Silicon' : 'ARM64';
+        else if (a === 'x86') arch = 'x86_64';
+      }
+      if (!arch && os === 'macOS')   arch = 'Apple Silicon';
+      if (!arch && os === 'Windows') arch = 'x64';
+      if (!arch && os === 'Linux')   arch = 'x86_64';
+      return { os, arch };
+    }
+
+    function fmtSize(bytes) {
+      const mb = bytes / 1024 / 1024;
+      return mb >= 100 ? mb.toFixed(0) + ' MB' : mb.toFixed(1) + ' MB';
+    }
+
+    function classify(name) {
+      for (const p of PATTERNS) if (p.re.test(name)) return p;
+      return null;
+    }
+
+    function render(release) {
+      versionEl.textContent = release.tag_name || '—';
+      // group classified assets by (os, arch); preserve PATTERNS order.
+      const groups = new Map();
+      for (const a of release.assets || []) {
+        const cls = classify(a.name);
+        if (!cls) continue;
+        const k = cls.os + '|' + cls.arch;
+        if (!groups.has(k)) groups.set(k, { os: cls.os, arch: cls.arch, files: [] });
+        groups.get(k).files.push({ name: a.name, ext: cls.ext, url: a.browser_download_url, size: a.size });
+      }
+      const detected = detectPlatform();
+      const detectedKey = detected.os && detected.arch ? (detected.os + '|' + detected.arch) : null;
+      const order = ['macOS|Apple Silicon','macOS|Intel','Windows|x64','Windows|ARM64','Linux|x86_64','Linux|ARM64'];
+      const cards = [];
+      // detected first
+      if (detectedKey && groups.has(detectedKey)) {
+        cards.push({ k: detectedKey, ...groups.get(detectedKey), detected: true });
+        groups.delete(detectedKey);
+      }
+      // rest in canonical order
+      for (const k of order) if (groups.has(k)) {
+        cards.push({ k, ...groups.get(k), detected: false });
+      }
+      grid.innerHTML = cards.map(c => `
+        <article class="dl-card${c.detected ? ' detected' : ''}">
+          <div class="dl-os">${c.os} <span class="arch">${c.arch}</span></div>
+          <div class="dl-files">
+            ${c.files.map(f => `
+              <a class="dl-file" href="${f.url}" rel="noopener">
+                <span class="dl-ext">${f.ext}</span>
+                <span class="dl-size">${fmtSize(f.size)}</span>
+              </a>
+            `).join('')}
+          </div>
+        </article>
+      `).join('');
+      loadingEl.hidden = true;
+      contentEl.hidden = false;
+    }
+
+    fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(render)
+      .catch(err => {
+        console.warn('release fetch failed', err);
+        loadingEl.hidden = true;
+        errorEl.hidden = false;
+      });
+  })();
 </script>
 </body>
 </html>
