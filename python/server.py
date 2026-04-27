@@ -3227,16 +3227,22 @@ async def ollama_tags():
     direct fetch always fails with a CORS error and installedTags stays empty.
     Routing through the backend avoids CORS entirely — server-to-server HTTP
     has no origin restrictions.
+
+    `reachable` distinguishes "Ollama daemon down / unreachable" (false) from
+    "daemon up but no models pulled yet" (true, models=[]) — the onboarding
+    UI renders different copy for each, otherwise both look like "not running"
+    to the user even though only one of them needs `ollama serve`.
     """
     import httpx
     try:
         async with httpx.AsyncClient(timeout=3) as c:
             r = await c.get("http://localhost:11434/api/tags")
             if r.status_code == 200:
-                return r.json()
+                payload = r.json()
+                return {"models": payload.get("models", []), "reachable": True}
     except Exception:
         pass
-    return {"models": []}
+    return {"models": [], "reachable": False}
 
 
 # ── Ollama automated install (Linux only) ─────────────────────────────────────

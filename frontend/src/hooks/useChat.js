@@ -20,6 +20,12 @@ export function useChat() {
   const wsRef = useRef(null);
   const streamingMsgRef = useRef(null);
   const sessionIdRef = useRef(null);  // sync ref for use inside WS callbacks
+  // Debounce ollamaOnline flips: a single failed /health (transient
+  // sidecar latency, Ollama loading a model, macOS WebKit jitter) used
+  // to flip the indicator and trigger a MainScreen→OfflineScreen→empty
+  // bounce loop. Require 2 consecutive misses before going offline; any
+  // success resets the counter and flips back to online immediately.
+  const healthFailRef = useRef(0);
 
   // Keep ref in sync
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
@@ -86,7 +92,13 @@ export function useChat() {
     try {
       const r = await fetch(`${API_URL}/health`);
       const d = await r.json();
-      setOllamaOnline(d.ollama);
+      if (d.ollama) {
+        healthFailRef.current = 0;
+        setOllamaOnline(true);
+      } else {
+        healthFailRef.current += 1;
+        if (healthFailRef.current >= 2) setOllamaOnline(false);
+      }
       const list = Array.isArray(d.models) ? d.models : [];
       if (list.length) setModels(list);
       // Self-heal the active model. If the currently selected model isn't
@@ -102,7 +114,8 @@ export function useChat() {
       });
       return d;
     } catch {
-      setOllamaOnline(false);
+      healthFailRef.current += 1;
+      if (healthFailRef.current >= 2) setOllamaOnline(false);
       return { ollama: false };
     }
   }, []);

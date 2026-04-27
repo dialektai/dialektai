@@ -420,6 +420,7 @@ export default function OnboardingScreen({ onNav }) {
   const [catalog, setCatalog] = useState({ ollama: [], providers: [], regulated_mode: false });
   const [providersStatus, setProvidersStatus] = useState([]); // [{ id, configured }]
   const [installedTags, setInstalledTags] = useState(() => new Set());
+  const [ollamaReachable, setOllamaReachable] = useState(null); // null=unknown, true/false once /ollama/tags answers
   const [ramTotalGB, setRamTotalGB] = useState(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -445,14 +446,17 @@ export default function OnboardingScreen({ onNav }) {
       Promise.allSettled([
         fetch(`${API}/llm/catalog`).then(r => r.json()),
         fetch(`${API}/llm/providers`).then(r => r.json()),
-        fetch(`${API}/ollama/tags`).then(r => r.ok ? r.json() : { models: [] }),
+        fetch(`${API}/ollama/tags`).then(r => r.ok ? r.json() : { models: [], reachable: false }),
         fetch(`${API}/system`).then(r => r.ok ? r.json() : null),
       ]).then(([cat, prov, tags, sys]) => {
         if (cancelled) return;
         const catOk = cat.status === 'fulfilled' && (cat.value?.ollama?.length > 0 || cat.value?.providers?.length > 0);
         if (catOk) { setCatalog(cat.value); setCatalogLoaded(true); }
         if (prov.status === 'fulfilled') setProvidersStatus(prov.value?.providers || []);
-        if (tags.status === 'fulfilled') setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
+        if (tags.status === 'fulfilled') {
+          setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
+          setOllamaReachable(tags.value?.reachable === true);
+        }
         if (sys.status === 'fulfilled' && sys.value && typeof sys.value.ram_total_gb === 'number') {
           setRamTotalGB(sys.value.ram_total_gb);
         }
@@ -601,7 +605,15 @@ export default function OnboardingScreen({ onNav }) {
             <div className="upper" style={{ color: T.dim, marginBottom: 8 }}>Your machine</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} className="mono">
               <Row k="RAM"  v={ramTotalGB ? `${ramTotalGB} GB` : '—'} />
-              <Row k="OLLAMA" v={installedTags.size > 0 ? `${installedTags.size} models` : 'not running'} />
+              <Row k="OLLAMA" v={
+                installedTags.size > 0
+                  ? `${installedTags.size} models`
+                  : ollamaReachable === true
+                    ? 'running · 0 models'
+                    : ollamaReachable === false
+                      ? 'not running'
+                      : '—'
+              } />
             </div>
             {tab === 'local' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 10 }}>
