@@ -4551,6 +4551,142 @@ async def branding_preview(brand_id: str):
         raise HTTPException(500, str(e))
 
 
+# ── Web search providers (Tavily / Brave / DuckDuckGo) ───────────────────────
+
+@app.get("/search/providers")
+async def search_providers():
+    """Return the configured-state of every search provider.
+
+    Drives the Settings → Web Search dropdown — the UI greys out
+    providers that don't have a key set, and shows the "default"
+    indicator for whichever the user picked in settings.
+    """
+    from dialekt.tools.search.router import (
+        PROVIDER_NAMES,
+        SECRET_KEY_BY_PROVIDER,
+        _build_provider,
+    )
+
+    settings = load_settings()
+    default = settings.get("web_search_provider")
+    return {
+        "ok": True,
+        "default": default,
+        "providers": [
+            {
+                "name": name,
+                "configured": _build_provider(name).is_configured(),
+                "needs_api_key": SECRET_KEY_BY_PROVIDER.get(name) is not None,
+                "secret_key": SECRET_KEY_BY_PROVIDER.get(name),
+            }
+            for name in PROVIDER_NAMES
+        ],
+    }
+
+
+@app.post("/search/providers/{provider}/credentials")
+async def search_save_credentials(provider: str, body: dict):
+    """Save (or clear) the API key for a search provider.
+
+    Empty/null/missing api_key deletes the stored secret — same shape as
+    the LLM-provider credential endpoints so the frontend can reuse one
+    save/clear pattern.
+    """
+    from dialekt.tools.search.router import SECRET_KEY_BY_PROVIDER
+    from dialekt.secrets import set_secret, delete_secret
+
+    secret_key = SECRET_KEY_BY_PROVIDER.get(provider)
+    if secret_key is None:
+        # DuckDuckGo or unknown: nothing to store.
+        if provider in SECRET_KEY_BY_PROVIDER:
+            return {"ok": True, "stored": False, "note": "provider needs no API key"}
+        raise HTTPException(404, f"unknown provider: {provider}")
+
+    api_key = (body.get("api_key") or "").strip()
+    if not api_key:
+        delete_secret(secret_key)
+        return {"ok": True, "stored": False, "cleared": True}
+    set_secret(secret_key, api_key)
+    return {"ok": True, "stored": True}
+
+
+@app.delete("/search/providers/{provider}/credentials")
+async def search_clear_credentials(provider: str):
+    from dialekt.tools.search.router import SECRET_KEY_BY_PROVIDER
+    from dialekt.secrets import delete_secret
+
+    secret_key = SECRET_KEY_BY_PROVIDER.get(provider)
+    if secret_key is None:
+        if provider in SECRET_KEY_BY_PROVIDER:
+            return {"ok": True, "cleared": False}
+        raise HTTPException(404, f"unknown provider: {provider}")
+    delete_secret(secret_key)
+    return {"ok": True, "cleared": True}
+
+
+@app.post("/search/providers/{provider}/test")
+async def search_test_provider(provider: str):
+    """Probe the provider — light query through the live API.
+
+    Wired to the "Проверить" button in Settings → Web Search. Runs in a
+    worker thread because every adapter uses sync httpx.
+    """
+    from dialekt.tools.search.router import _build_provider, PROVIDER_NAMES
+
+    if provider not in PROVIDER_NAMES:
+        raise HTTPException(404, f"unknown provider: {provider}")
+    p = _build_provider(provider)
+    return await asyncio.to_thread(p.test_connection)
+
+
+@app.post("/search/web")
+async def search_web(body: dict):
+    """Run a web search through the configured (or requested) provider.
+
+    Body:
+      ``{"query": "...", "max_results": 10, "provider": null,
+         "include_raw_content": false}``
+
+    Returns:
+      ``{"ok": true, "provider": "tavily", "query": "...",
+         "results": [{"url","title","snippet","score","extras"}, ...]}``
+    """
+    from dialekt.tools.search.router import search as _search
+    from dialekt.tools.search.provider import SearchProviderError
+
+    query = (body.get("query") or "").strip()
+    if not query:
+        return {"ok": False, "error": "query is required"}
+
+    max_results = int(body.get("max_results", 10))
+    provider = body.get("provider") or None
+    settings = load_settings()
+    default_provider = settings.get("web_search_provider")
+
+    options = {
+        k: body[k]
+        for k in ("include_raw_content", "search_depth", "country",
+                  "search_lang", "safesearch", "region")
+        if k in body
+    }
+
+    try:
+        result = await asyncio.to_thread(
+            _search,
+            query,
+            max_results,
+            provider=provider,
+            default_provider=default_provider,
+            **options,
+        )
+        return {"ok": True, **result}
+    except SearchProviderError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        log.exception("search failed")
+        return {"ok": False, "error": str(e)}
+
+
 # ── File / image context injection ───────────────────────────────────────────
 
 async def describe_image_vision(path: str) -> str:
