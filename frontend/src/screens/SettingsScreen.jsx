@@ -3465,6 +3465,480 @@ function AgentsSection() {
   );
 }
 
+// ── Section: Scheduled (v0.27 §3.2) ──────────────────────────────────────────
+//
+// Lists every agent whose manifest declares trigger.type=scheduled and
+// renders a card per agent: schedule line, next/last run, Run-now,
+// History (collapsible), Disconnect-style "Skip-on-startup" toggle is
+// deliberately absent — that's per-manifest, not per-session.
+
+const CRON_FIELD_LABELS = ['minute', 'hour', 'day', 'month', 'weekday'];
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function describeCron(expr) {
+  // Best-effort humanisation. Catches the common cases the IBA agents
+  // use; falls back to the raw expression when shape doesn't match.
+  if (!expr || typeof expr !== 'string') return expr || '';
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return expr;
+  const [m, h, dom, mon, dow] = parts;
+  const numeric = (s) => /^\d+$/.test(s);
+  const time = numeric(m) && numeric(h)
+    ? `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+    : null;
+  if (!time) return expr;
+  if (dom === '*' && mon === '*' && dow === '*') return `every day at ${time}`;
+  if (dom === '*' && mon === '*' && /^[A-Z]+$/i.test(dow)) {
+    return `${dow.slice(0, 3)} at ${time}`;
+  }
+  if (dom === '*' && mon === '*' && numeric(dow)) {
+    const idx = parseInt(dow, 10) % 7;
+    return `${WEEKDAY_NAMES[idx]} at ${time}`;
+  }
+  if (numeric(dom) && numeric(mon)) {
+    return `${MONTH_NAMES[parseInt(mon, 10) - 1] || mon} ${dom} at ${time}`;
+  }
+  return expr;
+}
+
+function parseScheduledManifest(yamlStr) {
+  // Tiny manual parser — we only need trigger.{type,schedule,timezone,
+  // missed_run_policy} and output.destination.type. Importing js-yaml
+  // for this is overkill (and SettingsScreen is already a chunky
+  // bundle). Caller falls back to "this isn't a scheduled agent" when
+  // anything looks off.
+  if (!yamlStr || typeof yamlStr !== 'string') return null;
+  const lines = yamlStr.split('\n');
+  const out = { type: null, schedule: null, timezone: null, policy: null, destination: null };
+  let inTrigger = false, inOutput = false, inDest = false, indentTrigger = -1, indentOutput = -1;
+  for (const raw of lines) {
+    const line = raw.replace(/\r$/, '');
+    if (/^[a-z_]+:\s*$/i.test(line) || /^[a-z_]+:/i.test(line)) {
+      if (line.startsWith('trigger:')) { inTrigger = true; inOutput = false; inDest = false; indentTrigger = 0; continue; }
+      if (line.startsWith('output:')) { inOutput = true; inTrigger = false; inDest = false; indentOutput = 0; continue; }
+      if (!line.startsWith(' ') && !line.startsWith('\t')) { inTrigger = false; inOutput = false; inDest = false; }
+    }
+    const m = line.match(/^(\s+)([a-z_]+):\s*['"]?([^'"#]*?)['"]?\s*(#.*)?$/i);
+    if (!m) continue;
+    const [, indent, key, value] = m;
+    const ind = indent.length;
+    if (inTrigger && ind === 2) {
+      if (key === 'type') out.type = value;
+      else if (key === 'schedule' || key === 'cron') out.schedule = value;
+      else if (key === 'timezone') out.timezone = value;
+      else if (key === 'missed_run_policy') out.policy = value;
+    }
+    if (inOutput) {
+      if (ind === 2 && key === 'destination') { inDest = true; continue; }
+      if (inDest && ind === 4 && key === 'type') { out.destination = value; inDest = false; }
+    }
+  }
+  return out.type === 'scheduled' ? out : null;
+}
+
+function formatRelative(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const delta = (d - Date.now()) / 1000;
+    const abs = Math.abs(delta);
+    if (abs < 60) return delta >= 0 ? 'in <1 min' : '<1 min ago';
+    if (abs < 3600) return delta >= 0 ? `in ${Math.round(delta / 60)} min` : `${Math.round(abs / 60)} min ago`;
+    if (abs < 86400) return delta >= 0 ? `in ${Math.round(delta / 3600)} h` : `${Math.round(abs / 3600)} h ago`;
+    return delta >= 0
+      ? `in ${Math.round(delta / 86400)}d (${d.toLocaleDateString()})`
+      : `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch { return iso; }
+}
+
+function ScheduledStatusBadge({ status }) {
+  const palette = {
+    success: { bg: '#0c2a1f', fg: T.green, label: 'OK' },
+    failed: { bg: '#2a0f12', fg: T.red, label: 'FAIL' },
+    timeout: { bg: '#2a1f0a', fg: T.amber, label: 'TIMEOUT' },
+    running: { bg: '#0a1d2a', fg: T.cyan, label: 'RUNNING' },
+  };
+  const p = palette[status] || { bg: T.bg2, fg: T.dim, label: (status || '—').toUpperCase() };
+  return (
+    <span className="mono" style={{
+      fontSize: 9, padding: '2px 6px', letterSpacing: '.08em',
+      background: p.bg, color: p.fg, border: `1px solid ${p.fg}33`,
+    }}>{p.label}</span>
+  );
+}
+
+function ScheduledAgentCard({ agent, schedSpec, schedulerJob, onChanged }) {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [running, setRunning] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [runs, setRuns] = useState(null);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+
+  const reloadRuns = useCallback(async () => {
+    setLoadingRuns(true);
+    try {
+      const r = await fetch(`${API}/agents/${agent.id}/runs`);
+      const j = r.ok ? await r.json() : { rows: [] };
+      setRuns(j.rows || []);
+    } finally {
+      setLoadingRuns(false);
+    }
+  }, [agent.id]);
+
+  const runNow = () => showConfirm({
+    title: `Run "${agent.name}" now?`,
+    body: `Fires the agent's trigger.message immediately, just like a scheduled tick. Output goes to ${schedSpec?.destination || 'the manifest destination'} and the run shows up in the history below.`,
+    action: 'Run now', danger: false,
+    onConfirm: async () => {
+      setRunning(true);
+      try {
+        const r = await fetch(`${API}/agents/${agent.id}/run-now`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: null }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+        addToast(`Run ${j.status} (${j.duration_ms} ms)`, j.status === 'success' ? 'ok' : 'error');
+        if (showHistory) reloadRuns();
+        onChanged?.();
+      } catch (e) {
+        addToast(`Run failed: ${e.message}`, 'error');
+      } finally {
+        setRunning(false);
+      }
+    },
+  });
+
+  const toggleHistory = () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && runs === null) reloadRuns();
+  };
+
+  const deleteRun = (runId) => showConfirm({
+    title: 'Delete run from history?',
+    body: 'This only removes the entry from the history panel. The output (if delivered) is unaffected.',
+    action: 'Delete', danger: true,
+    onConfirm: async () => {
+      try {
+        const r = await fetch(`${API}/agents/${agent.id}/runs/${runId}`, { method: 'DELETE' });
+        if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`);
+        setRuns(rs => (rs || []).filter(x => x.id !== runId));
+      } catch (e) {
+        addToast(`Delete failed: ${e.message}`, 'error');
+      }
+    },
+  });
+
+  const lastRun = schedulerJob?.last_run_at;
+  const lastStatus = schedulerJob?.last_status;
+  const nextRun = schedulerJob?.next_run;
+
+  return (
+    <div style={{
+      border: `1px solid ${T.border}`, background: T.bg1, marginBottom: 14,
+    }}>
+      <div style={{
+        padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <Icon name="sparkle" size={14} color={T.cyan} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, color: T.text, fontWeight: 500 }}>{agent.name}</div>
+          {agent.description && (
+            <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{agent.description}</div>
+          )}
+        </div>
+        <span className="mono" style={{
+          fontSize: 10, color: T.green, letterSpacing: '.08em',
+          padding: '2px 8px', background: '#0c2a1f', border: `1px solid ${T.green}33`,
+        }}>● ACTIVE</span>
+      </div>
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: '110px 1fr', gap: '8px 14px',
+        padding: '12px 16px', fontSize: 12,
+      }}>
+        <span style={{ color: T.dim }}>Schedule</span>
+        <span style={{ color: T.text }}>
+          <span className="mono" style={{ color: T.cyan }}>{schedSpec?.schedule}</span>
+          {schedSpec?.schedule && (
+            <span style={{ color: T.muted, marginLeft: 8 }}>
+              ({describeCron(schedSpec.schedule)}{schedSpec.timezone ? `, ${schedSpec.timezone}` : ''})
+            </span>
+          )}
+        </span>
+        <span style={{ color: T.dim }}>Next run</span>
+        <span style={{ color: T.text }} className="mono">
+          {nextRun
+            ? <>{new Date(nextRun).toLocaleString()} <span style={{ color: T.muted }}>· {formatRelative(nextRun)}</span></>
+            : <span style={{ color: T.dim }}>—</span>}
+        </span>
+        <span style={{ color: T.dim }}>Last run</span>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {lastRun ? (
+            <>
+              <span className="mono" style={{ color: T.text }}>
+                {new Date(lastRun).toLocaleString()}
+              </span>
+              <ScheduledStatusBadge status={lastStatus} />
+              <span style={{ color: T.muted, fontSize: 11 }}>{formatRelative(lastRun)}</span>
+            </>
+          ) : (
+            <span style={{ color: T.dim, fontSize: 11 }}>never run</span>
+          )}
+        </span>
+        <span style={{ color: T.dim }}>Delivery</span>
+        <span className="mono" style={{ color: T.muted, fontSize: 11 }}>
+          {schedSpec?.destination || 'unspecified'}
+          {schedSpec?.policy && (
+            <span style={{ marginLeft: 12 }}>
+              missed: <span style={{ color: T.text }}>{schedSpec.policy}</span>
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div style={{
+        padding: '10px 14px', borderTop: `1px solid ${T.border}`,
+        display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center',
+      }}>
+        <button className="dlk-btn" onClick={toggleHistory}
+          style={{ borderColor: T.border, color: T.text }}>
+          {showHistory ? 'Hide history' : 'History'}
+        </button>
+        <button className="dlk-btn primary" disabled={running} onClick={runNow}
+          style={{ opacity: running ? 0.5 : 1 }}>
+          {running ? 'Running…' : 'Run now'}
+        </button>
+      </div>
+
+      {showHistory && (
+        <RunsHistoryPanel
+          runs={runs}
+          loading={loadingRuns}
+          onReload={reloadRuns}
+          onDelete={deleteRun}
+        />
+      )}
+    </div>
+  );
+}
+
+function RunsHistoryPanel({ runs, loading, onReload, onDelete }) {
+  const [expanded, setExpanded] = useState(null);
+  if (loading && runs === null) {
+    return (
+      <div style={{ padding: '14px 16px', color: T.dim, fontSize: 12, borderTop: `1px solid ${T.border}` }}>
+        Loading runs…
+      </div>
+    );
+  }
+  if (!runs || runs.length === 0) {
+    return (
+      <div style={{ padding: '14px 16px', color: T.dim, fontSize: 12, borderTop: `1px solid ${T.border}` }}>
+        No runs yet.
+      </div>
+    );
+  }
+  return (
+    <div style={{ borderTop: `1px solid ${T.border}`, background: T.bg2 }}>
+      <div style={{
+        padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10,
+        fontSize: 11, color: T.dim, borderBottom: `1px solid ${T.border}`,
+      }}>
+        <span className="mono" style={{ letterSpacing: '.08em' }}>RUNS · {runs.length}</span>
+        <div style={{ flex: 1 }} />
+        <span onClick={onReload} style={{ cursor: 'pointer', color: T.muted, userSelect: 'none' }}>
+          ↻ refresh
+        </span>
+      </div>
+      {runs.map(run => {
+        const isOpen = expanded === run.id;
+        return (
+          <div key={run.id} style={{ borderBottom: `1px solid ${T.border}` }}>
+            <div onClick={() => setExpanded(isOpen ? null : run.id)} style={{
+              padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'pointer', fontSize: 12,
+            }}>
+              <span className="mono" style={{ color: T.muted, fontSize: 11, minWidth: 150 }}>
+                {new Date(run.triggered_at).toLocaleString()}
+              </span>
+              <ScheduledStatusBadge status={run.status} />
+              {run.duration_ms != null && (
+                <span className="mono" style={{ color: T.dim, fontSize: 10 }}>
+                  {run.duration_ms} ms
+                </span>
+              )}
+              {run.delivery_status && (
+                <span className="mono" style={{
+                  color: run.delivery_status === 'sent' ? T.green : T.amber,
+                  fontSize: 10, letterSpacing: '.04em',
+                }}>
+                  · {run.delivery_status}
+                </span>
+              )}
+              <span style={{ flex: 1, color: T.muted, fontSize: 11, overflow: 'hidden',
+                whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {run.error || (run.output || '').slice(0, 120)}
+              </span>
+              <span className="mono" style={{ color: T.dim, fontSize: 10 }}>{isOpen ? '▾' : '▸'}</span>
+            </div>
+            {isOpen && (
+              <div style={{ padding: '10px 14px 14px', background: T.bg0 }}>
+                {run.error && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div className="mono" style={{ fontSize: 10, color: T.red, marginBottom: 4 }}>
+                      ERROR
+                    </div>
+                    <pre className="mono" style={{
+                      margin: 0, padding: '8px 10px', background: '#2a0f12',
+                      border: `1px solid ${T.red}33`, color: T.text, fontSize: 11,
+                      whiteSpace: 'pre-wrap',
+                    }}>{run.error}</pre>
+                  </div>
+                )}
+                {run.output && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div className="mono" style={{ fontSize: 10, color: T.dim, marginBottom: 4 }}>
+                      OUTPUT
+                    </div>
+                    <pre className="mono" style={{
+                      margin: 0, padding: '8px 10px', background: T.bg1,
+                      border: `1px solid ${T.border}`, color: T.text, fontSize: 11,
+                      whiteSpace: 'pre-wrap', maxHeight: 320, overflowY: 'auto',
+                    }}>{run.output}</pre>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="mono" style={{ fontSize: 10, color: T.dim }}>
+                    delivery: {run.delivery_status || '—'}
+                    {run.delivery_status_detail && <> · {run.delivery_status_detail}</>}
+                    {run.delivery_target && <> · {run.delivery_target}</>}
+                  </span>
+                  <button className="dlk-btn" onClick={() => onDelete(run.id)}
+                    style={{ borderColor: T.red + '66', color: T.red }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduledSection() {
+  const { addToast } = useContext(Ctx);
+  const [scheduled, setScheduled] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [reloading, setReloading] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      const [aResp, sResp] = await Promise.all([
+        fetch(`${API}/agents`),
+        fetch(`${API}/scheduler/status`),
+      ]);
+      const agents = aResp.ok ? await aResp.json() : [];
+      const scheduledList = agents.flatMap(a => {
+        const spec = parseScheduledManifest(a.manifest_yaml);
+        return spec ? [{ agent: a, spec }] : [];
+      });
+      setScheduled(scheduledList);
+      setStatus(sResp.ok ? await sResp.json() : null);
+    } catch {
+      setScheduled([]);
+      setStatus(null);
+    }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const jobByAgent = (() => {
+    const map = {};
+    (status?.jobs || []).forEach(j => { if (j.agent_id) map[j.agent_id] = j; });
+    return map;
+  })();
+
+  const reloadScheduler = async () => {
+    setReloading(true);
+    try {
+      const r = await fetch(`${API}/scheduler/reload`, { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+      addToast(`Reloaded · +${j.added} / ~${j.updated} / -${j.removed}`, 'ok');
+      reload();
+    } catch (e) {
+      addToast(`Reload failed: ${e.message}`, 'error');
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  return (
+    <BodyShell crumb="02 / CAPABILITIES → SCHEDULED" title="Scheduled agents"
+      desc="Agents whose manifest declares trigger.type=scheduled. The scheduler fires their trigger.message on a cron schedule and routes the result to the configured destination — Telegram, filesystem, or in-app notifications.">
+
+      <Card title="Scheduler" n="A"
+        right={
+          status?.disabled ? (
+            <span className="mono" style={{ fontSize: 10, color: T.amber, letterSpacing: '.08em' }}>
+              DISABLED (DIALEKT_DISABLE_SCHEDULER=1)
+            </span>
+          ) : status?.running ? (
+            <span className="mono" style={{ fontSize: 10, color: T.green, letterSpacing: '.08em' }}>
+              ● RUNNING · {(status.jobs || []).length} job(s)
+            </span>
+          ) : (
+            <span className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.08em' }}>
+              not started
+            </span>
+          )
+        }>
+        <Row label="Reload jobs from manifests"
+          sub="re-syncs APScheduler against the agents table" last>
+          <button className="dlk-btn" disabled={reloading} onClick={reloadScheduler}
+            style={{ opacity: reloading ? 0.5 : 1 }}>
+            {reloading ? 'Reloading…' : 'Reload'}
+          </button>
+        </Row>
+      </Card>
+
+      {scheduled === null ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : scheduled.length === 0 ? (
+        <Card>
+          <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: 12 }}>
+            <Icon name="sparkle" size={28} color={T.dim} />
+            <div style={{ color: T.dim, fontSize: 13, textAlign: 'center' }}>
+              No scheduled agents yet.<br />
+              Import a manifest with{' '}
+              <span className="mono" style={{ color: T.cyan }}>trigger.type: scheduled</span>{' '}
+              from the Builder Wizard or the YAML import endpoint.
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div>
+          {scheduled.map(({ agent, spec }) => (
+            <ScheduledAgentCard
+              key={agent.id}
+              agent={agent}
+              schedSpec={spec}
+              schedulerJob={jobByAgent[agent.id]}
+              onChanged={reload}
+            />
+          ))}
+        </div>
+      )}
+    </BodyShell>
+  );
+}
+
 // ── Section: Admin ───────────────────────────────────────────────────────────
 
 function AdminSection() {
@@ -3635,6 +4109,7 @@ const NAV_GROUPS = [
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
     { k: 'Instagram',       icon: 'sparkle' },
+    { k: 'Scheduled',       icon: 'sparkle' },
   ]},
   { title: 'System', items: [
     { k: 'Storage & memory',   icon: 'file'   },
@@ -3661,6 +4136,7 @@ function renderSection(s) {
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
     case 'Instagram':          return <InstagramSection />;
+    case 'Scheduled':          return <ScheduledSection />;
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;
