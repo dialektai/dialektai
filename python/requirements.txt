@@ -23,6 +23,13 @@ asyncpg>=0.29.0
 aiomysql>=0.2.0
 clickhouse-connect>=0.7.0
 keyring>=25.0.0
+# Scheduled-trigger runtime (v0.27). MemoryJobStore is enough — we re-
+# register every scheduled agent from the agents table on boot, so we
+# don't need APScheduler's SQLAlchemyJobStore (which would pull in
+# SQLAlchemy as a transitive dep). croniter is already pulled in by
+# dialekt-manifest-validator for cron validation; APScheduler reuses it.
+apscheduler>=3.10,<4
+croniter>=2.0.0
 # All published sqlite-vec versions cap at python<3.12. On most platforms
 # pip pulls a prebuilt wheel that ignores that bound, but Windows ARM64
 # has no wheel, so pip falls back to the metadata-respecting sdist and
