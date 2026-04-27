@@ -1,7 +1,7 @@
 # What dialekt does today
 
-**Version:** v0.27.0
-**Last shipped:** v0.27.0 (2026-04-27) — scheduler, web search, visual engine, IBA pilot agents
+**Version:** v0.27.2
+**Last shipped:** v0.27.2 (2026-04-27) — post-pilot hardening (tests, docs, dev tooling) over v0.27.0 base (scheduler, web search, visual engine, IBA pilot agents)
 **Date:** 2026-04-27
 **Status:** Pilot-ready
 
