@@ -75,3 +75,10 @@ dist/
 # The committed stubs in binaries/ are shell scripts used for `tauri dev`;
 # real ELF binaries are always rebuilt and never committed.
 frontend/src-tauri/binaries/dialekt-server-x86_64-unknown-linux-gnu
+
+# Markdown files — only README.md is tracked. Everything else (planning
+# notes, scratch docs, MERGE_READINESS.md, audit reports, etc.) stays out
+# of the repo. Already-tracked .md files remain tracked until `git rm`'d.
+*.md
+!README.md
+!readme.md
