@@ -280,7 +280,7 @@ export function TriSegment({ value, onChange, disabled }) {
         return (
           <div key={o.k} className="mono" onClick={() => !disabled && onChange?.(o.k)} style={{
             padding: '5px 10px', fontSize: 10, letterSpacing: '.08em', userSelect: 'none',
-            background: on ? (o.k === 'allow' ? '#0c2a1f' : o.k === 'ask' ? '#2a1f0a' : '#2a0f12') : 'transparent',
+            background: on ? (o.k === 'allow' ? T.successBg : o.k === 'ask' ? T.warningBg : T.errorBg) : 'transparent',
             color: on ? o.color : T.dim,
             borderRight: o.k !== 'deny' ? `1px solid ${T.border}` : 'none',
             fontWeight: on ? 600 : 400, cursor: disabled ? 'default' : 'pointer',
@@ -1619,7 +1619,7 @@ function ScreenSection() {
       </Card>
       <Card title="Input control" n="C">
         <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#2a1f0a', border: `1px solid ${T.amber}44` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: T.warningBg, border: `1px solid ${T.amber}44` }}>
             <Icon name="stop" size={12} color={T.amber} />
             <span className="mono" style={{ fontSize: 10, color: T.amber }}>Mouse & keyboard control gives dialekt full desktop access. Off by default.</span>
           </div>
@@ -2691,7 +2691,7 @@ function StorageSection() {
         )}
       </Card>
 
-      <div style={{ border: `1px solid ${T.red}44`, background: '#1a0c0e' }}>
+      <div style={{ border: `1px solid ${T.red}44`, background: T.errorBg }}>
         <div style={{ padding: '10px 14px', borderBottom: `1px solid ${T.red}33` }}>
           <span className="mono" style={{ fontSize: 10, color: T.red, letterSpacing: '.14em' }}>DANGER ZONE</span>
         </div>
@@ -2784,7 +2784,7 @@ function PrivacySection() {
       desc="dialekt is 100% local. These controls exist to make that auditable.">
       <Card title="Data leaving this machine" n="A">
         <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#0c2a1f', border: `1px solid ${T.green}33` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: T.successBg, border: `1px solid ${T.green}33` }}>
             <Icon name="shield" size={14} color={T.green} />
             <div>
               <div style={{ fontSize: 13, color: T.green, fontWeight: 500 }}>0 bytes sent to the cloud by dialekt</div>
