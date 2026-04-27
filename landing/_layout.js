@@ -12,7 +12,7 @@
     <nav class="nav">
       <div class="nav-inner">
         <a href="/" class="brand" aria-label="dias.now">
-          <b>dialekt</b><span class="accent">.ai</span>
+          <b>dias</b><span class="accent">.now</span>
         </a>
         <div class="nav-links" id="nav-links">
           <a href="/" data-route="/" data-i18n="nav.product">Product</a>
@@ -37,7 +37,7 @@
     <footer class="footer">
       <div class="footer-grid">
         <div>
-          <a href="/" class="brand"><b>dialekt</b><span class="accent">.ai</span></a>
+          <a href="/" class="brand"><b>dias</b><span class="accent">.now</span></a>
           <p style="font-size:14px;line-height:1.6;margin-top:14px;max-width:380px;color:var(--ink-2)" data-i18n="footer.tag">
             Local-first AI agent. Your prompts, code, and files never leave your machine by default.
           </p>
