@@ -115,6 +115,22 @@ BEGIN
     -- locale requires an explicit migration AND new template folder.
     BEGIN ALTER TABLE tenants ADD COLUMN locale TEXT NOT NULL DEFAULT 'en'; EXCEPTION WHEN duplicate_column THEN NULL; END;
     BEGIN ALTER TABLE tenants ADD CONSTRAINT tenants_locale_chk CHECK (locale IN ('en','ru')); EXCEPTION WHEN duplicate_object THEN NULL; END;
+    -- KZ legal billing details, used to render the "Покупатель" block on
+    -- invoice PDFs. All nullable — drafts don't need them; admin fills
+    -- before issuing the first invoice. talon_number is only meaningful
+    -- for legal_form='ИП' (УВД-issued registration receipt — corporates
+    -- don't have one).
+    BEGIN ALTER TABLE tenants ADD COLUMN legal_form TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN bin TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN talon_number TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN postal_code TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN legal_address TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN phone TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN bank_iban TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN bank_name TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN bank_bik TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN kbe TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD COLUMN signatory_name TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
 END $$;
 
 -- Email verification tokens for self-serve signup. Separate from `invites`
