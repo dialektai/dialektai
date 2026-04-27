@@ -42,8 +42,15 @@
 <div class="section">
   <div class="section-title">Покупатель</div>
   <table class="no-border">
-    <tr><td style="width:140px;font-weight:bold">Наименование:</td><td>{{ buyer_company }}</td></tr>
-    {% if buyer_address %}<tr><td style="font-weight:bold">Адрес:</td><td>{{ buyer_address }}</td></tr>{% endif %}
+    <tr><td style="width:160px;font-weight:bold">Наименование:</td><td>{% if buyer.legal_form %}{{ buyer.legal_form }} {% endif %}{{ buyer.company_name }}</td></tr>
+    {% if buyer.bin %}<tr><td style="font-weight:bold">БИН/ИИН:</td><td>{{ buyer.bin }}</td></tr>{% endif %}
+    {% if buyer.legal_form == 'ИП' and buyer.talon_number %}<tr><td style="font-weight:bold">Талон №:</td><td>{{ buyer.talon_number }}</td></tr>{% endif %}
+    {% if buyer.postal_code or buyer.legal_address %}<tr><td style="font-weight:bold">Адрес:</td><td>{% if buyer.postal_code %}{{ buyer.postal_code }}, {% endif %}{{ buyer.legal_address }}</td></tr>{% endif %}
+    {% if buyer.phone %}<tr><td style="font-weight:bold">Телефон:</td><td>{{ buyer.phone }}</td></tr>{% endif %}
+    {% if buyer.bank_iban %}<tr><td style="font-weight:bold">ИИК:</td><td>{{ buyer.bank_iban }}</td></tr>{% endif %}
+    {% if buyer.bank_name %}<tr><td style="font-weight:bold">Банк:</td><td>{{ buyer.bank_name }}</td></tr>{% endif %}
+    {% if buyer.bank_bik %}<tr><td style="font-weight:bold">БИК:</td><td>{{ buyer.bank_bik }}</td></tr>{% endif %}
+    {% if buyer.kbe %}<tr><td style="font-weight:bold">КБЕ:</td><td>{{ buyer.kbe }}</td></tr>{% endif %}
   </table>
 </div>
 
