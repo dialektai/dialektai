@@ -430,6 +430,49 @@ async def test_resend_verify_resends_email_with_downloads(client, app):
 
 
 @pytest.mark.asyncio
+async def test_signup_records_cross_border_consent_when_given(client, pool):
+    """KZ Law on Personal Data §16: explicit cross-border consent is recorded
+    as a separate auditable column, not conflated with ToS acceptance."""
+    email = f"cb-consent-{uuid.uuid4().hex[:8]}@example.kz"
+    payload = _mk_signup_payload(email=email)
+    payload["cross_border_consent_given"] = True
+    payload["cross_border_consent_version"] = "KZ-ПДн-2026-v1"
+    r = await client.post("/auth/signup", json=payload)
+    assert r.status_code == 200
+    tenant_id = r.json()["tenant_id"]
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT cross_border_consent_given, cross_border_consent_version
+            FROM tos_acceptances WHERE tenant_id = $1::uuid ORDER BY accepted_at DESC LIMIT 1
+            """,
+            tenant_id,
+        )
+    assert row is not None
+    assert row["cross_border_consent_given"] is True
+    assert row["cross_border_consent_version"] == "KZ-ПДн-2026-v1"
+
+
+@pytest.mark.asyncio
+async def test_signup_cross_border_defaults_to_false(client, pool):
+    """When cross_border_consent_given is omitted, row defaults to FALSE — no
+    consent is inferred from ToS acceptance alone."""
+    email = f"cb-default-{uuid.uuid4().hex[:8]}@example.kz"
+    r = await client.post("/auth/signup", json=_mk_signup_payload(email=email))
+    assert r.status_code == 200
+    tenant_id = r.json()["tenant_id"]
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT cross_border_consent_given FROM tos_acceptances WHERE tenant_id = $1::uuid",
+            tenant_id,
+        )
+    assert row is not None
+    assert row["cross_border_consent_given"] is False
+
+
+@pytest.mark.asyncio
 async def test_admin_extend_logs_audit_entry(client, admin_headers, pool):
     payload = _mk_signup_payload()
     r = await client.post("/auth/signup", json=payload)

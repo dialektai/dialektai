@@ -316,7 +316,11 @@
           });
           const body = await r.json();
           if (!r.ok) {
-            alertSlot.innerHTML = `<div class="alert err">${body.detail || ('Error ' + r.status)}</div>`;
+            const _detail = body.detail;
+            const _detailMsg = Array.isArray(_detail)
+              ? _detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+              : (_detail || ('Error ' + r.status));
+            alertSlot.innerHTML = `<div class="alert err">${_detailMsg}</div>`;
             submitBtn.disabled = false;
             submitBtn.textContent = submitDefault();
             return;
