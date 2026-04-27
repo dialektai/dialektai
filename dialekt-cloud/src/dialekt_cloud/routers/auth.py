@@ -86,6 +86,11 @@ class SignupRequest(BaseModel):
     # server version is allowed (user genuinely saw their cached version).
     tos_version: str | None = Field(default=None, max_length=64)
     privacy_version: str | None = Field(default=None, max_length=64)
+    # KZ Law on Personal Data §16: cross-border transfer requires separate
+    # explicit consent when data leaves Kazakhstan. Users outside KZ receive
+    # the same field for parity; server records whatever the client sends.
+    cross_border_consent_given: bool = Field(default=False)
+    cross_border_consent_version: str | None = Field(default=None, max_length=64)
     # Email locale chosen by the client. None = let the server default it
     # from country (KZ/RU → ru, else en) so the welcome email lands in the
     # language the signup form was rendered in.
@@ -293,10 +298,12 @@ async def _record_tos_acceptance(
     await conn.execute(
         """
         INSERT INTO tos_acceptances(
-            tenant_id, email, tos_version, privacy_version, ip, user_agent, source
-        ) VALUES($1,$2,$3,$4,$5,$6,$7)
+            tenant_id, email, tos_version, privacy_version, ip, user_agent, source,
+            cross_border_consent_given, cross_border_consent_version
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
         """,
         tenant_id, email, claimed_tos, claimed_privacy, ip, user_agent, source,
+        body.cross_border_consent_given, body.cross_border_consent_version,
     )
 
 

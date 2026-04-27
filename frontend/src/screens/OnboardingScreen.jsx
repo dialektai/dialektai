@@ -444,7 +444,7 @@ export default function OnboardingScreen({ onNav }) {
       Promise.allSettled([
         fetch(`${API}/llm/catalog`).then(r => r.json()),
         fetch(`${API}/llm/providers`).then(r => r.json()),
-        fetch('http://127.0.0.1:11434/api/tags').then(r => r.ok ? r.json() : { models: [] }),
+        fetch(`${API}/ollama/tags`).then(r => r.ok ? r.json() : { models: [] }),
         fetch(`${API}/system`).then(r => r.ok ? r.json() : null),
       ]).then(([cat, prov, tags, sys]) => {
         if (cancelled) return;

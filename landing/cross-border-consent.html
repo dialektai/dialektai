@@ -555,6 +555,14 @@
 </ul>
 <hr />
 <h2>F. AUDIT TRAIL — журналирование согласий</h2>
+<p><strong>Примечание об имплементации (v0.27):</strong> В production-реализации
+cross-border согласие хранится не в отдельной таблице <code>consent_log</code>, а в
+таблице <code>tos_acceptances</code> через два отдельных поля:
+<code>cross_border_consent_given BOOLEAN</code> и
+<code>cross_border_consent_version TEXT</code>.
+Схема ниже — эталонный дизайн для будущего полноценного журнала согласий
+(M3); она не противоречит текущей реализации, а расширяет её.
+</p>
 <h3>F.1 Схема таблицы <code>consent_log</code> (PostgreSQL)</h3>
 <pre><code class="language-sql">CREATE TABLE consent_log (
     id BIGSERIAL PRIMARY KEY,

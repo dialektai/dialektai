@@ -67,35 +67,67 @@ _FALLBACK_FILE = _CONFIG_DIR / "secrets.enc"
 
 # ── Backend probing ───────────────────────────────────────────────────────────
 
+# Process-level cache: probe once per process lifetime.
+# Without this, every get_secret() call re-probes the keychain (3 round-trips
+# each), causing 30+ × 3 = 90+ D-Bus ops during startup that block the async
+# lifespan for several seconds — and on macOS/Windows the probe can show a
+# system auth dialog that hangs the sidecar subprocess indefinitely.
+_keyring_cache: tuple[bool, str] | None = None
+
+
 def _keyring_available() -> tuple[bool, str]:
     """Probe whether a real keyring backend is usable.
 
     Returns (ok, backend_name). `ok=False` means we must fall back to the
     encrypted file (or plaintext, if the user disables encryption).
+
+    Result is cached for the process lifetime — call once, pay once.
+    The probe runs in a daemon thread with a 3-second timeout so a locked
+    or missing keychain daemon (D-Bus on Linux, Keychain on macOS, Credential
+    Manager on Windows) can never block the FastAPI startup path.
     """
-    try:
-        import keyring
-        from keyring.backends.fail import Keyring as FailKeyring
-        kr = keyring.get_keyring()
-        if isinstance(kr, FailKeyring):
-            return False, "fail"
-        name = type(kr).__module__.split(".")[-1] + "." + type(kr).__name__
-        # Chainer wraps real backends — drill down for the first working one
-        if hasattr(kr, "backends"):
-            for inner in kr.backends:
-                if not isinstance(inner, FailKeyring):
-                    name = type(inner).__module__.split(".")[-1] + "." + type(inner).__name__
-                    break
-        # Round-trip test on a throwaway key — catches the common
-        # "D-Bus secret service daemon not running" case at runtime
-        probe_key = "__probe__"
-        keyring.set_password(_SERVICE, probe_key, "ok")
-        assert keyring.get_password(_SERVICE, probe_key) == "ok"
-        keyring.delete_password(_SERVICE, probe_key)
-        return True, name
-    except Exception as e:  # keyring unavailable OR backend broken at runtime
-        log.warning("keyring backend not usable: %s", e)
-        return False, f"error: {e}"
+    import threading
+
+    global _keyring_cache
+    if _keyring_cache is not None:
+        return _keyring_cache
+
+    result: list = [False, "timeout"]
+
+    def _probe() -> None:
+        try:
+            import keyring
+            from keyring.backends.fail import Keyring as FailKeyring
+            kr = keyring.get_keyring()
+            if isinstance(kr, FailKeyring):
+                result[0], result[1] = False, "fail"
+                return
+            name = type(kr).__module__.split(".")[-1] + "." + type(kr).__name__
+            # Chainer wraps real backends — drill down for the first working one
+            if hasattr(kr, "backends"):
+                for inner in kr.backends:
+                    if not isinstance(inner, FailKeyring):
+                        name = type(inner).__module__.split(".")[-1] + "." + type(inner).__name__
+                        break
+            # Round-trip test on a throwaway key — catches the common
+            # "D-Bus secret service daemon not running" case at runtime
+            probe_key = "__probe__"
+            keyring.set_password(_SERVICE, probe_key, "ok")
+            assert keyring.get_password(_SERVICE, probe_key) == "ok"
+            keyring.delete_password(_SERVICE, probe_key)
+            result[0], result[1] = True, name
+        except Exception as e:
+            log.warning("keyring backend not usable: %s", e)
+            result[0], result[1] = False, f"error: {e}"
+
+    t = threading.Thread(target=_probe, daemon=True)
+    t.start()
+    t.join(timeout=3.0)
+    if t.is_alive():
+        log.warning("keyring probe timed out after 3s — falling back to encrypted file")
+
+    _keyring_cache = (result[0], result[1])
+    return _keyring_cache
 
 
 # ── File fallback (XOR-with-scrypt encrypted) ─────────────────────────────────
