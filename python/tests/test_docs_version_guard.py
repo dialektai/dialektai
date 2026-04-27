@@ -44,11 +44,20 @@ def _doc_version() -> str | None:
     return m.group(1) if m else None
 
 
-def test_what_dialekt_does_today_version_matches_latest_tag():
-    """WHAT_DIALEKT_DOES_TODAY.md **Version:** must match the latest git tag.
+def _major_minor(v: str) -> tuple[int, int] | None:
+    """Extract (major, minor) from a 'vX.Y.Z' string, ignoring patch."""
+    m = re.match(r"^v(\d+)\.(\d+)\.\d+$", v)
+    return (int(m.group(1)), int(m.group(2))) if m else None
 
-    If this fails: update docs/WHAT_DIALEKT_DOES_TODAY.md to reflect the
-    new release before merging.
+
+def test_what_dialekt_does_today_version_matches_latest_tag():
+    """WHAT_DIALEKT_DOES_TODAY.md **Version:** major.minor must match the
+    latest git tag's major.minor. Patch differences are tolerated — patch
+    releases are typically bug fixes that don't change pilot-facing behavior,
+    so the doc may legitimately lag by one patch without misinforming pilots.
+
+    If this fails: bump the **Version:** line in
+    docs/WHAT_DIALEKT_DOES_TODAY.md to the current minor release.
     """
     latest_tag = _latest_git_tag()
     doc_version = _doc_version()
@@ -61,10 +70,16 @@ def test_what_dialekt_does_today_version_matches_latest_tag():
         "The file must contain a line like: **Version:** v0.27.0"
     )
 
-    assert doc_version == latest_tag, (
+    tag_mm = _major_minor(latest_tag)
+    doc_mm = _major_minor(doc_version)
+    assert tag_mm is not None, f"Latest tag {latest_tag!r} is not in vX.Y.Z form"
+    assert doc_mm is not None, f"Doc version {doc_version!r} is not in vX.Y.Z form"
+
+    assert doc_mm == tag_mm, (
         f"WHAT_DIALEKT_DOES_TODAY.md says Version={doc_version!r} "
-        f"but the latest git tag is {latest_tag!r}. "
-        "Update the **Version:** line in that doc before merging."
+        f"(major.minor={doc_mm}) but the latest git tag is {latest_tag!r} "
+        f"(major.minor={tag_mm}). Bump the **Version:** line to the current "
+        "minor release."
     )
 
 
