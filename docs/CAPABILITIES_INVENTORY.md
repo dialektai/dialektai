@@ -81,8 +81,8 @@ Source: `dialekt_manifest.schema.AgentManifest` (`venv/…/dialekt_manifest/sche
 | `capabilities.groups` | Declared access intentions | ❌ Metadata only (see §2) |
 | `autonomy.recommended` / `.max_allowed` | Default + ceiling for the confirmation slider | ⚠️ Global autonomy is what actually runs; max_allowed is not currently enforced to cap the slider |
 | `input.type` | chat / form / none | Only `chat` path exists in UI |
-| `output` (format, streaming, destination) | Result format | `streaming` ✅. `destination.type` — only `notification` is live; `filesystem / webhook / email_or_telegram` schema-valid but not wired. |
-| `trigger.type` | `interactive` or `scheduled` | `interactive` ✅. `scheduled` (cron + timezone + missed_run_policy) is **schema-valid but there is no scheduler process**. |
+| `output` (format, streaming, destination) | Result format | `streaming` ✅. `destination.type: notification` ✅. `destination.type: email_or_telegram` ⚠️ Telegram delivery ✅ v0.27; email (SMTP) ❌ v0.28; `filesystem / webhook` not wired. |
+| `trigger.type` | `interactive` or `scheduled` | `interactive` ✅. `scheduled` ✅ **ships v0.27** — APScheduler runtime in `dialekt.scheduler.runner`, 21/21 tests passing. |
 
 ### Optional
 
@@ -108,13 +108,15 @@ Source: `dialekt_manifest.schema.AgentManifest` (`venv/…/dialekt_manifest/sche
 | Few-shot memory (per agent, per question-type) | ✅ | `~/.dialekt/few_shots.db`, nomic-embed lookup at chat time. `save_interaction` on turn end, `get_few_shots(k=3)` on turn start. |
 | History summarisation when context overflows | ✅ | `TOKEN_BUDGET = 6000`; old turns get compressed to ≤1500 chars. |
 | File upload to chat | ✅ | `/upload` endpoint exists; file contents become part of the context. |
-| Screenshot input | ⚠️ UNVERIFIED | OI can ingest images if the model is vision-capable. None of the locally-installed Ollama models (`qwen2.5-coder:7b, gemma3-12b, gemma2:2b`) are vision-enabled today. |
+| Screenshot input | ⚠️ CODE READY | `describe_image_vision()` probes Ollama for llava/moondream/qwen2-vl. Install via `ollama pull llava` on the operator's machine to activate. Degrades gracefully if no vision model is found. |
 | License revocation refresh | ✅ | Background poller; desktop config flips to `revoked` when the cloud suspends the tenant. |
-| **Scheduled (cron) agents** | ❌ NOT IMPLEMENTED | No `APScheduler / croniter` runner in `server.py`. Manifest accepts the config but nothing runs it. |
-| **Webhook-triggered agents** | ❌ NOT IN SCHEMA | `Trigger` is a `Union[InteractiveTrigger, ScheduledTrigger]`. Webhook isn't a schema variant. |
+| **Scheduled (cron) agents** | ✅ SHIPS v0.27 | APScheduler runtime in `dialekt.scheduler` (21/21 tests). Telegram delivery wired. Email delivery → v0.28. |
+| **Webhook-triggered agents** | ❌ NOT IN SCHEMA | `Trigger` is a `Union[InteractiveTrigger, ScheduledTrigger]`. Webhook isn't a schema variant. Roadmap M3 (Q4 2026). |
 | **Multi-agent (A calls B)** | ❌ NOT SUPPORTED | No code path for agent-to-agent invocation. Each WS session binds one agent. |
 | **Context menu actions on messages** — Regenerate / Delete / Branch / Make concise / Explain step-by-step | ❌ STUBS | From earlier E2E report: `ChatColumn.jsx:456-466` all have `action: onClose`. Only Copy / Copy-as-markdown / Save-to-file actually do something. |
-| **Destination: filesystem / webhook / email_or_telegram** | ❌ NOT WIRED | Schema-valid; no runtime delivery. |
+| **Destination: email_or_telegram (Telegram)** | ✅ SHIPS v0.27 | `dialekt.scheduler.delivery` — Telegram bot delivery wired (chunks at 4000 chars). Requires `telegram_chat_id` + `telegram_bot_token` in OS keychain. |
+| **Destination: email_or_telegram (Email / SMTP)** | ❌ NOT WIRED | Deferred to v0.28. The `delivery.py` docstring documents this explicitly. |
+| **Destination: filesystem / webhook** | ❌ NOT WIRED | Schema-valid; no runtime delivery. `webhook` is also not in schema (M3). |
 | **Input type: form / none** | ❌ NOT IN UI | Schema-valid; only `chat` input renders. |
 
 ---
@@ -162,15 +164,17 @@ Plausible but need testing before you promise a pilot:
 
 (Ordered roughly by "how often will this bite you")
 
-1. **Scheduled / cron agents** — nothing runs them. If a pilot asks "daily KPI digest at 9am", you need to build this first.
-2. **Webhook triggers** — not in schema, not wired. "Run this agent when Stripe fires a webhook" → not today.
-3. **Capabilities checkboxes as a security story** — they are metadata, not a sandbox. Do **not** tell a pilot "you can safely let it access FS because Filesystem is checked off in the agent". The actual gate is autonomy level + global Settings → Permissions (which are per-install, not per-agent).
-4. **Variables beyond `connection_id`** — if your manifest declares `variables: {region: {type: string, required: true}}`, nothing in the UI will ask the user for `region` and `{{region}}` will be left literal in the prompt.
-5. **Destination: email / webhook / filesystem** — `output.destination.type` only supports `notification` (= shows in the chat) at runtime.
-6. **Multi-agent workflows** — "SQL Analyst queries data, then Summariser writes a report" = not possible without code.
-7. **MCP-server and http-api connection types** — schema accepts them, no router serves them.
-8. **Context-menu "Regenerate" / "Make concise" / "Branch conversation" / "Delete message"** — all stubs.
-9. **Retry loop on direct API calls** — has the recursive-validate bug. Fine as long as agents go through DialektSQL (which disables retry). Direct callers will spin.
+1. **Scheduled / cron agents** — ✅ SHIPS v0.27 — APScheduler runtime + Telegram delivery. If a pilot asks "daily KPI digest at 9am via Telegram" → configure cron manifest + Telegram bot token. Email delivery is v0.28.
+2. **Web search (Tavily / Brave / DDG)** — ✅ SHIPS v0.27 — configure in Settings → Web Search. Needs an API key (Tavily free tier sufficient for pilots).
+3. **Webhook triggers** — not in schema, not wired. "Run this agent when Stripe fires a webhook" → not today. M3 (Q4 2026).
+4. **Capabilities checkboxes as a security story** — they are metadata, not a sandbox. Do **not** tell a pilot "you can safely let it access FS because Filesystem is checked off in the agent". The actual gate is autonomy level + global Settings → Permissions (which are per-install, not per-agent).
+5. **Variables beyond `connection_id`** — if your manifest declares `variables: {region: {type: string, required: true}}`, nothing in the UI will ask the user for `region` and `{{region}}` will be left literal in the prompt.
+6. **Destination: email / webhook / filesystem** — only `notification` (chat) and `email_or_telegram` Telegram path are live. Email and filesystem destinations not wired.
+7. **Multi-agent workflows** — "SQL Analyst queries data, then Summariser writes a report" = not possible without code.
+8. **MCP-server and http-api connection types** — schema accepts them, no router serves them.
+9. **Context-menu "Regenerate" / "Make concise" / "Branch conversation" / "Delete message"** — all stubs.
+10. **Retry loop on direct API calls** — has the recursive-validate bug. Fine as long as agents go through DialektSQL (which disables retry). Direct callers will spin.
+11. **model.parameters (temperature / max_tokens) in manifest** — advisory only; global Settings → Model overrides them. `make_interpreter` now logs a warning when this happens (v0.27).
 10. **Vision input** — OI supports it but no vision-capable model is currently installed in Ollama.
 
 ---
