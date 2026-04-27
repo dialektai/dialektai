@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .config import settings, assert_production_ready
 from .db import close_pool, get_pool, migrate
-from .routers import admin, admin_ui, agents, auth, health
+from .routers import admin, admin_ui, agents, auth, health, public
 from .services.email import EmailService
 from .services.scheduler import run_lifecycle_scheduler
 
@@ -101,6 +101,7 @@ app.include_router(auth.router)
 app.include_router(agents.router)
 app.include_router(admin.router)
 app.include_router(admin_ui.router)
+app.include_router(public.router)
 
 
 # ── Root landing page ────────────────────────────────────────────────────────
