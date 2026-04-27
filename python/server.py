@@ -4031,6 +4031,61 @@ async def comfy_txt2vid(body: dict):
         return {"ok": False, "error": str(e)}
 
 
+# ── Visual templates (HTML → PNG) ────────────────────────────────────────────
+
+@app.get("/visual/templates")
+async def visual_templates():
+    """List all HTML templates discovered under ~/.dialekt/visual/templates/."""
+    from dialekt.tools.visual import list_templates
+    return {
+        "ok": True,
+        "templates": [
+            {
+                "id": t.id,
+                "set": t.set_name,
+                "name": t.name,
+                "description": t.description,
+                "width": t.width,
+                "height": t.height,
+                "variables": t.variables,
+            }
+            for t in list_templates()
+        ],
+    }
+
+
+@app.post("/visual/render")
+async def visual_render(body: dict):
+    """Render an HTML template to PNG.
+
+    Body: ``{"template_id": "default.announcement_1x1", "fields": {...}}``.
+    Returns ``{ok, file, files, size_bytes, ms, template_id, width, height}``.
+    """
+    from dialekt.tools.visual import render
+    from dialekt.tools.visual.template_registry import (
+        TemplateNotFoundError,
+        TemplateValidationError,
+    )
+
+    template_id = body.get("template_id")
+    fields = body.get("fields", {}) or {}
+    if not template_id:
+        return {"ok": False, "error": "template_id is required"}
+    if not isinstance(fields, dict):
+        return {"ok": False, "error": "fields must be an object"}
+
+    try:
+        # Playwright sync API blocks the event loop — push to a worker thread.
+        return await asyncio.to_thread(render, template_id, fields)
+    except TemplateNotFoundError:
+        return {"ok": False, "error": f"unknown template_id: {template_id}"}
+    except TemplateValidationError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        log.exception("visual render failed")
+        return {"ok": False, "error": str(e)}
+
+
 # ── File / image context injection ───────────────────────────────────────────
 
 async def describe_image_vision(path: str) -> str:
