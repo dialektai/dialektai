@@ -221,6 +221,29 @@
 
       <article class="release">
         <div class="release-head">
+          <span class="release-version">v0.27<span class="major">.1</span></span>
+          <span class="release-date">27 APR 2026</span>
+          <span class="release-tag patch">PATCH</span>
+        </div>
+        <p class="release-summary">Released 27 APR 2026. See <a href="https://github.com/dialektai/dialektai/releases/tag/v0.27.1" style="color:var(--cyan)">GitHub Release</a> for binaries.</p>
+        <h3>Added</h3>
+        <ul>
+          <li>track cross-border data-transfer consent in tos_acceptances</li>
+          <li>auto-update landing/changelog.html from release pipeline</li>
+        </ul>
+        <h3>Changed</h3>
+        <ul>
+          <li>ignore stray .md files (keep README.md only)</li>
+        </ul>
+        <h3>Fixed</h3>
+        <ul>
+          <li>keyring deadlock, CORS Ollama detection, brand cleanup</li>
+          <li>move cross-border consent ALTER after tos_acceptances CREATE</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
           <span class="release-version">v0.27<span class="major">.0</span></span>
           <span class="release-date">27 APR 2026</span>
           <span class="release-tag major">MAJOR</span>
