@@ -128,6 +128,15 @@ function AppRoutes() {
     setScreenProps(props);
   };
 
+  // Auto-start Ollama on every launch if installed but not yet running.
+  // BackendBootGate already confirmed the sidecar is up, so this is safe.
+  useEffect(() => {
+    fetch(`${API}/ollama/check`)
+      .then(r => r.json())
+      .then(d => { if (d.installed && !d.running) fetch(`${API}/ollama/start`, { method: 'POST' }).catch(() => {}); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // First-launch detection: run the onboarding flow if not completed
   useEffect(() => {
     (async () => {

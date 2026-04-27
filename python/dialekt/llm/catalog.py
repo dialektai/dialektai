@@ -44,12 +44,6 @@ class OllamaModel:
 
 
 OLLAMA_MODELS: tuple[OllamaModel, ...] = (
-    OllamaModel("gpt-oss",     "120b",                "OpenAI · via Ollama",
-                "OpenAI's open-weights frontier model. Reasoning + agentic tools.",
-                65.0, 96, "128k", ("frontier", "reasoning")),
-    OllamaModel("gpt-oss",     "20b",                 "OpenAI · via Ollama",
-                "OpenAI's smaller open-weights model. Strong reasoning under 20B.",
-                14.0, 24, "128k", ("reasoning", "general")),
     OllamaModel("deepseek-v3", "671b-q4_K_M",         "DeepSeek · via Ollama",
                 "Frontier-tier MoE. Exceeds typical desktop memory.",
                 404.0, 512, "160k", ("frontier", "reasoning")),

@@ -428,6 +428,7 @@ export default function OnboardingScreen({ onNav }) {
   const [selectedProviderModel, setSelectedProviderModel] = useState(null);
   const [credModalProvider, setCredModalProvider] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
 
   // ── Fetch catalog + system state on mount ────────────────────────────────
   // BackendBootGate already waited for /health, but the catalog endpoint can
@@ -449,12 +450,14 @@ export default function OnboardingScreen({ onNav }) {
       ]).then(([cat, prov, tags, sys]) => {
         if (cancelled) return;
         const catOk = cat.status === 'fulfilled' && (cat.value?.ollama?.length > 0 || cat.value?.providers?.length > 0);
-        if (catOk) setCatalog(cat.value);
+        if (catOk) { setCatalog(cat.value); setCatalogLoaded(true); }
         if (prov.status === 'fulfilled') setProvidersStatus(prov.value?.providers || []);
         if (tags.status === 'fulfilled') setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
         if (sys.status === 'fulfilled' && sys.value && typeof sys.value.ram_total_gb === 'number') {
           setRamTotalGB(sys.value.ram_total_gb);
         }
+        // Mark catalog loaded even if empty on final attempt
+        if (!catOk && attempts >= 20) setCatalogLoaded(true);
         // Re-poll until catalog populated, capped at 20 attempts (~30s wall).
         if (!catOk && attempts < 20) timer = setTimeout(tick, 1500);
       });
@@ -638,6 +641,7 @@ export default function OnboardingScreen({ onNav }) {
             ) : (
               <CloudTab
                 providers={catalog.providers || []}
+                catalogLoaded={catalogLoaded}
                 providersStatus={providersStatus}
                 selectedProvider={selectedProvider}
                 onSelectProvider={setSelectedProvider}
@@ -747,7 +751,7 @@ function LocalTab({ sorted, ramTotalGB, selected, onSelect, search, setSearch, c
   );
 }
 
-function CloudTab({ providers, providersStatus, selectedProvider, onSelectProvider, selectedProviderModel, onSelectModel, onOpenCredentials }) {
+function CloudTab({ providers, catalogLoaded, providersStatus, selectedProvider, onSelectProvider, selectedProviderModel, onSelectModel, onOpenCredentials }) {
   const statusMap = useMemo(() => {
     const m = new Map();
     for (const s of providersStatus) m.set(s.id, s.configured);
@@ -757,7 +761,9 @@ function CloudTab({ providers, providersStatus, selectedProvider, onSelectProvid
   if (providers.length === 0) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: T.dim, fontSize: 13 }}>
-        Cloud providers unavailable.
+        {catalogLoaded
+          ? 'Cloud providers unavailable.'
+          : <span className="mono" style={{ letterSpacing: '.1em' }}>LOADING PROVIDERS…</span>}
       </div>
     );
   }
