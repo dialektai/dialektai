@@ -5,14 +5,15 @@ re-deploy, the cloud does an idempotent upsert into `library_entries`
 on startup. v2 will move authoring to a founder admin UI but that's
 deferred until manual curation hits a real bottleneck (mentor call).
 
-Each template's category + tags are declared here (curation surface);
-the manifest YAML is the agent's behavior. requires_connection and
-requires_mcp are computed from the manifest at seed time so the catalog
-listing endpoint can filter without parsing every YAML at request time.
+Each template's manifest is the single source of truth for the agent's
+behavior; category + tags here are the curation surface for the
+catalog. requires_connection / requires_mcp are derived from the
+manifest at seed time so the listing endpoint can filter without
+parsing every YAML.
 
 NO `pilot_source` / `installed_count` / `verified` / `complexity` /
-`setup_time_minutes` fields exist — see the architectural review for
-why each was rejected for v1. NO client / pilot identifiers in agent
+`setup_time_minutes` columns — see the architectural review for why
+each was rejected for v1. NO client / pilot identifiers in agent
 names or descriptions (information leak risk).
 """
 from __future__ import annotations
@@ -38,78 +39,290 @@ class LibraryTemplate:
 
 
 def _yaml(s: str) -> str:
-    """Trim leading newline + dedent, so manifests can be authored as
-    triple-quoted Python strings without leading-space contamination."""
     return textwrap.dedent(s).lstrip("\n")
 
 
-_SQL_BASE_PROMPT = """\
-You are a read-only {dialect} SQL assistant.
-Connection ID: {{{{connection_id}}}}
-Respond in the same language as the user (Russian, English, or Kazakh).
+# Each manifest below conforms to the dialekt-manifest spec_version 1.1.0.
+# Required fields enumerated from the validator: metadata
+# (id UUIDv4 / created_at / updated_at), model.requirements
+# (min_ram_gb / min_vram_gb / recommended_ram_gb), model.parameters
+# (temperature / top_p / max_tokens), capabilities, autonomy, input,
+# output, trigger.
+#
+# UUIDs below were generated once with `uuid.uuid4()` and pinned —
+# stable IDs let an installed agent know it shares lineage with the
+# library entry even after rename.
 
-CORE RULES:
-1. NEVER execute destructive SQL. Only SELECT / SHOW / EXPLAIN are allowed.
-2. ALWAYS show the SQL query to the user BEFORE executing it. Wait for confirmation
-   on the first query of a session.
-3. For ambiguous requests, ask a clarifying question instead of guessing.
-4. Format results as markdown tables with human-readable numbers (thousands separator).
-5. If a query may return >10k rows, add LIMIT and warn the user.
-6. For aggregation questions, prefer a single SQL with GROUP BY over multiple
-   round-trips. The user pays per-second, not per-query.
-
-DATABASE TOOLS — call via Python httpx (auto-injected base URL):
-- POST /db/query  body: {{{{"connection_id": "...", "sql": "..."}}}}
-"""
+_TS = "2026-04-27T00:00:00+00:00"
 
 
-_SQL_TEMPLATE = """\
-spec_version: "1.0.1"
-minimum_dialekt_version: "1.0.0"
-metadata:
-  id: "__REPLACE__"
-  name: "{name}"
-  description: "{description}"
-  version: "1.0.0"
-  language: multi
-  author:
-    name: "dias.now"
-    email: "hello@dias.now"
-model:
-  preferred: "qwen2.5-coder:7b"
-  acceptable:
-    - "qwen2.5-coder:14b"
-    - "gemma3:12b"
-    - "mistral:7b"
-  min_context_window: 16384
-  requirements:
-    min_ram_gb: 8
-    recommended_ram_gb: 16
-  parameters:
-    temperature: 0.1
-    top_p: 0.95
-    max_tokens: 4096
-system_prompt: |
-  {prompt_indented}
-connections:
-  - id: "{{{{connection_id}}}}"
-    type: "{conn_type}"
-    required: true
-capabilities:
-  groups:
-    - sql_read
-"""
+def _sql_manifest(*, uid: str, name: str, dialect: str, conn_type: str,
+                  desc_extra: str = "") -> str:
+    return _yaml(f"""
+        spec_version: "1.1.0"
+        minimum_dialekt_version: "1.0.0"
+        metadata:
+          id: "{uid}"
+          name: "{name}"
+          description: "Read-only {dialect} SQL assistant. Shows queries before executing.{(' ' + desc_extra) if desc_extra else ''}"
+          version: "1.0.0"
+          language: multi
+          author:
+            name: "dias.now"
+            email: "hello@dias.now"
+          created_at: "{_TS}"
+          updated_at: "{_TS}"
+        model:
+          preferred: "qwen2.5-coder:7b"
+          acceptable: ["qwen2.5-coder:14b", "gemma3:12b", "mistral:7b"]
+          min_context_window: 16384
+          requirements:
+            min_ram_gb: 8
+            min_vram_gb: 4
+            recommended_ram_gb: 16
+          parameters:
+            temperature: 0.1
+            top_p: 0.95
+            max_tokens: 4096
+        system_prompt: |
+          You are a read-only {dialect} SQL assistant.
+          Connection ID: {{{{connection_id}}}}
+          Respond in the same language as the user (Russian or English).
+          NEVER execute destructive SQL. ALWAYS show the query before executing.
+          Format results as markdown tables. Add LIMIT for queries that may
+          return >10k rows. Ask a clarifying question instead of guessing.
+        variables:
+          connection_id:
+            type: string
+            required: true
+            description: "dialekt connection ID for the {dialect} database"
+        capabilities:
+          groups:
+            - database_read
+            - network
+          exceptions: []
+        connections:
+          required:
+            - type: {conn_type}
+              role: "readonly"
+              required_permissions: [SELECT]
+        autonomy:
+          recommended: "ask-before-write"
+          max_allowed: "ask-before-write"
+        input:
+          type: "chat"
+          placeholder: "Спросите о данных / Ask about your data..."
+        output:
+          format: "table"
+          streaming: true
+          destination:
+            type: "notification"
+        trigger:
+          type: "interactive"
+    """)
 
 
-def _make_sql(slug: str, dialect: str, conn_type: str) -> str:
-    name = f"SQL Analyst ({dialect})"
-    description = f"Read-only {dialect} SQL assistant. Shows queries before executing. Multilingual."
-    prompt = _SQL_BASE_PROMPT.format(dialect=dialect)
-    prompt_indented = "\n  ".join(prompt.splitlines())
-    return _SQL_TEMPLATE.format(
-        name=name, description=description,
-        prompt_indented=prompt_indented, conn_type=conn_type,
-    )
+_PYTHON_REVIEWER = _yaml("""
+    spec_version: "1.1.0"
+    minimum_dialekt_version: "1.0.0"
+    metadata:
+      id: "5b7a2c1e-9d3f-4a52-b811-77a8e9f1b223"
+      name: "Python Code Reviewer"
+      description: "Reviews Python code for bugs, style, and idiomatic patterns. Read-only — never edits files."
+      version: "1.0.0"
+      language: multi
+      author:
+        name: "dias.now"
+        email: "hello@dias.now"
+      created_at: "2026-04-27T00:00:00+00:00"
+      updated_at: "2026-04-27T00:00:00+00:00"
+    model:
+      preferred: "qwen2.5-coder:7b"
+      acceptable: ["qwen2.5-coder:14b", "gemma3:12b"]
+      min_context_window: 16384
+      requirements:
+        min_ram_gb: 8
+        min_vram_gb: 4
+        recommended_ram_gb: 16
+      parameters:
+        temperature: 0.2
+        top_p: 0.95
+        max_tokens: 4096
+    system_prompt: |
+      You are a senior Python code reviewer.
+      Respond in the same language as the user (Russian or English).
+      Identify bugs first, then style/idiom issues. Suggest concrete refactors
+      with rewritten snippets. Read files via the filesystem tool — never edit.
+    capabilities:
+      groups:
+        - filesystem_read
+      exceptions: []
+    autonomy:
+      recommended: "review-only"
+      max_allowed: "ask-before-write"
+    input:
+      type: "chat"
+      placeholder: "Paste code or ask about a file..."
+    output:
+      format: "markdown"
+      streaming: true
+      destination:
+        type: "notification"
+    trigger:
+      type: "interactive"
+""")
+
+
+_BASH_HELPER = _yaml("""
+    spec_version: "1.1.0"
+    minimum_dialekt_version: "1.0.0"
+    metadata:
+      id: "3c1d4f02-86b5-4e6a-9c51-12d4892ab7f8"
+      name: "Bash Helper"
+      description: "Suggests safe shell commands. Review-only autonomy — every command shown before running."
+      version: "1.0.0"
+      language: multi
+      author:
+        name: "dias.now"
+        email: "hello@dias.now"
+      created_at: "2026-04-27T00:00:00+00:00"
+      updated_at: "2026-04-27T00:00:00+00:00"
+    model:
+      preferred: "qwen2.5-coder:7b"
+      acceptable: ["qwen2.5-coder:14b", "gemma3:12b"]
+      min_context_window: 8192
+      requirements:
+        min_ram_gb: 8
+        min_vram_gb: 4
+        recommended_ram_gb: 16
+      parameters:
+        temperature: 0.2
+        top_p: 0.95
+        max_tokens: 2048
+    system_prompt: |
+      You are a Bash / Linux command-line assistant.
+      ALWAYS show the command BEFORE running. Refuse destructive ops on first
+      try (rm -rf, dd, mkfs, force-push, drop database) — explain and confirm.
+      Prefer composed POSIX pipelines. Show dry-run flags when supported.
+    capabilities:
+      groups:
+        - shell_review_only
+      exceptions: []
+    autonomy:
+      recommended: "review-only"
+      max_allowed: "review-only"
+    input:
+      type: "chat"
+      placeholder: "Describe what you want to do..."
+    output:
+      format: "markdown"
+      streaming: true
+      destination:
+        type: "notification"
+    trigger:
+      type: "interactive"
+""")
+
+
+_DOC_SUMMARIZER = _yaml("""
+    spec_version: "1.1.0"
+    minimum_dialekt_version: "1.0.0"
+    metadata:
+      id: "8e29c44a-1b76-4310-a9d2-6f81c2ee4561"
+      name: "Document Summarizer"
+      description: "Three-bullet extractive summary of pasted text or local documents. No connections, no setup."
+      version: "1.0.0"
+      language: multi
+      author:
+        name: "dias.now"
+        email: "hello@dias.now"
+      created_at: "2026-04-27T00:00:00+00:00"
+      updated_at: "2026-04-27T00:00:00+00:00"
+    model:
+      preferred: "gemma3:12b"
+      acceptable: ["qwen2.5:7b", "mistral:7b"]
+      min_context_window: 16384
+      requirements:
+        min_ram_gb: 8
+        min_vram_gb: 4
+        recommended_ram_gb: 16
+      parameters:
+        temperature: 0.3
+        top_p: 0.95
+        max_tokens: 1024
+    system_prompt: |
+      You are a document summarizer.
+      Output exactly three bullets, one sentence each: main claim, strongest
+      support, most important caveat. Never preamble — start with "•".
+      Match the document's language.
+    capabilities:
+      groups:
+        - filesystem_read
+      exceptions: []
+    autonomy:
+      recommended: "review-only"
+      max_allowed: "ask-before-write"
+    input:
+      type: "chat"
+      placeholder: "Paste a document or ask to summarize a file..."
+    output:
+      format: "markdown"
+      streaming: true
+      destination:
+        type: "notification"
+    trigger:
+      type: "interactive"
+""")
+
+
+_TRANSLATOR_RU_EN = _yaml("""
+    spec_version: "1.1.0"
+    minimum_dialekt_version: "1.0.0"
+    metadata:
+      id: "a4f6b98d-2c11-4855-be0e-9c5071a3d6f7"
+      name: "RU/EN Translator"
+      description: "Bidirectional Russian ↔ English translation. Preserves formatting, technical terms, and tone."
+      version: "1.0.0"
+      language: multi
+      author:
+        name: "dias.now"
+        email: "hello@dias.now"
+      created_at: "2026-04-27T00:00:00+00:00"
+      updated_at: "2026-04-27T00:00:00+00:00"
+    model:
+      preferred: "gemma3:12b"
+      acceptable: ["qwen2.5:7b", "mistral:7b"]
+      min_context_window: 16384
+      requirements:
+        min_ram_gb: 8
+        min_vram_gb: 4
+        recommended_ram_gb: 16
+      parameters:
+        temperature: 0.2
+        top_p: 0.95
+        max_tokens: 4096
+    system_prompt: |
+      You are a Russian ↔ English translator.
+      Detect the source language and translate to the other. Preserve markdown
+      formatting; do not translate code inside fenced blocks; keep technical
+      terms (API, SDK, JSON) as-is. Output the translation only, no preamble.
+    capabilities:
+      groups: []
+      exceptions: []
+    autonomy:
+      recommended: "review-only"
+      max_allowed: "review-only"
+    input:
+      type: "chat"
+      placeholder: "Paste text to translate..."
+    output:
+      format: "markdown"
+      streaming: true
+      destination:
+        type: "notification"
+    trigger:
+      type: "interactive"
+""")
 
 
 LIBRARY_TEMPLATES: tuple[LibraryTemplate, ...] = (
@@ -117,205 +330,61 @@ LIBRARY_TEMPLATES: tuple[LibraryTemplate, ...] = (
         id="sql-analyst-postgres",
         category="data-analytics",
         tags=("sql", "postgresql", "analytics"),
-        manifest_yaml=_make_sql("sql-analyst-postgres", "PostgreSQL", "postgres"),
+        manifest_yaml=_sql_manifest(
+            uid="d7c1a201-3b54-4f12-9d8a-1112233445aa",
+            name="SQL Analyst (PostgreSQL)",
+            dialect="PostgreSQL", conn_type="postgres",
+        ),
     ),
     LibraryTemplate(
         id="sql-analyst-mysql",
         category="data-analytics",
         tags=("sql", "mysql", "analytics"),
-        manifest_yaml=_make_sql("sql-analyst-mysql", "MySQL", "mysql"),
+        manifest_yaml=_sql_manifest(
+            uid="d7c1a201-3b54-4f12-9d8a-1112233445bb",
+            name="SQL Analyst (MySQL)",
+            dialect="MySQL", conn_type="mysql",
+        ),
     ),
     LibraryTemplate(
         id="sql-analyst-clickhouse",
         category="data-analytics",
         tags=("sql", "clickhouse", "analytics", "events"),
-        manifest_yaml=_make_sql("sql-analyst-clickhouse", "ClickHouse", "clickhouse"),
+        manifest_yaml=_sql_manifest(
+            uid="d7c1a201-3b54-4f12-9d8a-1112233445cc",
+            name="SQL Analyst (ClickHouse)",
+            dialect="ClickHouse", conn_type="clickhouse",
+            desc_extra="Optimised for event-stream analytics.",
+        ),
     ),
     LibraryTemplate(
         id="python-code-reviewer",
         category="development",
         tags=("python", "code-review", "linting"),
-        manifest_yaml=_yaml("""
-            spec_version: "1.0.1"
-            minimum_dialekt_version: "1.0.0"
-            metadata:
-              id: "__REPLACE__"
-              name: "Python Code Reviewer"
-              description: "Reviews Python code for bugs, style, and idiomatic patterns. Read-only — never edits files."
-              version: "1.0.0"
-              language: multi
-              author:
-                name: "dias.now"
-                email: "hello@dias.now"
-            model:
-              preferred: "qwen2.5-coder:7b"
-              acceptable:
-                - "qwen2.5-coder:14b"
-                - "gemma3:12b"
-              min_context_window: 16384
-              requirements:
-                min_ram_gb: 8
-                recommended_ram_gb: 16
-              parameters:
-                temperature: 0.2
-                max_tokens: 4096
-            system_prompt: |
-              You are a senior Python code reviewer.
-              Respond in the same language as the user (Russian or English).
-
-              When the user shares code:
-              1. Identify bugs (runtime errors, off-by-one, race conditions, etc.) FIRST.
-              2. Then call out style / idiom issues (PEP 8, type hints, comprehensions vs loops).
-              3. Suggest concrete refactors, not vague advice. Show the rewritten snippet.
-              4. If you'd flag a concern but aren't certain, say "I'd double-check ..." rather than asserting.
-
-              You can READ files via the filesystem tool. You do NOT edit files —
-              if the user asks for a fix, output the corrected code in the chat for them to apply.
-            capabilities:
-              groups:
-                - filesystem_read
-        """),
+        manifest_yaml=_PYTHON_REVIEWER,
     ),
     LibraryTemplate(
         id="bash-helper",
         category="development",
         tags=("bash", "shell", "linux"),
-        manifest_yaml=_yaml("""
-            spec_version: "1.0.1"
-            minimum_dialekt_version: "1.0.0"
-            metadata:
-              id: "__REPLACE__"
-              name: "Bash Helper"
-              description: "Suggests safe shell commands. Review-only autonomy — every command is shown for confirmation before running."
-              version: "1.0.0"
-              language: multi
-              author:
-                name: "dias.now"
-                email: "hello@dias.now"
-            model:
-              preferred: "qwen2.5-coder:7b"
-              acceptable:
-                - "qwen2.5-coder:14b"
-                - "gemma3:12b"
-              min_context_window: 8192
-              requirements:
-                min_ram_gb: 8
-                recommended_ram_gb: 16
-              parameters:
-                temperature: 0.2
-                max_tokens: 2048
-            system_prompt: |
-              You are a Bash / Linux command-line assistant.
-              Respond in the same language as the user (Russian or English).
-
-              RULES:
-              1. ALWAYS show the command BEFORE running. The autonomy mode is review-only —
-                 the user must approve every shell call.
-              2. Refuse anything destructive on first try (rm -rf, dd to a device, mkfs,
-                 force-push, drop database). Explain what it does and ask if the user
-                 really means it.
-              3. Prefer composed pipelines using POSIX tools over scripts where possible.
-              4. When suggesting a command, also show how to dry-run / preview it
-                 (--dry-run, -n, etc.) when the tool supports it.
-            capabilities:
-              groups:
-                - shell_review_only
-        """),
+        manifest_yaml=_BASH_HELPER,
     ),
     LibraryTemplate(
         id="document-summarizer",
         category="documents",
         tags=("summary", "documents", "reading"),
-        manifest_yaml=_yaml("""
-            spec_version: "1.0.1"
-            minimum_dialekt_version: "1.0.0"
-            metadata:
-              id: "__REPLACE__"
-              name: "Document Summarizer"
-              description: "Three-bullet extractive summary of any pasted text or local document. No connections, no setup."
-              version: "1.0.0"
-              language: multi
-              author:
-                name: "dias.now"
-                email: "hello@dias.now"
-            model:
-              preferred: "gemma3:12b"
-              acceptable:
-                - "qwen2.5:7b"
-                - "mistral:7b"
-              min_context_window: 16384
-              requirements:
-                min_ram_gb: 8
-                recommended_ram_gb: 16
-              parameters:
-                temperature: 0.3
-                max_tokens: 1024
-            system_prompt: |
-              You are a document summarizer.
-              Respond in the same language as the document.
-
-              For any text the user pastes (or a file they share):
-              1. Output exactly three bullets, each one sentence.
-              2. The first bullet captures the main claim. The second bullet captures
-                 the strongest supporting point. The third bullet captures the most
-                 important caveat, limitation, or counter-argument.
-              3. NEVER add a preamble like "Here is the summary:" — start with "•".
-              4. If the document is shorter than 200 words, return one bullet only and
-                 say "Document too short for three-bullet structure".
-            capabilities:
-              groups:
-                - filesystem_read
-        """),
+        manifest_yaml=_DOC_SUMMARIZER,
     ),
     LibraryTemplate(
         id="translator-ru-en",
         category="documents",
         tags=("translation", "russian", "english"),
-        manifest_yaml=_yaml("""
-            spec_version: "1.0.1"
-            minimum_dialekt_version: "1.0.0"
-            metadata:
-              id: "__REPLACE__"
-              name: "RU/EN Translator"
-              description: "Bidirectional Russian ↔ English translation. Preserves formatting, technical terms, and tone."
-              version: "1.0.0"
-              language: multi
-              author:
-                name: "dias.now"
-                email: "hello@dias.now"
-            model:
-              preferred: "gemma3:12b"
-              acceptable:
-                - "qwen2.5:7b"
-                - "mistral:7b"
-              min_context_window: 16384
-              requirements:
-                min_ram_gb: 8
-                recommended_ram_gb: 16
-              parameters:
-                temperature: 0.2
-                max_tokens: 4096
-            system_prompt: |
-              You are a Russian ↔ English translator.
-
-              RULES:
-              1. Detect the source language. If it's Russian, translate to English. If it's
-                 English, translate to Russian. If the user explicitly asks for a direction,
-                 follow it.
-              2. Preserve markdown formatting (headings, lists, code blocks, links). Do NOT
-                 translate code content inside ``` blocks; do translate comments inside.
-              3. Keep technical terms (API, JSON, SDK, etc.) as-is unless the user has
-                 specified a glossary in this session.
-              4. Output the translation only — no preamble, no apologies. If the input is
-                 ambiguous, ask one clarifying question instead of guessing.
-        """),
+        manifest_yaml=_TRANSLATOR_RU_EN,
     ),
 )
 
 
 def compute_signature(manifest_yaml: str, secret: str) -> str:
-    """HMAC-SHA256 of the manifest, hex-encoded. Desktop verifies on
-    cache to detect tamper at rest."""
     return hmac.new(
         secret.encode("utf-8"),
         manifest_yaml.encode("utf-8"),
@@ -324,18 +393,15 @@ def compute_signature(manifest_yaml: str, secret: str) -> str:
 
 
 def _derive_flags(manifest_yaml: str) -> tuple[bool, bool]:
-    """Compute requires_connection / requires_mcp from the manifest."""
-    requires_connection = "connections:" in manifest_yaml and "required: true" in manifest_yaml
+    requires_connection = "connections:" in manifest_yaml and (
+        "required:" in manifest_yaml.split("connections:", 1)[1][:200]
+        if "connections:" in manifest_yaml else False
+    )
     requires_mcp = "mcp_tools" in manifest_yaml or "mcp_servers:" in manifest_yaml
     return requires_connection, requires_mcp
 
 
 async def seed_library_entries(pool) -> int:
-    """Idempotent upsert of LIBRARY_TEMPLATES into library_entries.
-    Returns the number of rows touched. Safe to call on every boot.
-
-    Signature uses DIALEKT_LIBRARY_HMAC_SECRET — when unset (e.g. dev),
-    the column is left NULL and desktop skips integrity verification."""
     secret = os.environ.get("DIALEKT_LIBRARY_HMAC_SECRET", "")
     touched = 0
     async with pool.acquire() as conn:
