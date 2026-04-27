@@ -542,6 +542,167 @@ function PermissionsSection() {
   );
 }
 
+// ── Section: Models — Inference location subcard ─────────────────────────────
+//
+// Cloud-Assisted tier: lets pilots without a GPU forward Ollama traffic to
+// the dialekt server's relay (gpu-relay.dias.now → RTX 3060 in Almaty KZ).
+// Persisted to ~/.dialekt/relay.toml via the desktop sidecar's
+// /relay/{config,test} endpoints. PluginContext consumes the same file at
+// startup (Commit 5) — the lifespan rebuilds the context whenever this
+// card POSTs an update so the change applies without a restart.
+
+function RelayLocationCard() {
+  const { addToast } = useContext(Ctx);
+  const [cfg, setCfg] = useState(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+  const [testing, setTesting] = useState(false);
+
+  const reload = useCallback(() => {
+    fetch(`${API}/relay/config`)
+      .then(r => r.json())
+      .then(d => { setCfg(d); setUrlInput(d.url); })
+      .catch(() => setCfg({
+        url: 'https://gpu-relay.dias.now',
+        enabled: false, api_key_set: false, api_key_preview: '',
+      }));
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const post = async (body, okMsg) => {
+    try {
+      const r = await fetch(`${API}/relay/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      setCfg(d);
+      setKeyInput('');
+      if (okMsg) addToast(okMsg, 'ok');
+    } catch (e) {
+      addToast(`Save failed: ${e.message}`, 'error');
+    }
+  };
+
+  const setEnabled = (enabled) =>
+    post(
+      { enabled, url: urlInput, api_key: keyInput },
+      enabled ? 'Cloud GPU enabled' : 'Local mode',
+    );
+
+  const saveFields = () =>
+    post({ enabled: cfg.enabled, url: urlInput, api_key: keyInput }, 'Saved');
+
+  const testConn = async () => {
+    setTesting(true);
+    try {
+      const r = await fetch(`${API}/relay/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput, api_key: keyInput || undefined }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        const parts = [`${d.latency_ms}ms`];
+        if (d.ollama_reachable !== undefined) parts.push(d.ollama_reachable ? 'Ollama ✓' : 'Ollama down');
+        if (d.auth_ok) parts.push('auth ✓');
+        addToast(`Relay reachable — ${parts.join(' · ')}`, 'ok');
+      } else {
+        addToast(`Relay test failed: ${d.error || 'unknown'}`, 'error');
+      }
+    } catch (e) {
+      addToast(`Test failed: ${e.message}`, 'error');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (!cfg) return null;
+
+  const tabBtn = (active, label, sub, onClick) => (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        background: active ? T.bg2 : T.bg1,
+        border: 'none',
+        padding: '14px',
+        textAlign: 'left',
+        borderLeft: `2px solid ${active ? T.cyan : 'transparent'}`,
+        cursor: 'pointer',
+      }}
+    >
+      <div className="mono" style={{
+        fontSize: 11, fontWeight: 600,
+        color: active ? T.cyan : T.text, marginBottom: 4,
+      }}>
+        {label}
+      </div>
+      <div className="mono" style={{ fontSize: 10, color: T.dim }}>{sub}</div>
+    </button>
+  );
+
+  const inputStyle = {
+    width: '100%', padding: '7px 10px',
+    background: T.bg2, border: `1px solid ${T.border}`,
+    color: T.text, fontFamily: T.mono, fontSize: 11, outline: 'none',
+  };
+
+  return (
+    <Card title="Inference location" n="GPU">
+      <div style={{
+        display: 'flex',
+        border: `1px solid ${T.border}`,
+        borderRight: 'none',
+      }}>
+        {tabBtn(!cfg.enabled, 'LOCAL', 'Ollama on this PC', () => setEnabled(false))}
+        <div style={{ width: 1, background: T.border }} />
+        {tabBtn(cfg.enabled, 'CLOUD GPU', 'Relay · Cloud-Assisted tier', () => setEnabled(true))}
+        <div style={{ width: 1, background: T.border }} />
+      </div>
+
+      {cfg.enabled && (
+        <div style={{ marginTop: 14, padding: 14, border: `1px solid ${T.border}`, background: T.bg1 }}>
+          <Row label="Relay URL" sub="Default: https://gpu-relay.dias.now (KZ data residency)">
+            <input
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              placeholder="https://gpu-relay.dias.now"
+              style={inputStyle}
+            />
+          </Row>
+          <Row
+            label="API key"
+            sub={cfg.api_key_set
+              ? `current: ${cfg.api_key_preview} — paste a new one to rotate`
+              : 'paste the dlk_relay_… key issued by your tenant admin'}
+          >
+            <input
+              type="password"
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              placeholder={cfg.api_key_set ? '••••••••••' : 'dlk_relay_…'}
+              style={inputStyle}
+            />
+          </Row>
+          <Row label="Connection" sub="Save persists fields; Test verifies reachability + Bearer" last>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="dlk-btn ghost" onClick={saveFields}>Save</button>
+              <button className="dlk-btn" onClick={testConn} disabled={testing}>
+                {testing ? 'Testing…' : 'Test connection'}
+              </button>
+            </div>
+          </Row>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+
 // ── Section: Models ───────────────────────────────────────────────────────────
 
 function ModelsSection() {
@@ -602,6 +763,8 @@ function ModelsSection() {
   return (
     <BodyShell crumb="01 / SETUP → MODELS" title="Installed models"
       desc="Active model applies to new and running conversations. Pull downloads in the background.">
+      <RelayLocationCard />
+      <div style={{ height: 18 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.bg1, border: `1px solid ${T.border}`, flex: 1 }}>
           <Icon name="search" size={12} color={T.dim} />
