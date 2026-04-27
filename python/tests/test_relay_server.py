@@ -56,6 +56,14 @@ def _pool_with_key(plaintext: str = "test-key", *, revoked: bool = False, rate: 
         return row if key_hash == expected_hash else None
 
     conn.fetchrow = AsyncMock(side_effect=fetchrow)
+    conn.execute = AsyncMock(return_value=None)
+
+    @asynccontextmanager
+    async def transaction():
+        yield
+
+    conn.transaction = transaction
+
     pool = MagicMock()
     pool.close = AsyncMock()  # asyncpg.Pool.close is awaitable
 
