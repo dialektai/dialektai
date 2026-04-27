@@ -88,20 +88,32 @@ def test_generate_pdf_with_weasyprint():
 
 
 def test_invoice_html_template_renders():
-    """Jinja2 template should render without errors."""
+    """Both locale templates (ru/en) render without errors and surface
+    the buyer's KZ legal billing fields."""
     from jinja2 import Environment, FileSystemLoader
     from pathlib import Path
 
     tpl_dir = Path(__file__).parent.parent / "src/dialekt_cloud/templates/invoice"
     env = Environment(loader=FileSystemLoader(str(tpl_dir)), autoescape=True)
-    template = env.get_template("invoice_kz.html")
 
-    html = template.render(
+    buyer = {
+        "company_name": "International Business Academy",
+        "legal_form": "ИП",
+        "bin": "831210499082",
+        "talon_number": "KZ73TWQ05281352",
+        "postal_code": "050060",
+        "legal_address": "г. Алматы, ул. Шашкина 24",
+        "phone": "+7 702 777 44 11",
+        "bank_iban": "KZ24601A861075475071",
+        "bank_name": "АО «Народный Банк Казахстана»",
+        "bank_bik": "HSBKKZKX",
+        "kbe": "19",
+    }
+    common = dict(
         invoice_number="INV-2026-0001",
         issued_date="22.04.2026",
         seller=_seller(),
-        buyer_company="ТОО Покупатель",
-        buyer_address="г. Нур-Султан",
+        buyer=buyer,
         plan="team",
         seats=5,
         period_months=3,
@@ -109,8 +121,18 @@ def test_invoice_html_template_renders():
         amount_kzt_fmt="150 000",
         has_nds=False,
     )
-    assert "INV-2026-0001" in html
-    assert "ТОО Покупатель" in html
-    assert "150 000" in html
+    for tpl_name in ("invoice_kz_ru.html", "invoice_kz_en.html"):
+        html = env.get_template(tpl_name).render(**common)
+        assert "INV-2026-0001" in html
+        assert "International Business Academy" in html
+        assert "150 000" in html
+        assert "831210499082" in html       # БИН/ИИН rendered
+        assert "KZ73TWQ05281352" in html    # Талон only because legal_form='ИП'
+        assert "HSBKKZKX" in html
+
+    # Talon is suppressed for non-ИП buyers.
+    too = {**buyer, "legal_form": "ТОО"}
+    html_too = env.get_template("invoice_kz_ru.html").render(**{**common, "buyer": too})
+    assert "KZ73TWQ05281352" not in html_too
     assert "dias.now" in html
     assert "Kaspi Bank" in html
