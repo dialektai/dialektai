@@ -1422,6 +1422,184 @@ async def import_agent_yaml_endpoint(body: dict):
     )
 
 
+# ── Public library catalog ────────────────────────────────────────────────────
+# Local SQLite mirror of the public cloud catalog at
+# {cloud_api_url}/public/library. POST /library/sync refreshes from
+# cloud (called automatically on first reachable boot + manually via
+# the "Refresh library" button). GET /library serves from the local
+# cache only — works offline as long as a sync has succeeded once.
+
+async def _sync_library_from_cloud() -> dict:
+    """Pull the public catalog from cloud and upsert into the local
+    SQLite cache. Idempotent. Returns {synced, errors}."""
+    import httpx
+    s = load_settings()
+    cloud_url = s.get("cloud_api_url") or DEFAULT_SETTINGS["cloud_api_url"]
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(f"{cloud_url}/public/library")
+            r.raise_for_status()
+            data = r.json()
+    except Exception as e:
+        return {"synced": 0, "error": f"cloud unreachable: {e}"}
+
+    list_entries = data.get("entries", [])
+    synced = 0
+    for stub in list_entries:
+        # The list endpoint omits manifest_yaml for cheapness — fetch
+        # the full entry for each one. Sync is rare; the extra round-
+        # trips are fine.
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                fr = await client.get(f"{cloud_url}/public/library/{stub['id']}")
+                fr.raise_for_status()
+                full = fr.json()
+        except Exception:
+            continue
+        await db.execute(
+            """
+            INSERT INTO library_templates (
+                id, manifest_yaml, name, description, category, tags,
+                requires_connection, requires_mcp, version, signature, cached_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET
+                manifest_yaml = excluded.manifest_yaml,
+                name = excluded.name,
+                description = excluded.description,
+                category = excluded.category,
+                tags = excluded.tags,
+                requires_connection = excluded.requires_connection,
+                requires_mcp = excluded.requires_mcp,
+                version = excluded.version,
+                signature = excluded.signature,
+                cached_at = datetime('now')
+            """,
+            (
+                full["id"], full.get("manifest_yaml", ""),
+                full.get("name", full["id"]), full.get("description", ""),
+                full.get("category", "other"),
+                json.dumps(full.get("tags", [])),
+                int(bool(full.get("requires_connection"))),
+                int(bool(full.get("requires_mcp"))),
+                full.get("version", "1.0.0"),
+                full.get("signature"),
+            ),
+        )
+        synced += 1
+    await db.commit()
+    log.info("library: synced %d entries from %s", synced, cloud_url)
+    return {"synced": synced}
+
+
+def _row_to_library_template(row) -> dict:
+    try:
+        tags = json.loads(row[5]) if row[5] else []
+    except Exception:
+        tags = []
+    return {
+        "id": row[0],
+        "manifest_yaml": row[1],
+        "name": row[2],
+        "description": row[3],
+        "category": row[4],
+        "tags": tags,
+        "requires_connection": bool(row[6]),
+        "requires_mcp": bool(row[7]),
+        "version": row[8],
+        "signature": row[9],
+        "cached_at": row[10],
+    }
+
+
+@app.get("/library")
+async def list_library(category: str | None = None,
+                       requires_connection: bool | None = None,
+                       search: str | None = None):
+    """Return the cached library catalog. Filters apply in SQL where
+    cheap; substring search applies in Python after the row fetch."""
+    where = []
+    params: list = []
+    if category:
+        where.append("category = ?")
+        params.append(category)
+    if requires_connection is not None:
+        where.append("requires_connection = ?")
+        params.append(1 if requires_connection else 0)
+    sql = """
+        SELECT id, manifest_yaml, name, description, category, tags,
+               requires_connection, requires_mcp, version, signature, cached_at
+        FROM library_templates
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY category, name"
+    cursor = await db.execute(sql, params)
+    rows = await cursor.fetchall()
+    entries = [_row_to_library_template(r) for r in rows]
+    if search:
+        q = search.strip().lower()
+        if q:
+            entries = [
+                e for e in entries
+                if q in e["id"].lower()
+                or q in e["name"].lower()
+                or q in e["description"].lower()
+                or any(q in str(t).lower() for t in e["tags"])
+            ]
+    # Manifest_yaml dropped from list response — frontend doesn't need
+    # it on the catalog screen, only on install.
+    for e in entries:
+        e.pop("manifest_yaml", None)
+    return {"entries": entries}
+
+
+@app.get("/library/{template_id}")
+async def get_library_template(template_id: str):
+    cursor = await db.execute(
+        """
+        SELECT id, manifest_yaml, name, description, category, tags,
+               requires_connection, requires_mcp, version, signature, cached_at
+        FROM library_templates WHERE id = ?
+        """,
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
+    return _row_to_library_template(row)
+
+
+@app.post("/library/sync")
+async def post_library_sync():
+    """Refresh local library cache from cloud. Idempotent — safe to
+    call repeatedly. Called automatically on app start; user-triggered
+    via the 'Refresh library' button."""
+    return await _sync_library_from_cloud()
+
+
+@app.post("/library/{template_id}/install", status_code=201)
+async def install_library_template(template_id: str):
+    """Install an agent in the user's workspace from a library template.
+
+    Reuses import_manifest_yaml() — same validation + agent creation
+    path as the builder wizard. The created agent gets a non-null
+    source_template_id so the UI can show 'Update available' when the
+    library entry's version bumps."""
+    cursor = await db.execute(
+        "SELECT manifest_yaml FROM library_templates WHERE id = ?",
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
+    manifest_yaml = row[0]
+    return await import_manifest_yaml(
+        manifest_yaml,
+        status="published",  # installed from a curated library entry → trusted
+        source_template_id=template_id,
+    )
+
+
 @app.get("/agents/{agent_id}/export")
 async def export_agent_endpoint(agent_id: str):
     from fastapi.responses import Response
