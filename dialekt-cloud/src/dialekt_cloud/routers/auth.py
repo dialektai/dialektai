@@ -86,6 +86,20 @@ class SignupRequest(BaseModel):
     # server version is allowed (user genuinely saw their cached version).
     tos_version: str | None = Field(default=None, max_length=64)
     privacy_version: str | None = Field(default=None, max_length=64)
+    # Email locale chosen by the client. None = let the server default it
+    # from country (KZ/RU → ru, else en) so the welcome email lands in the
+    # language the signup form was rendered in.
+    locale: str | None = Field(default=None, max_length=8)
+
+    @field_validator("locale")
+    @classmethod
+    def locale_known(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip().lower()
+        if v not in ("en", "ru"):
+            raise ValueError("locale must be 'en' or 'ru'")
+        return v
 
     @field_validator("country")
     @classmethod
@@ -387,15 +401,17 @@ async def signup(
         license_key = generate_license_key()
         verify_token = _secrets.token_urlsafe(32)
         expires_at = now + timedelta(days=TRIAL_DAYS)
+        locale = body.locale or ("ru" if body.country in ("KZ", "RU") else "en")
 
         async with conn.transaction():
             tenant_id = await conn.fetchval(
                 """
                 INSERT INTO tenants(
                     name, company_name, admin_email, plan, seats_limit,
-                    status, expires_at, signup_source, intended_use, country
+                    status, expires_at, signup_source, intended_use, country,
+                    locale
                 )
-                VALUES($1,$1,$2,'trial',$3,'trial',$4,$5,$6,$7)
+                VALUES($1,$1,$2,'trial',$3,'trial',$4,$5,$6,$7,$8)
                 RETURNING id
                 """,
                 body.full_name,
@@ -405,6 +421,7 @@ async def signup(
                 body.signup_source,
                 body.intended_use,
                 body.country,
+                locale,
             )
             await conn.execute(
                 "INSERT INTO licenses(tenant_id, license_key) VALUES($1,$2)",

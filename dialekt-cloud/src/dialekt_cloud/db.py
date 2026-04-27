@@ -109,6 +109,12 @@ BEGIN
     -- triggered an email so the hourly task can't double-send. Format:
     -- '{"d7","d3","d1","d0"}' — one entry per fired email.
     BEGIN ALTER TABLE tenants ADD COLUMN expiring_notices_sent TEXT[] NOT NULL DEFAULT '{}'; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    -- Email locale. Drives which {en,ru} folder the mailer reads from.
+    -- Set at signup from form (defaults country-based KZ/RU → 'ru' else 'en');
+    -- admin can override later. CHECK constraint kept narrow — adding a new
+    -- locale requires an explicit migration AND new template folder.
+    BEGIN ALTER TABLE tenants ADD COLUMN locale TEXT NOT NULL DEFAULT 'en'; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tenants ADD CONSTRAINT tenants_locale_chk CHECK (locale IN ('en','ru')); EXCEPTION WHEN duplicate_object THEN NULL; END;
 END $$;
 
 -- Email verification tokens for self-serve signup. Separate from `invites`

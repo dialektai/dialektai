@@ -305,6 +305,7 @@
           signup_source: utm.slice(0, 80) || null,
           tos_version: tosVersion,
           privacy_version: privacyVersion,
+          locale: window.dlkI18n?.getLang() || 'en',
         };
 
         try {
