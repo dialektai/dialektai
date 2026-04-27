@@ -47,6 +47,14 @@ sqlite-vec>=0.1.9; platform_machine != "ARM64"
 mcp>=1.25,<1.27
 sse-starlette<3
 
+# Visual content engine (HTML → PNG via headless Chromium). After
+# installing Python deps, run `playwright install chromium` once to
+# fetch the browser binaries (~150MB). Pillow ships with PIL.Image
+# which the engine uses for read-back / dimension probes and which
+# agents can call from their Python code blocks for ad-hoc image ops.
+playwright>=1.50,<2
+Pillow>=10.0
+
 # Dev / test only
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
