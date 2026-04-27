@@ -16,14 +16,16 @@ Validated by posting a stub manifest with each single capability group against `
 
 | # | Checkbox label (UI) | Emitted group name | Schema valid? | Runtime enforcement? | Underlying OI capability actually works? | Net status |
 |---|---|---|---|---|---|---|
-| 1 | Filesystem | `filesystem` | ❌ **Validator rejects**: "Unknown capability groups: {'filesystem'}. Valid: filesystem_read, filesystem_write, …" | — | ✅ Agents can read/write via OI Python+shell regardless | ❌ **BROKEN** (publish fails if ticked) |
+| 1 | Filesystem | `filesystem_read` ✅ (was `filesystem` — **F1 applied**) | ✅ | ❌ Metadata only | ✅ Agents can read/write via OI Python+shell regardless | ⚠️ **MISLEADING** (publish works, check does nothing) |
 | 2 | Network | `network` | ✅ | ❌ Metadata only | ✅ Agents call any URL via Python httpx regardless | ⚠️ **MISLEADING** (publish works, check does nothing) |
 | 3 | Browser | `browser` | ✅ | ❌ Metadata only | ❓ `interpreter.computer.browser` exists (Selenium); **untested on this Linux server**, OS deps unclear | ⚠️ **MISLEADING + UNVERIFIED** |
 | 4 | Database Read | `database_read` | ✅ | ❌ Metadata only — DialektSQL executes regardless of this flag. The *actual* DB gate is the per-agent `agent_bindings` row. | ✅ via DialektSQL + Schema RAG (E2E verified) | ⚠️ **MISLEADING** (works, but not because of the check) |
-| 5 | Terminal | `terminal` | ❌ **Validator rejects**: "Unknown capability groups: {'terminal'}. Valid: shell_execute, …" | — | ✅ Agents run shell via OI regardless | ❌ **BROKEN** (publish fails if ticked) |
-| 6 | Screen | `screen` | ❌ **Validator rejects**: "Unknown capability groups: {'screen'}. Valid: screen_capture, …" | — | ❓ `interpreter.computer.display` exists; untested on this Linux server | ❌ **BROKEN** (publish fails if ticked) |
+| 5 | Terminal | `shell_execute` ✅ (was `terminal` — **F1 applied**) | ✅ | ❌ Metadata only | ✅ Agents run shell via OI regardless | ⚠️ **MISLEADING** (publish works, check does nothing) |
+| 6 | Screen | `screen_capture` ✅ (was `screen` — **F1 applied**) | ✅ | ❌ Metadata only | ❓ `interpreter.computer.display` exists; untested on this Linux server | ⚠️ **MISLEADING + UNVERIFIED** |
 
-**Summary:** 3 of 6 checkboxes are **hard-broken** (publish fails). The other 3 publish successfully but don't gate anything at runtime. Zero checkboxes provide the security guarantee the UI copy (*"Grant permissions — select what this agent is allowed to do"*) promises.
+**F1 fix applied (v0.21+):** The 3 broken checkboxes (Filesystem/Terminal/Screen) now emit valid group names `filesystem_read`, `shell_execute`, `screen_capture`. Verified in `test_wizard_capability_names.py` (part of 846-test passing suite).
+
+**Summary (post-F1):** 0 of 6 checkboxes are hard-broken (all publish). 6 of 6 emit schema-valid names. 0 of 6 provide a runtime security boundary. Zero checkboxes provide the security guarantee the UI copy (*"Grant permissions — select what this agent is allowed to do"*) promises.
 
 Valid group names accepted by schema (`schema.py:11`):
 `filesystem_read, filesystem_write, database_read, database_write, shell_execute, network, browser, screen_capture`.
@@ -76,9 +78,7 @@ All fixes follow the rule: **fix, don't delete.** Keep the surfaces the UI promi
 
 ### Small (~30 min each) — low-risk
 
-- **F1. Wizard capability name mapping.** Rename the 3 broken checkbox keys so they emit schema-valid group names: `filesystem → filesystem_read`, `terminal → shell_execute`, `screen → screen_capture`. Bonus: add a `+ write` toggle next to Filesystem if we want to expose `filesystem_write` too (defer). Publish no longer 422s.
-  - Files: `frontend/src/screens/AgentWizardScreen.jsx` only.
-  - Risk: none — existing seeded agents (SQL Analyst, General Assistant) don't go through Wizard; their manifests already use valid names.
+- **F1. Wizard capability name mapping.** ✅ **DONE (v0.21+)** — `filesystem → filesystem_read`, `terminal → shell_execute`, `screen → screen_capture` — applied in `AgentWizardScreen.jsx`. Verified by `test_wizard_capability_names.py` in the 846-test passing suite.
 - **F2. Settings → Connections: add MySQL + ClickHouse "Add connection" forms.** Backend endpoints exist; UI currently only exposes PostgreSQL form. Clone the form component, swap the endpoint and default port, add a driver dropdown at the top of the "Add connection" card so all three are creatable from one place. Matches the wizard's own drop-down (postgres / mysql / clickhouse).
   - Files: `frontend/src/screens/SettingsScreen.jsx` (ConnectionsSection) only.
   - Risk: low — purely additive UI.
@@ -90,7 +90,7 @@ All fixes follow the rule: **fix, don't delete.** Keep the surfaces the UI promi
 
 ### Large (>2 hours) — flag for user decision
 
-- **F5. Scheduled trigger runtime.** Implement an `APScheduler` process that reads `trigger: scheduled` agents from DB and launches chat sessions on the cron. Needs: scheduler process, a new "job run" WS / session type, failure handling, missed-run policy implementation. Realistic cost: 1–2 days plus tests. **Not recommended before pilots** — pilots won't expect this. Leave as a Milestone-2 item; until then the UI still offers the trigger choice but we should add a "coming soon" badge rather than the silent-no-op it is now.
+- **F5. Scheduled trigger runtime.** ✅ **DONE (v0.27)** — APScheduler runtime in `dialekt.scheduler` (runner, cron_session, missed_run_policy, delivery). Telegram delivery wired. 21/21 tests passing. Email delivery is v0.28.
 - **F6. Webhook trigger.** Not in schema. Adding it means a schema bump + backend listener + secret rotation UI. Same "not now" call.
 - **F7. OI `computer.*` API verification.** Each sub-module (browser / mail / display / clipboard / vision) needs OS-level deps and a test. Per-item cost ~30 min to verify. Easiest one: `computer.files` (pure Python, no selenium). Hardest: `computer.browser` (Selenium on Linux, needs chromedriver). Recommend: verify `computer.files` only for now, document the rest as "OS-dependent, not tested".
 
@@ -103,14 +103,15 @@ All fixes follow the rule: **fix, don't delete.** Keep the surfaces the UI promi
 
 ## 6. Recommended order (if you want me to proceed)
 
-1. **F1** — Wizard naming fix. ~30 min. Unblocks publish for 3 checkboxes. No product trade-off.
-2. **M1** — Retry-loop recursion fix. ~15 min. Removes a lurking footgun.
-3. **F2** — MySQL / ClickHouse Add-connection UI. ~30-45 min. Unlocks two capabilities that backend already supports.
-4. **F4** — Verify MySQL / ClickHouse E2E on a real agent. ~30 min.
-5. **F3** — Runtime enforcement for capability groups. **Pause here for your decision** — do we want capabilities to actually gate, or to stay declarative? The answer shapes the rest.
-6. F5/F6/F7 — not before pilots.
+1. **F1** ✅ DONE — Wizard naming fix applied.
+2. **F5** ✅ DONE — Scheduled trigger runtime ships in v0.27.
+3. **M1** — Retry-loop recursion fix. ~15 min. Removes a lurking footgun.
+4. **F2** — MySQL / ClickHouse Add-connection UI. ~30-45 min. Unlocks two capabilities that backend already supports.
+5. **F4** — Verify MySQL / ClickHouse E2E on a real agent. ~30 min.
+6. **F3** — Runtime enforcement for capability groups. **Pause here for your decision** — do we want capabilities to actually gate, or to stay declarative? The answer shapes the rest.
+7. F6/F7 — not before pilots.
 
-Total for F1 + M1 + F2 + F4 = **~2 hours**, all low-risk, all additive or trivial.
+Remaining for M1 + F2 + F4 = **~1.25 hours**, all low-risk, all additive or trivial.
 
 ---
 
