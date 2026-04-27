@@ -758,6 +758,15 @@ function CloudTab({ providers, catalogLoaded, providersStatus, selectedProvider,
     return m;
   }, [providersStatus]);
 
+  const modelsRef = useRef(null);
+
+  // Scroll model list into view whenever the selected provider changes
+  useEffect(() => {
+    if (selectedProvider && modelsRef.current) {
+      modelsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedProvider]);
+
   if (providers.length === 0) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: T.dim, fontSize: 13 }}>
@@ -781,8 +790,11 @@ function CloudTab({ providers, catalogLoaded, providersStatus, selectedProvider,
         Cloud providers send your prompts to third-party servers. Each provider has its own data-handling policy. Local Ollama keeps everything on your machine.
       </div>
 
-      {/* Provider grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 24 }}>
+      {/* Provider grid — max-height so model list stays in view */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 24,
+        maxHeight: 340, overflowY: 'auto', paddingRight: 4,
+      }}>
         {providers.map(p => (
           <ProviderCard
             key={p.id}
@@ -802,8 +814,8 @@ function CloudTab({ providers, catalogLoaded, providersStatus, selectedProvider,
       </div>
 
       {/* Provider's models */}
-      {active && (
-        <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
+      {active ? (
+        <div ref={modelsRef} style={{ paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>
@@ -824,6 +836,10 @@ function CloudTab({ providers, catalogLoaded, providersStatus, selectedProvider,
             selectedModel={selectedProviderModel}
             onSelect={onSelectModel}
           />
+        </div>
+      ) : (
+        <div style={{ padding: '20px 0', textAlign: 'center', color: T.dim, fontSize: 12 }}>
+          <span className="mono" style={{ letterSpacing: '.08em' }}>← SELECT A PROVIDER ABOVE</span>
         </div>
       )}
     </>
