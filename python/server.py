@@ -3141,17 +3141,76 @@ async def test_mcp_server_endpoint(server_id: str):
 
 @app.post("/ollama/start")
 async def ollama_start():
+    """Start the local Ollama daemon.
+
+    Two correctness traps this handles:
+
+    1. PATH on Tauri-launched macOS — apps launched from Finder/Dock get a
+       stripped PATH (no /usr/local/bin, no Homebrew). A bare
+       ``Popen(["ollama", "serve"])`` raises FileNotFoundError even when
+       Ollama is installed. Resolve the binary with the same fallback
+       list as ``/ollama/check``.
+    2. Duplicate launch — if Ollama is already running on :11434, calling
+       ``ollama serve`` again starts a second daemon that fails to bind
+       and exits silently, leaving the UI to look like nothing happened.
+       Probe first; if already up, return a distinct status so the FE
+       can re-check rather than wait for a phantom boot.
+
+    On macOS prefer ``open -a Ollama`` so the menubar icon comes up, with
+    a direct-binary fallback for headless / non-bundle installs.
+    """
     import subprocess
+    import shutil
+    import os
+    import platform
+    import httpx
+
+    # Already running? Don't double-spawn.
     try:
-        subprocess.Popen(
-            ["ollama", "serve"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
+        async with httpx.AsyncClient(timeout=2) as c:
+            r = await c.get("http://localhost:11434/api/tags")
+            if r.status_code == 200:
+                return {"status": "already_running"}
+    except Exception:
+        pass
+
+    sys_platform = platform.system().lower()
+    candidate_paths = (
+        [
+            "/usr/local/bin/ollama",
+            "/opt/homebrew/bin/ollama",
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+        ]
+        if sys_platform == "darwin"
+        else (
+            ["C:\\Program Files\\Ollama\\ollama.exe", "C:\\Users\\Public\\Ollama\\ollama.exe"]
+            if sys_platform == "windows"
+            else ["/usr/local/bin/ollama", "/usr/bin/ollama"]
         )
-        return {"status": "starting"}
-    except FileNotFoundError:
-        return {"status": "error", "error": "ollama binary not found"}
+    )
+    ollama_bin = shutil.which("ollama")
+    if not ollama_bin:
+        for p in candidate_paths:
+            if os.path.exists(p):
+                ollama_bin = p
+                break
+
+    common_kw = dict(
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    try:
+        if sys_platform == "darwin" and os.path.exists("/Applications/Ollama.app"):
+            # `open -a` is in /usr/bin which is in the stripped Tauri PATH,
+            # and it brings up the menubar agent the way the user expects.
+            subprocess.Popen(["/usr/bin/open", "-a", "Ollama"], **common_kw)
+            return {"status": "starting", "method": "open"}
+        if not ollama_bin:
+            return {"status": "error", "error": "ollama binary not found"}
+        subprocess.Popen([ollama_bin, "serve"], **common_kw)
+        return {"status": "starting", "method": "serve"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
@@ -5102,6 +5161,15 @@ async def ws_chat(ws: WebSocket):
         while True:
             raw = await ws.receive_text()
             msg = json.loads(raw)
+
+            if msg.get("type") == "ping":
+                # Application-level keepalive from the FE. Reply with a
+                # pong so the round-trip primes any intermediate idle
+                # timers; without this the WS dies silently on macOS
+                # sleep / network change and the user sees a flapping
+                # "backend offline" badge.
+                await send({"type": "pong"})
+                continue
 
             if msg.get("type") == "stop":
                 stop_flag.set()
