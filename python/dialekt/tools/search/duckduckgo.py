@@ -31,13 +31,18 @@ _UA = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
-# DDG html-lite wraps each result in a single <div class="result"> ... </div>.
-# Title + url live inside <a class="result__a" href="..."> (where href is a
-# /l/?uddg= redirect URL — we unwrap it). Snippet sits in <a class="result__snippet">.
-_RESULT_RE = re.compile(
-    r'<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
-    r'.*?(?:<a[^>]*class="result__snippet"[^>]*>(.*?)</a>)?',
-    re.DOTALL,
+# DDG html-lite wraps each result in a <div class="result"> ... </div>. We
+# slice the page into per-result blocks first, then pull title/url/snippet
+# out of each block — a single sweeping regex with a lazy `.*?` and an
+# optional snippet group misses snippets unpredictably.
+_RESULT_BLOCK_RE = re.compile(r'<div[^>]*class="[^"]*\bresult\b[^"]*"[^>]*>', re.IGNORECASE)
+_RESULT_LINK_RE = re.compile(
+    r'<a[^>]*class="[^"]*\bresult__a\b[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+    re.DOTALL | re.IGNORECASE,
+)
+_RESULT_SNIPPET_RE = re.compile(
+    r'<a[^>]*class="[^"]*\bresult__snippet\b[^"]*"[^>]*>(.*?)</a>',
+    re.DOTALL | re.IGNORECASE,
 )
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -103,26 +108,35 @@ class DuckDuckGoClient(SearchProvider):
                 f"duckduckgo: HTTP {resp.status_code} — {resp.text[:200]}"
             )
 
+        # Slice the page into per-result blocks. ``re.split`` with the
+        # block-opening tag as separator drops the tag itself but keeps
+        # the content of each result in its own slot.
+        blocks = _RESULT_BLOCK_RE.split(resp.text)[1:]  # discard pre-first-result preamble
         out: list[SearchResult] = []
-        matches = _RESULT_RE.findall(resp.text)
-        if not matches:
+        total = len(blocks) or 1
+        for rank, block in enumerate(blocks):
+            if rank >= max_results:
+                break
+            link_match = _RESULT_LINK_RE.search(block)
+            if not link_match:
+                continue
+            href, title_html = link_match.group(1), link_match.group(2)
+            snippet_match = _RESULT_SNIPPET_RE.search(block)
+            snippet_html = snippet_match.group(1) if snippet_match else ""
+            out.append(
+                SearchResult(
+                    url=_unwrap_redirect(unescape(href)),
+                    title=_strip_tags(title_html),
+                    snippet=_strip_tags(snippet_html),
+                    score=round(1.0 - (rank / total), 4),
+                )
+            )
+
+        if not out:
             # DDG occasionally returns an interstitial / anti-bot page
             # instead of results. Bubble that up as a clear error so the
             # router can fall back rather than returning [] silently.
             raise SearchProviderError(
                 "duckduckgo: no results found (possible rate-limit / interstitial)"
-            )
-        total = len(matches) or 1
-        for rank, (href, title_html, snippet_html) in enumerate(matches):
-            if rank >= max_results:
-                break
-            url = _unwrap_redirect(unescape(href))
-            out.append(
-                SearchResult(
-                    url=url,
-                    title=_strip_tags(title_html),
-                    snippet=_strip_tags(snippet_html or ""),
-                    score=round(1.0 - (rank / total), 4),
-                )
             )
         return out
