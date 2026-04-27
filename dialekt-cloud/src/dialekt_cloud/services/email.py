@@ -1,15 +1,26 @@
-"""SMTP email service using aiosmtplib + Jinja2 templates."""
+"""SMTP email service using aiosmtplib + Jinja2 templates.
+
+Templates live under ``templates/emails/{locale}/{name}.{html,txt}``.
+Subject lines live inside each template as ``{% block subject %}...{% endblock %}``
+with ``{% autoescape false %}`` so interpolated values don't HTML-escape into
+mail headers (e.g. ``Smith & Co`` stays as ``Smith & Co``, not ``Smith &amp; Co``).
+
+If a template is missing in the requested locale, the service falls back to
+``en`` so a half-translated rollout never drops a transactional email.
+"""
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
 import aiosmtplib
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 
 logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "emails"
+SUPPORTED_LOCALES = ("en", "ru")
+DEFAULT_LOCALE = "en"
 
 
 class EmailService:
@@ -28,34 +39,86 @@ class EmailService:
         self.password = password
         self.from_addr = from_addr
         self.use_tls = use_tls
-        self._env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True)
+        # Autoescape only HTML files. .txt and subject blocks stay raw —
+        # subject blocks individually wrap themselves in {% autoescape false %}
+        # for headers; .txt is plain text where escaping breaks readability.
+        self._env = Environment(
+            loader=FileSystemLoader(str(TEMPLATES_DIR)),
+            autoescape=select_autoescape(enabled_extensions=("html",)),
+        )
+
+    def _resolve(self, locale: str, template: str, ext: str) -> str:
+        """Return a Jinja-relative path that exists, falling back to EN."""
+        candidate = f"{locale}/{template}.{ext}"
+        try:
+            self._env.get_template(candidate)
+            return candidate
+        except TemplateNotFound:
+            if locale != DEFAULT_LOCALE:
+                fallback = f"{DEFAULT_LOCALE}/{template}.{ext}"
+                self._env.get_template(fallback)  # raises if also missing
+                logger.info(
+                    "email template %s missing for locale=%s; falling back to %s",
+                    template, locale, DEFAULT_LOCALE,
+                )
+                return fallback
+            raise
 
     async def send(
         self, *,
         to: str | list[str],
-        subject: str,
         template: str,
         context: dict,
+        locale: str = DEFAULT_LOCALE,
+        subject: str | None = None,
         from_addr: str | None = None,
         reply_to: str | None = None,
     ) -> bool:
         """Send a templated email.
 
+        - ``locale`` picks which ``emails/{locale}/`` folder to read from.
+          Falls back to ``en`` if the template is missing in the requested
+          locale (logged at INFO).
+        - ``subject`` is normally extracted from the template's
+          ``{% block subject %}``. Pass it explicitly only for legacy callers
+          or one-off overrides.
         - ``to`` accepts a list to fan out a single send to multiple
           recipients (used for admin-broadcast alerts).
-        - ``from_addr`` lets callers pick the right Zoho-alias mailbox per
+        - ``from_addr`` lets callers pick the right alias mailbox per
           email category (security@, billing@, privacy@, hello@). Defaults
           to the instance-level ``self.from_addr`` (hello@) when omitted.
         - ``reply_to`` overrides the inbox a recipient hits when they
-          click "Reply" — useful when From is `noreply@` but you still
-          want replies to land at hello@.
+          click "Reply".
         """
+        if locale not in SUPPORTED_LOCALES:
+            logger.warning("unknown locale %r, falling back to %s", locale, DEFAULT_LOCALE)
+            locale = DEFAULT_LOCALE
+
         try:
-            html = self._env.get_template(f"{template}.html").render(**context)
+            html_tpl = self._env.get_template(self._resolve(locale, template, "html"))
+            html = html_tpl.render(**context)
+
+            # Subject: prefer caller override, else pull from template block.
+            # Children declare {% block subject %}{% autoescape false %}...{%
+            # endautoescape %}{% endblock %}, which the layout exposes as the
+            # <title> element. Render the block in isolation to get a clean
+            # header value (no HTML/whitespace).
+            if subject is None:
+                if "subject" not in html_tpl.blocks:
+                    raise RuntimeError(
+                        f"template {template} has no {{% block subject %}} and no subject= passed"
+                    )
+                block_ctx = html_tpl.new_context(vars=context)
+                subject = "".join(html_tpl.blocks["subject"](block_ctx))
+            # Strip CR/LF to defend against header injection via interpolated
+            # values (e.g. a malicious full_name containing "\nBcc: attacker@").
+            subject = subject.replace("\r", " ").replace("\n", " ").strip()
+
             try:
-                text = self._env.get_template(f"{template}.txt").render(**context)
-            except Exception:
-                text = subject  # fallback plain text
+                text_tpl = self._env.get_template(self._resolve(locale, template, "txt"))
+                text = text_tpl.render(**context)
+            except TemplateNotFound:
+                text = subject  # last-resort plain-text fallback
 
             recipients = [to] if isinstance(to, str) else list(to)
 
@@ -68,17 +131,11 @@ class EmailService:
             msg.attach(MIMEText(text, "plain", "utf-8"))
             msg.attach(MIMEText(html, "html", "utf-8"))
 
-            smtp_kwargs = dict(
-                hostname=self.host,
-                port=self.port,
-            )
+            smtp_kwargs = dict(hostname=self.host, port=self.port)
             if self.user:
                 smtp_kwargs["username"] = self.user
                 smtp_kwargs["password"] = self.password
             # Port 465 = implicit TLS, 587 = STARTTLS, 25 = plain.
-            # `use_tls` in the .env controls "encryption expected"; map it to
-            # the correct aiosmtplib flag based on port so Gmail (587) works
-            # alongside providers that only speak implicit TLS (465).
             if self.use_tls:
                 if self.port == 465:
                     smtp_kwargs["use_tls"] = True
@@ -86,18 +143,24 @@ class EmailService:
                     smtp_kwargs["start_tls"] = True
 
             await aiosmtplib.send(msg, recipients=recipients, **smtp_kwargs)
-            logger.info("Email sent to %s (template=%s, from=%s)", recipients, template, msg["From"])
+            logger.info(
+                "Email sent to %s (template=%s, locale=%s, from=%s)",
+                recipients, template, locale, msg["From"],
+            )
             return True
         except Exception as exc:
             logger.error("Failed to send email to %s: %s", to, exc)
             return False
 
-    async def send_invite(self, *, to: str, invite_token: str, company_name: str, landing_url: str) -> bool:
+    async def send_invite(
+        self, *, to: str, invite_token: str, company_name: str,
+        landing_url: str, locale: str = DEFAULT_LOCALE,
+    ) -> bool:
         from ..config import settings as _cfg
         return await self.send(
             to=to,
-            subject=f"Приглашение в dialekt.ai — {company_name}",
             template="invite",
+            locale=locale,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={
                 "invite_token": invite_token,
@@ -107,12 +170,16 @@ class EmailService:
             },
         )
 
-    async def send_license_activated(self, *, to: str, license_key: str, company_name: str, plan: str, seats: int, landing_url: str) -> bool:
+    async def send_license_activated(
+        self, *, to: str, license_key: str, company_name: str,
+        plan: str, seats: int, landing_url: str,
+        locale: str = DEFAULT_LOCALE,
+    ) -> bool:
         from ..config import settings as _cfg
         return await self.send(
             to=to,
-            subject="Ваша лицензия dialekt.ai активирована",
             template="license_activated",
+            locale=locale,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={
                 "license_key": license_key,
@@ -123,12 +190,15 @@ class EmailService:
             },
         )
 
-    async def send_welcome(self, *, to: str, company_name: str, landing_url: str) -> bool:
+    async def send_welcome(
+        self, *, to: str, company_name: str, landing_url: str,
+        locale: str = DEFAULT_LOCALE,
+    ) -> bool:
         from ..config import settings as _cfg
         return await self.send(
             to=to,
-            subject=f"Добро пожаловать в dialekt.ai",
             template="welcome",
+            locale=locale,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={"company_name": company_name, "landing_url": landing_url},
         )
@@ -138,18 +208,14 @@ class EmailService:
     async def send_trial_expiring(
         self, *, to: str, full_name: str, days_left: int, expires_at_human: str,
         license_key: str, landing_url: str,
+        locale: str = DEFAULT_LOCALE,
     ) -> bool:
         """T-7 / T-3 / T-1 / T+0 reminder. Single template parameterised by
-        ``days_left`` (0 means already expired)."""
+        ``days_left`` (0 means already expired). Subject derived inside the
+        template based on the same flag — one source of truth."""
         from ..config import settings as _cfg
-        if days_left <= 0:
-            subject = "Your dialekt.ai trial has ended — keep going?"
-        elif days_left == 1:
-            subject = "1 day left on your dialekt.ai trial"
-        else:
-            subject = f"{days_left} days left on your dialekt.ai trial"
         return await self.send(
-            to=to, subject=subject, template="trial_expiring",
+            to=to, template="trial_expiring", locale=locale,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={
                 "full_name": full_name,
@@ -164,14 +230,15 @@ class EmailService:
     async def send_license_extended(
         self, *, to: str, full_name: str, plan: str, seats_limit: int,
         new_expires_at_human: str, days_added: int, landing_url: str,
+        locale: str = DEFAULT_LOCALE,
     ) -> bool:
         """Sent after admin runs POST /admin/tenants/:id/extend so the
         customer knows they got more time / a comp year."""
         from ..config import settings as _cfg
         return await self.send(
             to=to,
-            subject="Your dialekt.ai license has been extended",
             template="license_extended",
+            locale=locale,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={
                 "full_name": full_name,
@@ -184,20 +251,20 @@ class EmailService:
         )
 
     # ── Internal admin notifications ────────────────────────────────────────
+    # These are operations telemetry read only by Dias. Locale-fixed at EN —
+    # restyling/translating is pure overhead since they're not brand surface.
 
     async def send_admin_signup_notification(
         self, *, to: str, signup_email: str, full_name: str,
         country: str, intended_use: str, signup_source: str | None,
         ip: str, tenant_id: str,
     ) -> bool:
-        """Internal heads-up to the founder when a new trial signup lands.
-        Sent FROM hello@ TO admin's inbox (also hello@ unless overridden) —
-        gives Dias the lead profile in his inbox without opening the dashboard."""
         from ..config import settings as _cfg
         return await self.send(
             to=to,
             subject=f"[lead] {full_name} from {country} — dialekt.ai trial signup",
             template="admin_signup_notification",
+            locale=DEFAULT_LOCALE,
             from_addr=_cfg.SMTP_FROM_HELLO,
             context={
                 "signup_email": signup_email,
@@ -233,6 +300,7 @@ class EmailService:
             to=to,
             subject=subject_map.get(kind, "[security] dialekt.ai admin event"),
             template="admin_security_alert",
+            locale=DEFAULT_LOCALE,
             from_addr=_cfg.SMTP_FROM_SECURITY,
             reply_to=_cfg.SMTP_FROM_SECURITY,
             context={

@@ -61,7 +61,7 @@ async def _expiring_trials_pass(app) -> int:
         rows = await conn.fetch(
             """
             SELECT t.id, t.admin_email, t.expires_at, t.expiring_notices_sent,
-                   t.status, t.email_verified_at,
+                   t.status, t.email_verified_at, t.locale,
                    u.full_name,
                    l.license_key
             FROM tenants t
@@ -99,6 +99,7 @@ async def _expiring_trials_pass(app) -> int:
                     expires_at_human=r["expires_at"].strftime("%d %b %Y"),
                     license_key=r["license_key"] or "",
                     landing_url=settings.LANDING_URL,
+                    locale=r["locale"] or "en",
                 )
                 async with pool.acquire() as conn:
                     await conn.execute(

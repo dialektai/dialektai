@@ -1,0 +1,96 @@
+{#-
+  Shared email layout — institutional design (Light theme).
+  Email-safe HTML: nested tables, inline styles, 600px fixed,
+  font fallback stack (Source Serif 4 → Georgia, Inter → Arial).
+
+  Children must define:
+    {% block subject %}{% autoescape false %}...{% endautoescape %}{% endblock %}
+    {% block preheader %}...{% endblock %}     -- ~100ch teaser line
+    {% block content %}...{% endblock %}       -- main HTML body
+  Optional:
+    {% block footer_note %}...{% endblock %}   -- small line above the rule
+    {% block lang %}en{% endblock %}           -- ISO code for <html lang="">
+-#}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{% block lang %}en{% endblock %}">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{% block subject %}dialekt.ai{% endblock %}</title>
+<style type="text/css">
+  /* Apple/Gmail/etc. honour these. Outlook ignores; falls back to inline. */
+  @media only screen and (max-width: 620px) {
+    .email-card { padding: 28px 22px !important; }
+    .email-h1   { font-size: 26px !important; line-height: 1.12 !important; }
+    .email-h2   { font-size: 18px !important; }
+    .email-section { padding: 18px !important; }
+    .email-btn  { padding: 13px 18px !important; font-size: 14px !important; }
+  }
+  a { color: #1E3A8A; }
+  /* Force light treatment in Apple Mail dark mode — institutional look depends
+     on warm off-white paper, not auto-inverted slate. */
+  :root { color-scheme: light; supported-color-schemes: light; }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#FAFAFA;color:#0B1220;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+<!-- preheader: visible in inbox preview, hidden in body -->
+<div style="display:none;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">{% block preheader %}{% endblock %}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAFAFA" style="background:#FAFAFA;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <!-- card -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#FFFFFF;border:1px solid #E4E6EB;border-radius:4px;">
+        <tr>
+          <td class="email-card" style="padding:40px 44px;">
+
+            <!-- brand wordmark -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+              <tr>
+                <td style="font-family:'Source Serif 4','Source Serif Pro',Georgia,'Times New Roman',serif;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:#0B1220;">
+                  dialekt<span style="font-weight:400;color:#0B1220;">.ai</span>
+                </td>
+                <td align="right" style="font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;font-weight:500;">
+                  {% block topmeta %}{% endblock %}
+                </td>
+              </tr>
+            </table>
+
+            <!-- divider -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="height:1px;background:#E4E6EB;line-height:1px;font-size:1px;">&nbsp;</td></tr>
+            </table>
+            <div style="height:32px;line-height:32px;">&nbsp;</div>
+
+            {% block content %}{% endblock %}
+
+          </td>
+        </tr>
+      </table>
+
+      <!-- footer: outside the card, restrained -->
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+        <tr>
+          <td style="padding:24px 12px 8px 12px;font-family:'Inter',Arial,sans-serif;font-size:12px;line-height:1.65;color:#6B7280;">
+            {% block footer_note %}{% endblock %}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px 0 12px;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#9CA3AF;font-weight:500;">
+            <a href="{{ landing_url }}" style="color:#9CA3AF;text-decoration:none;">dialekt.ai</a>
+            &nbsp;·&nbsp; local-first ai agent platform
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

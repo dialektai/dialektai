@@ -1,0 +1,118 @@
+{% extends "_layout.html" %}
+{% block lang %}ru{% endblock %}
+{% block subject %}{% autoescape false %}Добро пожаловать в dialekt.ai — пробная версия и загрузки{% endautoescape %}{% endblock %}
+{% block preheader %}Три шага: скачать приложение, скопировать ключ, подтвердить email для активации.{% endblock %}
+{% block topmeta %}Trial · 30 дней{% endblock %}
+
+{% block content %}
+<h1 class="email-h1" style="margin:0 0 14px 0;font-family:'Source Serif 4','Source Serif Pro',Georgia,'Times New Roman',serif;font-size:32px;line-height:1.06;letter-spacing:-0.022em;font-weight:400;color:#0B1220;">
+  Здравствуйте, {{ full_name }} — приступим.
+</h1>
+<p style="margin:0 0 28px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.55;color:#3F4657;">
+  Ваш 30-дневный пробный период создан. Три коротких шага ниже —
+  можно выполнить в любом порядке.
+</p>
+
+<!-- ── Шаг 1: Скачать ──────────────────────────────────────────────── -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-section" style="background:#FAFAFA;border:1px solid #E4E6EB;padding:22px 24px;margin:0 0 14px 0;">
+  <tr><td>
+    <p style="margin:0 0 6px 0;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#1E3A8A;font-weight:600;">
+      Шаг 01 &nbsp;·&nbsp; Скачайте dialekt
+    </p>
+    <h2 class="email-h2" style="margin:0 0 12px 0;font-family:'Source Serif 4',Georgia,serif;font-size:20px;line-height:1.2;letter-spacing:-0.012em;font-weight:500;color:#0B1220;">
+      Выберите свою платформу
+    </h2>
+    <p style="margin:0 0 14px 0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.6;color:#3F4657;">
+      Приложение работает локально — ваши промпты по умолчанию не покидают машину.
+    </p>
+    {% if downloads %}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        {% for d in downloads %}
+        <tr>
+          <td style="padding:10px 0;border-top:1px solid #E4E6EB;font-family:'Inter',Arial,sans-serif;font-size:14px;color:#0B1220;">
+            <strong style="font-weight:500;">{{ d.platform }}</strong>
+            <span style="color:#6B7280;font-size:12px;">&nbsp; {{ d.ext }}</span>
+          </td>
+          <td align="right" style="padding:10px 0;border-top:1px solid #E4E6EB;">
+            <a href="{{ d.url }}" style="font-family:'Inter',Arial,sans-serif;font-size:13px;color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;padding-bottom:1px;">{{ d.label }} &rarr;</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+    <p style="margin:14px 0 0 0;font-family:'Inter',Arial,sans-serif;font-size:13px;color:#6B7280;">
+      Другая платформа или старая версия?
+      <a href="{{ releases_page }}" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">Все релизы &rarr;</a>
+    </p>
+  </td></tr>
+</table>
+
+<!-- ── Шаг 2: Лицензионный ключ ────────────────────────────────────── -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-section" style="background:#FAFAFA;border:1px solid #E4E6EB;padding:22px 24px;margin:0 0 14px 0;">
+  <tr><td>
+    <p style="margin:0 0 6px 0;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#1E3A8A;font-weight:600;">
+      Шаг 02 &nbsp;·&nbsp; Ваш лицензионный ключ
+    </p>
+    <h2 class="email-h2" style="margin:0 0 12px 0;font-family:'Source Serif 4',Georgia,serif;font-size:20px;line-height:1.2;letter-spacing:-0.012em;font-weight:500;color:#0B1220;">
+      Вставьте на экране лицензии при первом запуске
+    </h2>
+    <p style="margin:0 0 14px 0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.6;color:#3F4657;">
+      Ключ активируется после подтверждения email ниже.
+    </p>
+    <div style="background:#FFFFFF;border:1px solid #CDD1D9;padding:16px 18px;font-family:Menlo,Consolas,monospace;font-size:13px;color:#0B1220;word-break:break-all;letter-spacing:0.02em;">
+      {{ license_key }}
+    </div>
+    <p style="margin:14px 0 0 0;font-family:'Inter',Arial,sans-serif;font-size:13px;color:#6B7280;">
+      Тариф <strong style="color:#0B1220;font-weight:500;">Trial</strong> &nbsp;·&nbsp;
+      Мест <strong style="color:#0B1220;font-weight:500;">{{ seats }}</strong> &nbsp;·&nbsp;
+      Действует до <strong style="color:#0B1220;font-weight:500;">{{ expires_at_human }}</strong>
+    </p>
+  </td></tr>
+</table>
+
+<!-- ── Шаг 3: Подтвердить email ────────────────────────────────────── -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-section" style="background:#FAFAFA;border:1px solid #E4E6EB;padding:22px 24px;margin:0 0 24px 0;">
+  <tr><td>
+    <p style="margin:0 0 6px 0;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#1E3A8A;font-weight:600;">
+      Шаг 03 &nbsp;·&nbsp; Подтвердите email
+    </p>
+    <h2 class="email-h2" style="margin:0 0 12px 0;font-family:'Source Serif 4',Georgia,serif;font-size:20px;line-height:1.2;letter-spacing:-0.012em;font-weight:500;color:#0B1220;">
+      Один клик — и лицензия проходит проверку
+    </h2>
+    <p style="margin:0 0 18px 0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.6;color:#3F4657;">
+      Без подтверждения настольное приложение не примет ключ.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr><td style="background:#B45309;border:1px solid #B45309;border-radius:4px;">
+        <a href="{{ verify_url }}" class="email-btn" style="display:inline-block;padding:14px 24px;font-family:'Inter',Arial,sans-serif;font-size:15px;font-weight:600;color:#FFFEF7;text-decoration:none;letter-spacing:-0.005em;">
+          Подтвердить и активировать &rarr;
+        </a>
+      </td></tr>
+    </table>
+    <p style="margin:16px 0 0 0;font-family:'Inter',Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B7280;word-break:break-all;">
+      Если кнопка не работает, скопируйте ссылку:<br>
+      <span style="color:#3F4657;">{{ verify_url }}</span>
+    </p>
+    <p style="margin:12px 0 0 0;font-family:'Inter',Arial,sans-serif;font-size:12px;color:#6B7280;">
+      Ссылка действует 7 дней. Потеряли её? Напишите на
+      <a href="mailto:hello@dialekt.ai" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">hello@dialekt.ai</a>.
+    </p>
+  </td></tr>
+</table>
+
+<p style="margin:0 0 8px 0;font-family:'Source Serif 4',Georgia,serif;font-size:16px;font-weight:500;color:#0B1220;">
+  Что дальше?
+</p>
+<p style="margin:0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.6;color:#3F4657;">
+  После установки мастер первого запуска поможет выбрать модель
+  (33 локальных модели Ollama или 18 облачных провайдеров) и выдать разрешения
+  на инструменты. Около трёх минут.
+</p>
+{% endblock %}
+
+{% block footer_note %}
+Вы получили это письмо, потому что зарегистрировали 30-дневный пробный период
+dialekt на <a href="{{ landing_url }}/signup.html" style="color:#6B7280;text-decoration:none;border-bottom:1px solid #E4E6EB;">{{ landing_url }}/signup.html</a>.
+Маркетинговые рассылки мы не отправляем. По всем вопросам —
+<a href="mailto:hello@dialekt.ai" style="color:#1E3A8A;text-decoration:none;">hello@dialekt.ai</a>.
+{% endblock %}
