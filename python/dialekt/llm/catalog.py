@@ -406,6 +406,11 @@ CLOUD_PROVIDERS: tuple[CloudProvider, ...] = (
         litellm_prefix="replicate/", base_url=None,
         docs_url="https://replicate.com/docs",
         privacy_note="Sent to Replicate. Mostly open-source models. Pay-per-second pricing.",
+        # Catalog entry only — no Settings UI in v0.27. Routing works via
+        # litellm if the user manually sets `replicate_api_key` in the
+        # keyring. A dedicated Replicate provider card in Settings is
+        # planned post-first-pilot (PLATFORM_ROADMAP.md §1.2).
+        notes="post-pilot: no Settings UI in v0.27; configure manually via keyring if needed.",
         models=(
             ProviderModel("meta/meta-llama-3.1-405b-instruct", "Llama 3.1 405B", "Frontier Llama on demand.", "128k", ("frontier",)),
             ProviderModel("meta/meta-llama-3-70b-instruct", "Llama 3 70B", "Workhorse Llama.", "8k", ("general",)),
