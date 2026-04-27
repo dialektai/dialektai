@@ -203,6 +203,64 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
           <label>ЗАМЕТКИ (внутренние)</label>
           <textarea x-model="newTenant.notes" rows="2" placeholder="Контекст переговоров, дата follow-up..."></textarea>
         </div>
+      </div>
+
+      <div class="panel">
+        <h3>РЕКВИЗИТЫ ДЛЯ СЧЁТА <span style="font-size:10px;color:#6c7086;letter-spacing:.04em">(опционально, можно заполнить позже)</span></h3>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>ОРГАНИЗАЦИОННАЯ ФОРМА</label>
+            <select x-model="newTenant.legal_form">
+              <option value="">— не указано —</option>
+              <option value="ИП">ИП — Индивидуальный предприниматель</option>
+              <option value="ТОО">ТОО — Товарищество с огр. ответственностью</option>
+              <option value="АО">АО — Акционерное общество</option>
+              <option value="ЧФ">ЧФ — Частный фонд</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>БИН/ИИН (12 цифр)</label>
+            <input type="text" x-model="newTenant.bin" placeholder="831210499082" maxlength="12">
+          </div>
+          <div class="form-row" x-show="newTenant.legal_form === 'ИП'">
+            <label>ТАЛОН № <span style="font-size:9px;color:#89dceb">(только ИП)</span></label>
+            <input type="text" x-model="newTenant.talon_number" placeholder="KZ73TWQ05281352">
+          </div>
+          <div class="form-row">
+            <label>ИНДЕКС</label>
+            <input type="text" x-model="newTenant.postal_code" placeholder="050060">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>ЮРИДИЧЕСКИЙ АДРЕС</label>
+          <input type="text" x-model="newTenant.legal_address" placeholder="Республика Казахстан, г. Алматы, ул. Шашкина д. 24, БЦ K Plaza, офис 1">
+        </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>ТЕЛЕФОН</label>
+            <input type="text" x-model="newTenant.phone" placeholder="+7 (702) 777 44 11">
+          </div>
+          <div class="form-row">
+            <label>ИИК (IBAN)</label>
+            <input type="text" x-model="newTenant.bank_iban" placeholder="KZ24601A861075475071">
+          </div>
+          <div class="form-row">
+            <label>БАНК</label>
+            <input type="text" x-model="newTenant.bank_name" placeholder="АО «Народный Банк Казахстана»">
+          </div>
+          <div class="form-row">
+            <label>БИК</label>
+            <input type="text" x-model="newTenant.bank_bik" placeholder="HSBKKZKX">
+          </div>
+          <div class="form-row">
+            <label>КБЕ</label>
+            <input type="text" x-model="newTenant.kbe" placeholder="19" maxlength="3">
+          </div>
+          <div class="form-row">
+            <label>ПОДПИСЬ (ФИО)</label>
+            <input type="text" x-model="newTenant.signatory_name" placeholder="Н. Батухтина">
+          </div>
+        </div>
         <button class="btn btn-primary" @click="createTenant()" :disabled="creating">
           <span x-show="!creating">СОЗДАТЬ ЧЕРНОВИК →</span>
           <span x-show="creating">Создание...</span>
@@ -448,9 +506,19 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
           <input type="number" x-model.number="invoiceForm.period_months" placeholder="3">
         </div>
       </div>
-      <div class="form-row">
-        <label>АДРЕС ПОКУПАТЕЛЯ</label>
-        <input type="text" x-model="invoiceForm.company_address" placeholder="г. Алматы, ул. Примерная, 1">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>АДРЕС ПОКУПАТЕЛЯ <span style="font-size:9px;color:#6c7086">(если у клиента не задан)</span></label>
+          <input type="text" x-model="invoiceForm.company_address" placeholder="г. Алматы, ул. Примерная, 1">
+        </div>
+        <div class="form-row">
+          <label>ЯЗЫК СЧЁТА</label>
+          <select x-model="invoiceForm.locale">
+            <option value="">авто (по локали клиента)</option>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+          </select>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" @click="generateInvoice()">СГЕНЕРИРОВАТЬ PDF</button>
       <span x-show="invoiceMsg" style="font-size:11px;color:#a6e3a1;margin-left:12px" x-text="invoiceMsg"></span>
@@ -507,7 +575,7 @@ function adminApp() {
     showTenant: false,
     tenantDetail: null,
     showInvoiceForm: false,
-    invoiceForm: { amount_kzt: 0, period_months: 3, company_address: '' },
+    invoiceForm: { amount_kzt: 0, period_months: 3, company_address: '', locale: '' },
     invoiceMsg: '',
     showExtendForm: false,
     extendForm: { days: 30, plan: '', seats_limit: null, reason: '' },
@@ -522,7 +590,11 @@ function adminApp() {
     regenCodes: [],                      // populated on successful rotation
     regenMsg: '',
     loginHistory: [],
-    newTenant: { company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '' },
+    newTenant: {
+      company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '',
+      legal_form: '', bin: '', talon_number: '', postal_code: '', legal_address: '',
+      phone: '', bank_iban: '', bank_name: '', bank_bik: '', kbe: '', signatory_name: '',
+    },
     createMsg: { text: '', ok: true },
     creating: false,
     newTenantId: null,
@@ -704,7 +776,11 @@ function adminApp() {
         const data = await api('/admin/tenants', { method: 'POST', body: JSON.stringify(this.newTenant) });
         this.newTenantId = data.tenant_id;
         this.createMsg = { text: `Клиент создан: ${data.tenant_id}`, ok: true };
-        this.newTenant = { company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '' };
+        this.newTenant = {
+          company_name: '', admin_email: '', plan: 'team', seats: 3, expiration_months: 12, notes: '',
+          legal_form: '', bin: '', talon_number: '', postal_code: '', legal_address: '',
+          phone: '', bank_iban: '', bank_name: '', bank_bik: '', kbe: '', signatory_name: '',
+        };
         await this.loadTenants();
         await this.loadStats();
       } catch(e) {
