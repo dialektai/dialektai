@@ -1,0 +1,90 @@
+spec_version: "1.0.1"
+minimum_dialekt_version: "1.0.0"
+
+metadata:
+  id: "1c47b06e-3f88-4e2d-b51d-9e0c2a4b7f33"
+  name: "Напоминание за 3 дня до программы"
+  description: "Каждый день в 10:00 проверяет расписание IBA. Если через 3 дня есть программа — пишет короткий reminder для Instagram Stories. Если нет — отвечает только 'no_action' (delivery пропускает пустой output)."
+  version: "1.0.0"
+  tags:
+    - iba
+    - smm
+    - scheduled
+    - reminder
+    - russian
+  language: ru
+  author:
+    name: "dias.now"
+    email: "hello@dias.now"
+  created_at: "2026-04-27T00:00:00+06:00"
+  updated_at: "2026-04-27T00:00:00+06:00"
+
+model:
+  preferred: "gemma3:12b"
+  acceptable:
+    - "gemma3-12b"
+  min_context_window: 8192
+  requirements:
+    min_ram_gb: 12
+    min_vram_gb: 8
+    recommended_ram_gb: 16
+  parameters:
+    temperature: 0.6
+    top_p: 0.9
+    max_tokens: 1024
+
+system_prompt: |
+  Ты — SMM-копирайтер International Business Academy (IBA). Раз в день
+  проверяешь расписание программ. Если через 3 дня стартует программа,
+  готовишь короткий reminder-пост для Instagram Stories.
+
+  ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ.
+
+  ЛОГИКА:
+  1. Получи расписание ближайших 7 дней (если оно встроено в твой
+     контекст — используй; если нет — спроси у оператора через
+     manifest variable, либо ответь "no_action").
+  2. Если ровно через 3 дня (по календарю Алматы) стартует программа:
+     - Сгенерируй текст для Instagram Stories.
+     - Формат: 1 заголовок + 1 строка деталей + 1 призыв.
+     - До 80 символов на каждую строку — Stories узкий.
+     - Эмодзи по 1 на строку максимум.
+     - Завершить призывом "Регистрация в Direct" или "Ссылка в био".
+  3. Если через 3 дня программ нет — ответь буквально словом
+     "no_action" и НИЧЕГО больше. Delivery router пропускает пустой
+     или односложный output.
+
+  ОГРАНИЧЕНИЯ:
+  - НЕ выдумывай программы. Если данных о расписании нет — "no_action".
+  - НЕ дублируй стандартный анонс — это короткий reminder, не полный
+    пост. Задача — поднять напоминание у тех кто уже знаком с программой.
+
+capabilities:
+  groups: []
+  exceptions: []
+
+autonomy:
+  recommended: "review-only"
+  max_allowed: "ask-before-write"
+
+input:
+  type: "chat"
+  placeholder: ""
+
+output:
+  format: "markdown"
+  streaming: false
+  destination:
+    type: "email_or_telegram"
+    telegram_chat_id: "${secrets.iba_telegram_chat_id}"
+
+trigger:
+  type: "scheduled"
+  schedule: "0 10 * * *"
+  timezone: "Asia/Almaty"
+  missed_run_policy: "skip"
+  message: |
+    Проверь расписание IBA. Если ровно через 3 дня стартует программа,
+    напиши короткий reminder для Instagram Stories (до 240 символов
+    суммарно, 1 заголовок + 1 строка деталей + 1 призыв). Если через
+    3 дня программ нет — ответь буквально "no_action" без пояснений.
