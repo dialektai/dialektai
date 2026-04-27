@@ -1026,6 +1026,16 @@ async def admin_reload_schema():
         except Exception as e:
             errors.append(f"{modname}: {type(e).__name__}: {e}")
 
+    # Re-apply dialekt's runtime capability patch — reload wiped it.
+    # Without this, capability groups dialekt ships ahead of the
+    # validator (e.g. web_search) disappear after the first reload,
+    # which would silently break agent validation in-process.
+    try:
+        from dialekt.manifest_capabilities import apply_runtime_patch
+        apply_runtime_patch()
+    except Exception as e:
+        errors.append(f"runtime capability patch: {type(e).__name__}: {e}")
+
     # Surface the new constants so the UI can show them in a toast and
     # the user knows the reload actually took effect.
     try:
