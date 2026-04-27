@@ -572,6 +572,37 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_log_ts       ON audit_log(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_log_agent_id ON audit_log(agent_id, ts);
 CREATE INDEX IF NOT EXISTS idx_audit_log_kind     ON audit_log(kind, ts);
+
+CREATE TABLE IF NOT EXISTS batch_jobs (
+    id             TEXT PRIMARY KEY,
+    agent_id       TEXT NOT NULL,
+    tenant_id      TEXT,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    total          INTEGER NOT NULL DEFAULT 0,
+    done           INTEGER NOT NULL DEFAULT 0,
+    variables_json TEXT,
+    error          TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS batch_job_files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id      TEXT NOT NULL REFERENCES batch_jobs(id) ON DELETE CASCADE,
+    ordinal     INTEGER NOT NULL,
+    input_path  TEXT NOT NULL,
+    input_name  TEXT NOT NULL,
+    output_path TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    duration_ms INTEGER,
+    error       TEXT,
+    started_at  TEXT,
+    finished_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_agent_id ON batch_jobs(agent_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_status   ON batch_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_batch_files_job_id  ON batch_job_files(job_id, ordinal);
 """
 
 
