@@ -690,8 +690,16 @@ async def lifespan(app: FastAPI):
     # ── secrets migration (v0.8 → v0.9): move plaintext secrets out of
     #    config.json into the OS keychain. Idempotent, runs every boot.
     try:
-        from dialekt.secrets import migrate_from_config, backend_info
+        from dialekt.secrets import (
+            migrate_from_config, migrate_fallback_to_keyring, backend_info,
+        )
         rep = migrate_from_config(SETTINGS_FILE)
+        # Signed-build upgrade path: pull anything the v0.27.4 fallback
+        # file holds into the Keychain bundle. Costs one "Always Allow"
+        # prompt on first signed launch; silent thereafter.
+        fallback_rep = migrate_fallback_to_keyring()
+        if fallback_rep.get("migrated"):
+            log.info("fallback → keyring: migrated %s", fallback_rep["migrated"])
         info = backend_info()
         if rep["migrated"]:
             log.warning("secrets migrated to %s: %s", info["kind"], rep["migrated"])
