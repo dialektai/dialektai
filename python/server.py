@@ -478,8 +478,32 @@ CREATE TABLE IF NOT EXISTS agents (
     manifest_yaml TEXT,
     version       TEXT NOT NULL DEFAULT '1.0.0',
     status        TEXT NOT NULL DEFAULT 'draft',
+    -- Set when the agent was installed from the public library catalog.
+    -- NULL for user-authored agents. Used by the "Update available"
+    -- UX (mentor): when a library entry's version bumps, installed
+    -- copies show an opt-in update prompt. The installed agent stays
+    -- independent — we never auto-mirror manifest changes.
+    source_template_id TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Local cache of the public library catalog. Refreshed via
+-- POST /library/sync (called on app start when online + on-demand
+-- via a "Refresh library" button). The bundled fallback ships with
+-- the app installer so first-launch isn't an empty screen.
+CREATE TABLE IF NOT EXISTS library_templates (
+    id                  TEXT PRIMARY KEY,
+    manifest_yaml       TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    description         TEXT NOT NULL DEFAULT '',
+    category            TEXT NOT NULL,
+    tags                TEXT NOT NULL DEFAULT '[]',  -- JSON array
+    requires_connection INTEGER NOT NULL DEFAULT 0,
+    requires_mcp        INTEGER NOT NULL DEFAULT 0,
+    version             TEXT NOT NULL DEFAULT '1.0.0',
+    signature           TEXT,
+    cached_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -565,6 +589,12 @@ async def _migrate_agents():
             "ALTER TABLE sessions ADD COLUMN agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL"
         )
         log.info("Migration: added agent_id column to sessions")
+
+    cursor = await db.execute("PRAGMA table_info(agents)")
+    agent_cols = [row[1] for row in await cursor.fetchall()]
+    if "source_template_id" not in agent_cols:
+        await db.execute("ALTER TABLE agents ADD COLUMN source_template_id TEXT")
+        log.info("Migration: added source_template_id column to agents")
 
     cursor = await db.execute("SELECT id FROM agents WHERE name = 'General Assistant' LIMIT 1")
     row = await cursor.fetchone()
@@ -772,12 +802,13 @@ async def db_save_message(session_id: str, role: str, type_: str,
 async def db_create_agent(name: str, description: str, system_prompt: str,
                           manifest_yaml: str | None = None,
                           version: str = "1.0.0",
-                          status: str = "draft") -> str:
+                          status: str = "draft",
+                          source_template_id: str | None = None) -> str:
     agent_id = str(uuid.uuid4())
     await db.execute(
-        "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status)"
-        " VALUES (?,?,?,?,?,?,?)",
-        (agent_id, name, description, system_prompt, manifest_yaml, version, status),
+        "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status, source_template_id)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (agent_id, name, description, system_prompt, manifest_yaml, version, status, source_template_id),
     )
     await db.commit()
     return agent_id
@@ -1345,14 +1376,22 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
     return {"id": agent_id, "name": name, "warnings": warnings}
 
 
-@app.post("/agents/import-yaml", status_code=201)
-async def import_agent_yaml_endpoint(body: dict):
-    """Import agent from YAML string (used by the builder wizard)."""
+async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
+                               source_template_id: str | None = None) -> dict:
+    """Validate a manifest YAML and create an agent from it.
+
+    Shared between POST /agents/import-yaml (builder wizard) and
+    POST /library/{id}/install (catalog install) — keeping this in
+    one function eliminates the divergence risk for v2 features
+    (post-install hooks, telemetry, "imported from library" toast).
+
+    Raises HTTPException(400|422) on validation failure.
+    Returns {"id": agent_id, "name": str, "warnings": [...]}.
+    """
     from dialekt_manifest import ManifestValidator
-    yaml_str = (body.get("manifest_yaml") or "").strip()
+    yaml_str = (yaml_str or "").strip()
     if not yaml_str:
         raise HTTPException(400, "manifest_yaml is required")
-    status = body.get("status", "draft")
     if status not in ("draft", "published"):
         status = "draft"
     result = ManifestValidator().validate_string(yaml_str)
@@ -1368,9 +1407,197 @@ async def import_agent_yaml_endpoint(body: dict):
         manifest_yaml=yaml_str,
         version=m.metadata.version,
         status=status,
+        source_template_id=source_template_id,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
     return {"id": agent_id, "name": m.metadata.name, "warnings": warnings}
+
+
+@app.post("/agents/import-yaml", status_code=201)
+async def import_agent_yaml_endpoint(body: dict):
+    """Import agent from YAML string (used by the builder wizard)."""
+    return await import_manifest_yaml(
+        body.get("manifest_yaml") or "",
+        status=body.get("status", "draft"),
+    )
+
+
+# ── Public library catalog ────────────────────────────────────────────────────
+# Local SQLite mirror of the public cloud catalog at
+# {cloud_api_url}/public/library. POST /library/sync refreshes from
+# cloud (called automatically on first reachable boot + manually via
+# the "Refresh library" button). GET /library serves from the local
+# cache only — works offline as long as a sync has succeeded once.
+
+async def _sync_library_from_cloud() -> dict:
+    """Pull the public catalog from cloud and upsert into the local
+    SQLite cache. Idempotent. Returns {synced, errors}."""
+    import httpx
+    s = load_settings()
+    cloud_url = s.get("cloud_api_url") or DEFAULT_SETTINGS["cloud_api_url"]
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(f"{cloud_url}/public/library")
+            r.raise_for_status()
+            data = r.json()
+    except Exception as e:
+        return {"synced": 0, "error": f"cloud unreachable: {e}"}
+
+    list_entries = data.get("entries", [])
+    synced = 0
+    for stub in list_entries:
+        # The list endpoint omits manifest_yaml for cheapness — fetch
+        # the full entry for each one. Sync is rare; the extra round-
+        # trips are fine.
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                fr = await client.get(f"{cloud_url}/public/library/{stub['id']}")
+                fr.raise_for_status()
+                full = fr.json()
+        except Exception:
+            continue
+        await db.execute(
+            """
+            INSERT INTO library_templates (
+                id, manifest_yaml, name, description, category, tags,
+                requires_connection, requires_mcp, version, signature, cached_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET
+                manifest_yaml = excluded.manifest_yaml,
+                name = excluded.name,
+                description = excluded.description,
+                category = excluded.category,
+                tags = excluded.tags,
+                requires_connection = excluded.requires_connection,
+                requires_mcp = excluded.requires_mcp,
+                version = excluded.version,
+                signature = excluded.signature,
+                cached_at = datetime('now')
+            """,
+            (
+                full["id"], full.get("manifest_yaml", ""),
+                full.get("name", full["id"]), full.get("description", ""),
+                full.get("category", "other"),
+                json.dumps(full.get("tags", [])),
+                int(bool(full.get("requires_connection"))),
+                int(bool(full.get("requires_mcp"))),
+                full.get("version", "1.0.0"),
+                full.get("signature"),
+            ),
+        )
+        synced += 1
+    await db.commit()
+    log.info("library: synced %d entries from %s", synced, cloud_url)
+    return {"synced": synced}
+
+
+def _row_to_library_template(row) -> dict:
+    try:
+        tags = json.loads(row[5]) if row[5] else []
+    except Exception:
+        tags = []
+    return {
+        "id": row[0],
+        "manifest_yaml": row[1],
+        "name": row[2],
+        "description": row[3],
+        "category": row[4],
+        "tags": tags,
+        "requires_connection": bool(row[6]),
+        "requires_mcp": bool(row[7]),
+        "version": row[8],
+        "signature": row[9],
+        "cached_at": row[10],
+    }
+
+
+@app.get("/library")
+async def list_library(category: str | None = None,
+                       requires_connection: bool | None = None,
+                       search: str | None = None):
+    """Return the cached library catalog. Filters apply in SQL where
+    cheap; substring search applies in Python after the row fetch."""
+    where = []
+    params: list = []
+    if category:
+        where.append("category = ?")
+        params.append(category)
+    if requires_connection is not None:
+        where.append("requires_connection = ?")
+        params.append(1 if requires_connection else 0)
+    sql = """
+        SELECT id, manifest_yaml, name, description, category, tags,
+               requires_connection, requires_mcp, version, signature, cached_at
+        FROM library_templates
+    """
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY category, name"
+    cursor = await db.execute(sql, params)
+    rows = await cursor.fetchall()
+    entries = [_row_to_library_template(r) for r in rows]
+    if search:
+        q = search.strip().lower()
+        if q:
+            entries = [
+                e for e in entries
+                if q in e["id"].lower()
+                or q in e["name"].lower()
+                or q in e["description"].lower()
+                or any(q in str(t).lower() for t in e["tags"])
+            ]
+    # Manifest_yaml dropped from list response — frontend doesn't need
+    # it on the catalog screen, only on install.
+    for e in entries:
+        e.pop("manifest_yaml", None)
+    return {"entries": entries}
+
+
+@app.get("/library/{template_id}")
+async def get_library_template(template_id: str):
+    cursor = await db.execute(
+        """
+        SELECT id, manifest_yaml, name, description, category, tags,
+               requires_connection, requires_mcp, version, signature, cached_at
+        FROM library_templates WHERE id = ?
+        """,
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
+    return _row_to_library_template(row)
+
+
+@app.post("/library/sync")
+async def post_library_sync():
+    """Refresh local library cache from cloud. Idempotent — safe to
+    call repeatedly. Called automatically on app start; user-triggered
+    via the 'Refresh library' button."""
+    return await _sync_library_from_cloud()
+
+
+@app.post("/library/{template_id}/install", status_code=201)
+async def install_library_template(template_id: str):
+    """Install an agent in the user's workspace from a library template.
+
+    Reuses import_manifest_yaml() — same validation + agent creation
+    path as the builder wizard. The created agent gets a non-null
+    source_template_id so the UI can show 'Update available' when the
+    library entry's version bumps."""
+    cursor = await db.execute(
+        "SELECT manifest_yaml FROM library_templates WHERE id = ?",
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
+    manifest_yaml = row[0]
+    return await import_manifest_yaml(
+        manifest_yaml,
+        status="published",  # installed from a curated library entry → trusted
+        source_template_id=template_id,
+    )
 
 
 @app.get("/agents/{agent_id}/export")

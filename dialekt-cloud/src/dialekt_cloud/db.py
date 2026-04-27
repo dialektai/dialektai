@@ -94,6 +94,36 @@ CREATE TABLE IF NOT EXISTS founder_admin_log (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Public agent library. Distinct from `agent_templates` (which is
+-- tenant-private, used by agent_assignments). `library_entries` is the
+-- public catalog any first-time visitor can read via /public/library
+-- — no auth, rate-limited at the edge.
+--
+-- name/description/version are read from manifest_yaml at serve time
+-- (we do NOT denormalize) — manifest is the single source of truth.
+-- requires_connection / requires_mcp are computed from the manifest at
+-- seed time and cached as columns purely so the catalog list page can
+-- filter without parsing 100 YAML strings client-side.
+--
+-- Curation flow for v1: PRs add YAML + a row to `seeds/library/`. Cloud
+-- redeploy refreshes the table. v2 will add a founder-admin UI.
+CREATE TABLE IF NOT EXISTS library_entries (
+    id TEXT PRIMARY KEY,             -- stable slug, e.g. "sql-analyst-postgres"
+    manifest_yaml TEXT NOT NULL,
+    category TEXT NOT NULL,
+    tags JSONB NOT NULL DEFAULT '[]',
+    requires_connection BOOLEAN NOT NULL DEFAULT FALSE,
+    requires_mcp BOOLEAN NOT NULL DEFAULT FALSE,
+    signature TEXT,                  -- HMAC of manifest_yaml; desktop verifies on cache
+    version TEXT NOT NULL DEFAULT '1.0.0',
+    published BOOLEAN NOT NULL DEFAULT TRUE,  -- soft-hide without deletion
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_library_entries_category ON library_entries(category) WHERE published;
+CREATE INDEX IF NOT EXISTS idx_library_entries_published ON library_entries(published);
+
 -- Self-serve signup additions (v0.21).
 -- ALTER inside DO blocks is idempotent (skips on duplicate_column).
 DO $$

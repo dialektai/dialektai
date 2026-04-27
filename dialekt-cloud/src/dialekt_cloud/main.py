@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .config import settings, assert_production_ready
 from .db import close_pool, get_pool, migrate
-from .routers import admin, admin_ui, agents, auth, health
+from .routers import admin, admin_ui, agents, auth, health, public
 from .services.email import EmailService
 from .services.scheduler import run_lifecycle_scheduler
 
@@ -38,6 +38,14 @@ async def lifespan(app: FastAPI):
     pool = await get_pool(settings.DATABASE_URL)
     app.state.pool = pool
     await migrate(pool)
+    # Seed the public library catalog. Idempotent — safe on every boot.
+    # Disable in tests via DIALEKT_DISABLE_LIBRARY_SEED.
+    if os.environ.get("DIALEKT_DISABLE_LIBRARY_SEED", "").lower() not in ("1", "true", "yes"):
+        try:
+            from .services.library_seed import seed_library_entries
+            await seed_library_entries(pool)
+        except Exception as exc:
+            logger.warning("library seed skipped: %s", exc)
     app.state.email = EmailService(
         host=settings.SMTP_HOST,
         port=settings.SMTP_PORT,
@@ -101,6 +109,7 @@ app.include_router(auth.router)
 app.include_router(agents.router)
 app.include_router(admin.router)
 app.include_router(admin_ui.router)
+app.include_router(public.router)
 
 
 # ── Root landing page ────────────────────────────────────────────────────────
