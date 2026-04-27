@@ -1167,6 +1167,183 @@ async def audit_log_query(
     return {"rows": rows, "truncated": truncated}
 
 
+# ── Instagram Graph API endpoints ────────────────────────────────────────────
+#
+# Native publish surface for Instagram Business / Creator accounts. The
+# user creates their own Facebook App and pastes App ID + App Secret —
+# we never share a dialekt-owned app, both because Meta's terms forbid
+# proxying credentials and because per-user apps avoid one suspended
+# review torching every pilot.
+#
+# Storage: app_id, app_secret, access_token, token_expires (ISO),
+# ig_user_id, username — all in the keychain via dialekt.secrets.
+# Nothing Instagram-related lands in ~/.dialekt/config.json.
+#
+# Publish path is gated by an explicit ``confirmed: true`` body flag so
+# an MCP-driven agent can't reach this endpoint without a UI confirm —
+# defence in depth on top of the frontend ConfirmModal.
+
+_INSTAGRAM_SECRET_KEYS = (
+    "instagram_app_id",
+    "instagram_app_secret",
+    "instagram_access_token",
+    "instagram_token_expires",
+    "instagram_ig_user_id",
+    "instagram_username",
+)
+
+# OAuth state → started_at_ts. CSRF defence + redirect_uri lookup on
+# the way back. Pruned on read; bounded by a hard cap so a malicious
+# /setup/start flood can't blow memory.
+_instagram_oauth_state: dict[str, dict] = {}
+_INSTAGRAM_STATE_TTL_SECONDS = 600
+_INSTAGRAM_STATE_MAX_ENTRIES = 32
+
+
+def _instagram_redirect_uri() -> str:
+    """The callback URL we hand to Facebook. Must match an entry the
+    user added under "Valid OAuth Redirect URIs" in their FB App.
+    """
+    port = int(os.environ.get("DIALEKT_PORT", "8765"))
+    return f"http://localhost:{port}/social/instagram/setup/callback"
+
+
+def _instagram_prune_state() -> None:
+    import time
+    now = time.time()
+    expired = [
+        k for k, v in _instagram_oauth_state.items()
+        if now - v.get("started_at", 0) > _INSTAGRAM_STATE_TTL_SECONDS
+    ]
+    for k in expired:
+        _instagram_oauth_state.pop(k, None)
+    while len(_instagram_oauth_state) > _INSTAGRAM_STATE_MAX_ENTRIES:
+        oldest = min(
+            _instagram_oauth_state,
+            key=lambda k: _instagram_oauth_state[k].get("started_at", 0),
+        )
+        _instagram_oauth_state.pop(oldest, None)
+
+
+@app.post("/social/instagram/setup/start")
+async def instagram_setup_start(body: dict):
+    """Stash App ID + Secret in the keychain and return the FB authorize URL.
+
+    The user opens the URL in a browser, grants permissions, and FB
+    redirects to ``/social/instagram/setup/callback`` with ``code``.
+    """
+    import secrets as _stdlib_secrets
+    import time
+    from dialekt.secrets import set_secret
+    from dialekt.tools.social import oauth_flow
+
+    app_id = (body.get("app_id") or "").strip()
+    app_secret = (body.get("app_secret") or "").strip()
+    if not app_id or not app_secret:
+        raise HTTPException(400, "app_id and app_secret are required")
+
+    set_secret("instagram_app_id", app_id)
+    set_secret("instagram_app_secret", app_secret)
+
+    state = _stdlib_secrets.token_urlsafe(24)
+    redirect_uri = _instagram_redirect_uri()
+    _instagram_prune_state()
+    _instagram_oauth_state[state] = {
+        "started_at": time.time(),
+        "redirect_uri": redirect_uri,
+    }
+    auth_url = oauth_flow.build_auth_url(app_id, redirect_uri, state=state)
+    return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
+
+
+@app.get("/social/instagram/setup/callback")
+async def instagram_setup_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+):
+    """OAuth landing page. Exchanges the code for a long-lived token,
+    fetches the IG Business account, persists everything, and renders
+    a tiny HTML page telling the user to switch back to dialekt.
+    """
+    from dialekt.audit import log_event
+    from dialekt.secrets import get_secret, set_secret
+    from dialekt.tools.social import oauth_flow
+
+    def _html(title: str, msg: str, ok: bool) -> Response:
+        body = (
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            f"<title>{title}</title>"
+            "<style>body{font-family:system-ui;background:#0d0e10;color:#e4e6ea;"
+            "display:flex;align-items:center;justify-content:center;height:100vh;"
+            "margin:0}div{max-width:480px;padding:32px;border:1px solid "
+            f"{'#1f6f4a' if ok else '#7a2a2a'};text-align:center}}"
+            "h1{margin:0 0 12px;font-size:18px;letter-spacing:-.01em}"
+            "p{color:#9aa0a8;font-size:13px;line-height:1.6;margin:0}</style>"
+            f"</head><body><div><h1>{title}</h1><p>{msg}</p></div></body></html>"
+        )
+        return Response(content=body, media_type="text/html",
+                        status_code=200 if ok else 400)
+
+    if error:
+        await log_event(
+            db, kind="instagram_oauth", action="callback", result="error",
+            error_kind=error, extra={"description": error_description},
+        )
+        return _html("Instagram setup failed", error_description or error, False)
+
+    if not code or not state:
+        return _html("Instagram setup failed",
+                     "Missing code or state in the callback URL.", False)
+
+    _instagram_prune_state()
+    pending = _instagram_oauth_state.pop(state, None)
+    if not pending:
+        await log_event(db, kind="instagram_oauth", action="callback",
+                        result="error", error_kind="state_mismatch")
+        return _html("Instagram setup failed",
+                     "Setup state expired or didn't match. Run setup again.", False)
+
+    app_id = get_secret("instagram_app_id")
+    app_secret = get_secret("instagram_app_secret")
+    if not app_id or not app_secret:
+        return _html("Instagram setup failed",
+                     "App credentials missing — re-enter App ID and Secret.", False)
+
+    try:
+        short = await oauth_flow.exchange_code_for_token(
+            app_id, app_secret, code, pending["redirect_uri"],
+        )
+        long_lived = await oauth_flow.exchange_for_long_lived(
+            app_id, app_secret, short["access_token"],
+        )
+        info = await oauth_flow.get_ig_business_account(long_lived["access_token"])
+    except oauth_flow.OAuthError as e:
+        await log_event(db, kind="instagram_oauth", action="callback",
+                        result="error", error_kind="graph_error",
+                        extra={"detail": str(e)})
+        return _html("Instagram setup failed", str(e), False)
+
+    set_secret("instagram_access_token", long_lived["access_token"])
+    set_secret("instagram_token_expires",
+               oauth_flow.expires_at_from_payload(long_lived))
+    set_secret("instagram_ig_user_id", info["ig_user_id"])
+    set_secret("instagram_username", info.get("username") or "")
+
+    await log_event(
+        db, kind="instagram_oauth", action="callback", result="success",
+        target=info["ig_user_id"],
+        extra={"username": info.get("username"), "page_id": info.get("page_id")},
+    )
+    return _html(
+        "Instagram connected",
+        f"Signed in as @{info.get('username') or info['ig_user_id']}. "
+        "You can close this window and return to dialekt.",
+        True,
+    )
+
+
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
 
 @app.get("/schema-rag/model-status")
