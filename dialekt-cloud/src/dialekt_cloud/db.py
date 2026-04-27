@@ -161,12 +161,6 @@ BEGIN
     BEGIN ALTER TABLE tenants ADD COLUMN bank_bik TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
     BEGIN ALTER TABLE tenants ADD COLUMN kbe TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
     BEGIN ALTER TABLE tenants ADD COLUMN signatory_name TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
-    -- v0.27: explicit cross-border data-transfer consent tracking.
-    -- Landing page design doc proposed a separate consent_log table; shipped
-    -- impl uses tos_acceptances. These columns make cross_border_us consent
-    -- distinguishable from standard ToS acceptance in the audit log.
-    BEGIN ALTER TABLE tos_acceptances ADD COLUMN cross_border_consent_given BOOLEAN NOT NULL DEFAULT FALSE; EXCEPTION WHEN duplicate_column THEN NULL; END;
-    BEGIN ALTER TABLE tos_acceptances ADD COLUMN cross_border_consent_version TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
 END $$;
 
 -- Email verification tokens for self-serve signup. Separate from `invites`
@@ -209,6 +203,17 @@ CREATE TABLE IF NOT EXISTS tos_acceptances (
     user_agent TEXT,
     source TEXT NOT NULL DEFAULT 'signup'  -- 'signup', 're-accept', 'admin-recorded'
 );
+
+-- v0.27: explicit cross-border data-transfer consent tracking.
+-- Landing page design doc proposed a separate consent_log table; shipped
+-- impl uses tos_acceptances. These columns make cross_border_us consent
+-- distinguishable from standard ToS acceptance in the audit log.
+-- Must run AFTER CREATE TABLE tos_acceptances above (idempotent, safe to re-run).
+DO $$
+BEGIN
+    BEGIN ALTER TABLE tos_acceptances ADD COLUMN cross_border_consent_given BOOLEAN NOT NULL DEFAULT FALSE; EXCEPTION WHEN duplicate_column THEN NULL; END;
+    BEGIN ALTER TABLE tos_acceptances ADD COLUMN cross_border_consent_version TEXT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant ON tenant_users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(invite_token);
