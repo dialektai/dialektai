@@ -147,11 +147,17 @@ def render(
     fields: Mapping[str, Any],
     *,
     output_path: str | Path | None = None,
+    brand_id: str | None = None,
 ) -> dict[str, Any]:
     """Render a template by id. Returns a dict with file path + timing.
 
     Output file lands in ``VISUAL_ROOT/out/<template_id>_<token>.png`` unless
     ``output_path`` is given explicitly.
+
+    When ``brand_id`` is provided, the matching brand profile's CSS
+    prelude (variables, ``.brand-logo``, ``@font-face``) is prepended
+    to the template HTML before screenshot. Templates that don't
+    reference brand variables render unchanged — opt-in via CSS.
     """
     tmpl = get_template(template_id)
     variables = _validate_fields(tmpl, fields)
@@ -161,6 +167,13 @@ def render(
         safe_id = template_id.replace(".", "_")
         output_path = _out_dir() / f"{safe_id}_{token}.png"
 
+    # Lazy import — avoids the visual engine pulling in the branding
+    # module if no caller passes a brand_id.
+    brand_prelude = ""
+    if brand_id:
+        from dialekt.branding import brand_css_prelude
+        brand_prelude = brand_css_prelude(brand_id)
+
     started = time.perf_counter()
     file_path = render_template(
         html_path=tmpl.html_path,
@@ -168,6 +181,7 @@ def render(
         output_path=output_path,
         width=tmpl.width,
         height=tmpl.height,
+        head_prelude=brand_prelude,
     )
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 
@@ -181,4 +195,5 @@ def render(
         "template_id": template_id,
         "width": tmpl.width,
         "height": tmpl.height,
+        "brand_id": brand_id,
     }

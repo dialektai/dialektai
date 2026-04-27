@@ -44,6 +44,7 @@ def render_template(
     *,
     network_wait_ms: int = 1500,
     device_scale_factor: float = 1.0,
+    head_prelude: str = "",
 ) -> str:
     """Render an HTML template to PNG at the exact viewport.
 
@@ -54,6 +55,10 @@ def render_template(
         width / height: viewport in CSS pixels.
         network_wait_ms: extra wait after ``networkidle`` for web fonts.
         device_scale_factor: 1.0 = 1080×1920 native, 2.0 = 2× retina.
+        head_prelude: optional ``<style>`` (or other ``<head>``-safe)
+            block prepended before the template. Used by the brand
+            engine to inject CSS variables, ``@font-face`` and
+            logo data URIs.
 
     Returns the absolute output path.
     """
@@ -66,6 +71,11 @@ def render_template(
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     rendered_html = substitute_variables(html_file.read_text(encoding="utf-8"), variables)
+    if head_prelude:
+        # Templates may or may not have a parseable <head>. Easiest +
+        # safest: prepend before the doctype/html so the browser still
+        # sees a complete doc — Chromium tolerates a leading <style>.
+        rendered_html = head_prelude + "\n" + rendered_html
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
