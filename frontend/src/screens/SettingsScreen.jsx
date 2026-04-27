@@ -8,6 +8,7 @@ import McpTemplateModal from '../components/McpTemplateModal.jsx';
 import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
 import McpToolList from '../components/McpToolList.jsx';
 import MCPAuditDashboard from '../components/MCPAuditDashboard.jsx';
+import WebSearchSection from './Settings/WebSearchSection.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -503,6 +504,359 @@ function ComingSoonBanner({ version = 'v1.1', label }) {
     </div>
   );
 }
+
+// ── Section: Branding ────────────────────────────────────────────────────────
+//
+// Pilot brand profile editor — colors + logo + optional font. Saves via
+// POST /branding/upload (multipart) then renders a synthetic showcase
+// PNG via POST /branding/{id}/preview so the user sees the result inline.
+// One profile per pilot is enough for v0.27 — list/switch UX comes later.
+
+const BRAND_DEFAULTS = {
+  brand_id: '',
+  name: '',
+  primary_color:    '#FF5629',
+  secondary_color:  '#3A5ADC',
+  background_color: '#0C1014',
+  text_color:       '#F5F1EA',
+  font_family: '',
+};
+
+function isHex(s) {
+  return /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s.trim());
+}
+
+function ColorRow({ label, sub, value, onChange }) {
+  // Browser <input type=color> needs strict #RRGGBB. The visible hex
+  // input below it is unconstrained so the user can still paste 3-char
+  // shorthand or alpha — server side normalises.
+  const swatch = isHex(value) && value.length >= 4
+    ? (value.length === 4
+        ? '#' + value.slice(1).split('').map(c => c + c).join('')
+        : value)
+    : '#888888';
+  return (
+    <Row label={label} sub={sub}>
+      <input
+        type="color" value={swatch}
+        onChange={e => onChange(e.target.value.toUpperCase())}
+        style={{
+          width: 36, height: 22, padding: 0, border: `1px solid ${T.border}`,
+          background: 'transparent', cursor: 'pointer',
+        }}
+      />
+      <input
+        type="text" value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="#RRGGBB"
+        style={{
+          width: 110, marginLeft: 10,
+          background: T.bg0, border: `1px solid ${isHex(value) || !value ? T.border : T.amber}`,
+          color: T.text, fontFamily: T.mono, fontSize: 12,
+          padding: '4px 8px',
+        }}
+      />
+    </Row>
+  );
+}
+
+function DropFile({ label, sub, value, accept, onChange }) {
+  const ref = useRef(null);
+  const [over, setOver] = useState(false);
+  const onPick = (file) => onChange(file || null);
+  return (
+    <div
+      onDragEnter={e => { e.preventDefault(); setOver(true); }}
+      onDragOver={e => { e.preventDefault(); }}
+      onDragLeave={e => { if (e.currentTarget === e.target) setOver(false); }}
+      onDrop={e => {
+        e.preventDefault(); setOver(false);
+        const f = e.dataTransfer?.files?.[0];
+        if (f) onPick(f);
+      }}
+      style={{
+        padding: '14px 16px',
+        borderBottom: `1px solid ${T.border}`,
+        background: over ? `${T.cyan}11` : 'transparent',
+        outline: over ? `1px dashed ${T.cyan}` : 'none',
+        outlineOffset: '-4px',
+      }}
+    >
+      <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
+             onChange={e => onPick(e.target.files?.[0])} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: T.text }}>{label}</div>
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{sub}</div>
+          {value && (
+            <div className="mono" style={{ fontSize: 11, color: T.cyan, marginTop: 6 }}>
+              {value.name} · {Math.ceil(value.size / 1024)}KB
+            </div>
+          )}
+        </div>
+        <button className="dlk-btn" onClick={() => ref.current?.click()}>
+          {value ? 'Replace' : 'Choose file'}
+        </button>
+        {value && (
+          <button className="dlk-btn ghost" onClick={() => onPick(null)} title="Clear">
+            <Icon name="x" size={11} color={T.dim} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BrandingSection() {
+  const [form, setForm] = useState(BRAND_DEFAULTS);
+  const [logoFile, setLogoFile] = useState(null);
+  const [fontFile, setFontFile] = useState(null);
+  const [savedBrand, setSavedBrand] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [busy, setBusy] = useState(null);  // null | 'saving' | 'previewing'
+  const [error, setError] = useState(null);
+  const [brands, setBrands] = useState([]);
+
+  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Load existing brands on mount; pick the first one so the user can
+  // edit instead of always starting blank.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/branding`);
+        if (!r.ok) return;
+        const { brands: list } = await r.json();
+        setBrands(list || []);
+        if ((list || []).length > 0) {
+          loadBrand(list[0]);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const loadBrand = (b) => {
+    setForm({
+      brand_id: b.id,
+      name: b.name,
+      primary_color:    b.colors.primary    || '#000000',
+      secondary_color:  b.colors.secondary  || '',
+      background_color: b.colors.background || '#FFFFFF',
+      text_color:       b.colors.text       || '#111111',
+      font_family:      b.font_family       || '',
+    });
+    setSavedBrand(b);
+    setPreviewUrl(null);
+    setError(null);
+  };
+
+  const validate = () => {
+    if (!form.brand_id || !/^[a-z0-9][a-z0-9_-]{0,62}$/.test(form.brand_id)) {
+      return 'brand_id: 1–63 chars, [a-z0-9_-], must start with [a-z0-9]';
+    }
+    if (!form.name.trim()) return 'name is required';
+    if (!isHex(form.primary_color)) return 'primary color must be #RRGGBB';
+    if (form.secondary_color && !isHex(form.secondary_color)) return 'secondary color must be #RRGGBB';
+    if (!isHex(form.background_color)) return 'background color must be #RRGGBB';
+    if (!isHex(form.text_color)) return 'text color must be #RRGGBB';
+    return null;
+  };
+
+  const saveAndPreview = async () => {
+    const err = validate();
+    if (err) { setError(err); return; }
+    setError(null); setBusy('saving'); setPreviewUrl(null);
+    try {
+      const fd = new FormData();
+      fd.append('brand_id', form.brand_id);
+      fd.append('name', form.name);
+      fd.append('primary_color', form.primary_color);
+      fd.append('secondary_color', form.secondary_color);
+      fd.append('background_color', form.background_color);
+      fd.append('text_color', form.text_color);
+      if (form.font_family) fd.append('font_family', form.font_family);
+      if (logoFile) fd.append('logo', logoFile, logoFile.name);
+      if (fontFile) fd.append('font', fontFile, fontFile.name);
+
+      const r = await fetch(`${API}/branding/upload`, { method: 'POST', body: fd });
+      if (!r.ok) {
+        const txt = await r.text();
+        setError(`save failed (${r.status}): ${txt}`);
+        return;
+      }
+      const { brand } = await r.json();
+      setSavedBrand(brand);
+      // Refresh brand list
+      const listR = await fetch(`${API}/branding`);
+      if (listR.ok) setBrands((await listR.json()).brands || []);
+
+      // Render preview
+      setBusy('previewing');
+      const pr = await fetch(`${API}/branding/${brand.id}/preview`, { method: 'POST' });
+      if (!pr.ok) {
+        setError(`preview failed: ${pr.status}`);
+        return;
+      }
+      const { file } = await pr.json();
+      // /files endpoint serves any path under /tmp/dialekt_files OR
+      // ~/.dialekt/visual/out/, with a cache-buster to defeat browser
+      // caching of the previous render under the same URL.
+      setPreviewUrl(`${API}/files?path=${encodeURIComponent(file)}&_=${Date.now()}`);
+    } catch (e) {
+      setError(`unexpected error: ${e.message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <BodyShell
+      crumb="01 / SETUP → BRANDING"
+      title="Branding"
+      desc="Pilot brand profile applied to generated visuals (Instagram posts, announcements, schedules) when the agent renders a template with brand_id."
+    >
+      {brands.length > 1 && (
+        <Card title="Existing brands" n="A">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12 }}>
+            {brands.map(b => (
+              <button
+                key={b.id}
+                className={`dlk-btn ${savedBrand?.id === b.id ? 'primary' : ''}`}
+                onClick={() => loadBrand(b)}
+              >
+                {b.name}
+              </button>
+            ))}
+            <button className="dlk-btn ghost" onClick={() => {
+              setForm(BRAND_DEFAULTS);
+              setSavedBrand(null); setPreviewUrl(null); setError(null);
+              setLogoFile(null); setFontFile(null);
+            }}>+ New brand</button>
+          </div>
+        </Card>
+      )}
+
+      <Card title="Identity" n={brands.length > 1 ? 'B' : 'A'}>
+        <Row label="Brand ID" sub="lower-case identifier used in API and file paths (e.g. iba)">
+          <input
+            type="text" value={form.brand_id}
+            onChange={e => set('brand_id')(e.target.value.toLowerCase())}
+            disabled={!!savedBrand}
+            placeholder="iba"
+            style={{
+              width: 200, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontFamily: T.mono, fontSize: 12, padding: '5px 8px',
+              opacity: savedBrand ? 0.5 : 1,
+            }}
+          />
+        </Row>
+        <Row label="Display name" sub="shown in the preview and brand picker" last>
+          <input
+            type="text" value={form.name}
+            onChange={e => set('name')(e.target.value)}
+            placeholder="International Business Academy"
+            style={{
+              width: 280, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontSize: 12, padding: '5px 8px',
+            }}
+          />
+        </Row>
+      </Card>
+
+      <Card title="Colors" n={brands.length > 1 ? 'C' : 'B'}>
+        <ColorRow label="Primary" sub="main accent — headlines, buttons, eyebrow"
+          value={form.primary_color} onChange={set('primary_color')} />
+        <ColorRow label="Secondary" sub="optional — supporting accent"
+          value={form.secondary_color} onChange={set('secondary_color')} />
+        <ColorRow label="Background" sub="canvas fill"
+          value={form.background_color} onChange={set('background_color')} />
+        <ColorRow label="Text" sub="body copy on the canvas"
+          value={form.text_color} onChange={set('text_color')} />
+      </Card>
+
+      <Card title="Assets" n={brands.length > 1 ? 'D' : 'C'}>
+        <DropFile
+          label="Logo"
+          sub="PNG, SVG, JPG, or WebP. Drop or pick. Used by .brand-logo in templates."
+          accept="image/png,image/svg+xml,image/jpeg,image/webp"
+          value={logoFile}
+          onChange={setLogoFile}
+        />
+        <DropFile
+          label="Custom font (optional)"
+          sub="TTF, OTF, WOFF, or WOFF2. Templates can reference var(--brand-font)."
+          accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+          value={fontFile}
+          onChange={setFontFile}
+        />
+        <Row label="Font family alias" sub="CSS @font-face name (defaults to BrandFont)" last>
+          <input
+            type="text" value={form.font_family}
+            onChange={e => set('font_family')(e.target.value)}
+            placeholder="BrandFont"
+            style={{
+              width: 200, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontFamily: T.mono, fontSize: 12, padding: '5px 8px',
+            }}
+          />
+        </Row>
+      </Card>
+
+      {error && (
+        <div className="mono" style={{
+          padding: '10px 14px', marginBottom: 14, fontSize: 11,
+          color: T.amber, border: `1px solid ${T.amber}55`,
+          background: `${T.amber}0a`,
+        }}>{error}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <button
+          className="dlk-btn primary"
+          style={{ padding: '8px 18px', opacity: busy ? 0.5 : 1 }}
+          onClick={saveAndPreview}
+          disabled={!!busy}
+        >
+          {busy === 'saving' ? 'Saving…'
+            : busy === 'previewing' ? 'Rendering preview…'
+            : 'Save & Preview'}
+        </button>
+        {savedBrand && (
+          <button
+            className="dlk-btn ghost"
+            onClick={async () => {
+              if (!confirm(`Delete brand ${savedBrand.id}?`)) return;
+              await fetch(`${API}/branding/${savedBrand.id}`, { method: 'DELETE' });
+              setForm(BRAND_DEFAULTS); setSavedBrand(null); setPreviewUrl(null);
+              const r = await fetch(`${API}/branding`);
+              if (r.ok) setBrands((await r.json()).brands || []);
+            }}
+          >
+            Delete brand
+          </button>
+        )}
+      </div>
+
+      {previewUrl && (
+        <Card title="Preview" n={brands.length > 1 ? 'E' : 'D'}
+          right={<span className="mono" style={{ fontSize: 10, color: T.dim }}>1080×1080</span>}>
+          <div style={{ padding: 14, display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={previewUrl}
+              alt="Brand preview"
+              style={{ maxWidth: '100%', height: 'auto',
+                       border: `1px solid ${T.border}` }}
+            />
+          </div>
+        </Card>
+      )}
+    </BodyShell>
+  );
+}
+
 
 // ── Section: Permissions ──────────────────────────────────────────────────────
 
@@ -3465,6 +3819,480 @@ function AgentsSection() {
   );
 }
 
+// ── Section: Scheduled (v0.27 §3.2) ──────────────────────────────────────────
+//
+// Lists every agent whose manifest declares trigger.type=scheduled and
+// renders a card per agent: schedule line, next/last run, Run-now,
+// History (collapsible), Disconnect-style "Skip-on-startup" toggle is
+// deliberately absent — that's per-manifest, not per-session.
+
+const CRON_FIELD_LABELS = ['minute', 'hour', 'day', 'month', 'weekday'];
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function describeCron(expr) {
+  // Best-effort humanisation. Catches the common cases the IBA agents
+  // use; falls back to the raw expression when shape doesn't match.
+  if (!expr || typeof expr !== 'string') return expr || '';
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return expr;
+  const [m, h, dom, mon, dow] = parts;
+  const numeric = (s) => /^\d+$/.test(s);
+  const time = numeric(m) && numeric(h)
+    ? `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+    : null;
+  if (!time) return expr;
+  if (dom === '*' && mon === '*' && dow === '*') return `every day at ${time}`;
+  if (dom === '*' && mon === '*' && /^[A-Z]+$/i.test(dow)) {
+    return `${dow.slice(0, 3)} at ${time}`;
+  }
+  if (dom === '*' && mon === '*' && numeric(dow)) {
+    const idx = parseInt(dow, 10) % 7;
+    return `${WEEKDAY_NAMES[idx]} at ${time}`;
+  }
+  if (numeric(dom) && numeric(mon)) {
+    return `${MONTH_NAMES[parseInt(mon, 10) - 1] || mon} ${dom} at ${time}`;
+  }
+  return expr;
+}
+
+function parseScheduledManifest(yamlStr) {
+  // Tiny manual parser — we only need trigger.{type,schedule,timezone,
+  // missed_run_policy} and output.destination.type. Importing js-yaml
+  // for this is overkill (and SettingsScreen is already a chunky
+  // bundle). Caller falls back to "this isn't a scheduled agent" when
+  // anything looks off.
+  if (!yamlStr || typeof yamlStr !== 'string') return null;
+  const lines = yamlStr.split('\n');
+  const out = { type: null, schedule: null, timezone: null, policy: null, destination: null };
+  let inTrigger = false, inOutput = false, inDest = false, indentTrigger = -1, indentOutput = -1;
+  for (const raw of lines) {
+    const line = raw.replace(/\r$/, '');
+    if (/^[a-z_]+:\s*$/i.test(line) || /^[a-z_]+:/i.test(line)) {
+      if (line.startsWith('trigger:')) { inTrigger = true; inOutput = false; inDest = false; indentTrigger = 0; continue; }
+      if (line.startsWith('output:')) { inOutput = true; inTrigger = false; inDest = false; indentOutput = 0; continue; }
+      if (!line.startsWith(' ') && !line.startsWith('\t')) { inTrigger = false; inOutput = false; inDest = false; }
+    }
+    const m = line.match(/^(\s+)([a-z_]+):\s*['"]?([^'"#]*?)['"]?\s*(#.*)?$/i);
+    if (!m) continue;
+    const [, indent, key, value] = m;
+    const ind = indent.length;
+    if (inTrigger && ind === 2) {
+      if (key === 'type') out.type = value;
+      else if (key === 'schedule' || key === 'cron') out.schedule = value;
+      else if (key === 'timezone') out.timezone = value;
+      else if (key === 'missed_run_policy') out.policy = value;
+    }
+    if (inOutput) {
+      if (ind === 2 && key === 'destination') { inDest = true; continue; }
+      if (inDest && ind === 4 && key === 'type') { out.destination = value; inDest = false; }
+    }
+  }
+  return out.type === 'scheduled' ? out : null;
+}
+
+function formatRelative(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const delta = (d - Date.now()) / 1000;
+    const abs = Math.abs(delta);
+    if (abs < 60) return delta >= 0 ? 'in <1 min' : '<1 min ago';
+    if (abs < 3600) return delta >= 0 ? `in ${Math.round(delta / 60)} min` : `${Math.round(abs / 60)} min ago`;
+    if (abs < 86400) return delta >= 0 ? `in ${Math.round(delta / 3600)} h` : `${Math.round(abs / 3600)} h ago`;
+    return delta >= 0
+      ? `in ${Math.round(delta / 86400)}d (${d.toLocaleDateString()})`
+      : `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch { return iso; }
+}
+
+function ScheduledStatusBadge({ status }) {
+  const palette = {
+    success: { bg: '#0c2a1f', fg: T.green, label: 'OK' },
+    failed: { bg: '#2a0f12', fg: T.red, label: 'FAIL' },
+    timeout: { bg: '#2a1f0a', fg: T.amber, label: 'TIMEOUT' },
+    running: { bg: '#0a1d2a', fg: T.cyan, label: 'RUNNING' },
+  };
+  const p = palette[status] || { bg: T.bg2, fg: T.dim, label: (status || '—').toUpperCase() };
+  return (
+    <span className="mono" style={{
+      fontSize: 9, padding: '2px 6px', letterSpacing: '.08em',
+      background: p.bg, color: p.fg, border: `1px solid ${p.fg}33`,
+    }}>{p.label}</span>
+  );
+}
+
+function ScheduledAgentCard({ agent, schedSpec, schedulerJob, onChanged }) {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [running, setRunning] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [runs, setRuns] = useState(null);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+
+  const reloadRuns = useCallback(async () => {
+    setLoadingRuns(true);
+    try {
+      const r = await fetch(`${API}/agents/${agent.id}/runs`);
+      const j = r.ok ? await r.json() : { rows: [] };
+      setRuns(j.rows || []);
+    } finally {
+      setLoadingRuns(false);
+    }
+  }, [agent.id]);
+
+  const runNow = () => showConfirm({
+    title: `Run "${agent.name}" now?`,
+    body: `Fires the agent's trigger.message immediately, just like a scheduled tick. Output goes to ${schedSpec?.destination || 'the manifest destination'} and the run shows up in the history below.`,
+    action: 'Run now', danger: false,
+    onConfirm: async () => {
+      setRunning(true);
+      try {
+        const r = await fetch(`${API}/agents/${agent.id}/run-now`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: null }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+        addToast(`Run ${j.status} (${j.duration_ms} ms)`, j.status === 'success' ? 'ok' : 'error');
+        if (showHistory) reloadRuns();
+        onChanged?.();
+      } catch (e) {
+        addToast(`Run failed: ${e.message}`, 'error');
+      } finally {
+        setRunning(false);
+      }
+    },
+  });
+
+  const toggleHistory = () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && runs === null) reloadRuns();
+  };
+
+  const deleteRun = (runId) => showConfirm({
+    title: 'Delete run from history?',
+    body: 'This only removes the entry from the history panel. The output (if delivered) is unaffected.',
+    action: 'Delete', danger: true,
+    onConfirm: async () => {
+      try {
+        const r = await fetch(`${API}/agents/${agent.id}/runs/${runId}`, { method: 'DELETE' });
+        if (!r.ok && r.status !== 204) throw new Error(`HTTP ${r.status}`);
+        setRuns(rs => (rs || []).filter(x => x.id !== runId));
+      } catch (e) {
+        addToast(`Delete failed: ${e.message}`, 'error');
+      }
+    },
+  });
+
+  const lastRun = schedulerJob?.last_run_at;
+  const lastStatus = schedulerJob?.last_status;
+  const nextRun = schedulerJob?.next_run;
+
+  return (
+    <div style={{
+      border: `1px solid ${T.border}`, background: T.bg1, marginBottom: 14,
+    }}>
+      <div style={{
+        padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <Icon name="sparkle" size={14} color={T.cyan} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, color: T.text, fontWeight: 500 }}>{agent.name}</div>
+          {agent.description && (
+            <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{agent.description}</div>
+          )}
+        </div>
+        <span className="mono" style={{
+          fontSize: 10, color: T.green, letterSpacing: '.08em',
+          padding: '2px 8px', background: '#0c2a1f', border: `1px solid ${T.green}33`,
+        }}>● ACTIVE</span>
+      </div>
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: '110px 1fr', gap: '8px 14px',
+        padding: '12px 16px', fontSize: 12,
+      }}>
+        <span style={{ color: T.dim }}>Schedule</span>
+        <span style={{ color: T.text }}>
+          <span className="mono" style={{ color: T.cyan }}>{schedSpec?.schedule}</span>
+          {schedSpec?.schedule && (
+            <span style={{ color: T.muted, marginLeft: 8 }}>
+              ({describeCron(schedSpec.schedule)}{schedSpec.timezone ? `, ${schedSpec.timezone}` : ''})
+            </span>
+          )}
+        </span>
+        <span style={{ color: T.dim }}>Next run</span>
+        <span style={{ color: T.text }} className="mono">
+          {nextRun
+            ? <>{new Date(nextRun).toLocaleString()} <span style={{ color: T.muted }}>· {formatRelative(nextRun)}</span></>
+            : <span style={{ color: T.dim }}>—</span>}
+        </span>
+        <span style={{ color: T.dim }}>Last run</span>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {lastRun ? (
+            <>
+              <span className="mono" style={{ color: T.text }}>
+                {new Date(lastRun).toLocaleString()}
+              </span>
+              <ScheduledStatusBadge status={lastStatus} />
+              <span style={{ color: T.muted, fontSize: 11 }}>{formatRelative(lastRun)}</span>
+            </>
+          ) : (
+            <span style={{ color: T.dim, fontSize: 11 }}>never run</span>
+          )}
+        </span>
+        <span style={{ color: T.dim }}>Delivery</span>
+        <span className="mono" style={{ color: T.muted, fontSize: 11 }}>
+          {schedSpec?.destination || 'unspecified'}
+          {schedSpec?.policy && (
+            <span style={{ marginLeft: 12 }}>
+              missed: <span style={{ color: T.text }}>{schedSpec.policy}</span>
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div style={{
+        padding: '10px 14px', borderTop: `1px solid ${T.border}`,
+        display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center',
+      }}>
+        <button className="dlk-btn" onClick={toggleHistory}
+          style={{ borderColor: T.border, color: T.text }}>
+          {showHistory ? 'Hide history' : 'History'}
+        </button>
+        <button className="dlk-btn primary" disabled={running} onClick={runNow}
+          style={{ opacity: running ? 0.5 : 1 }}>
+          {running ? 'Running…' : 'Run now'}
+        </button>
+      </div>
+
+      {showHistory && (
+        <RunsHistoryPanel
+          runs={runs}
+          loading={loadingRuns}
+          onReload={reloadRuns}
+          onDelete={deleteRun}
+        />
+      )}
+    </div>
+  );
+}
+
+function RunsHistoryPanel({ runs, loading, onReload, onDelete }) {
+  const [expanded, setExpanded] = useState(null);
+  if (loading && runs === null) {
+    return (
+      <div style={{ padding: '14px 16px', color: T.dim, fontSize: 12, borderTop: `1px solid ${T.border}` }}>
+        Loading runs…
+      </div>
+    );
+  }
+  if (!runs || runs.length === 0) {
+    return (
+      <div style={{ padding: '14px 16px', color: T.dim, fontSize: 12, borderTop: `1px solid ${T.border}` }}>
+        No runs yet.
+      </div>
+    );
+  }
+  return (
+    <div style={{ borderTop: `1px solid ${T.border}`, background: T.bg2 }}>
+      <div style={{
+        padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10,
+        fontSize: 11, color: T.dim, borderBottom: `1px solid ${T.border}`,
+      }}>
+        <span className="mono" style={{ letterSpacing: '.08em' }}>RUNS · {runs.length}</span>
+        <div style={{ flex: 1 }} />
+        <span onClick={onReload} style={{ cursor: 'pointer', color: T.muted, userSelect: 'none' }}>
+          ↻ refresh
+        </span>
+      </div>
+      {runs.map(run => {
+        const isOpen = expanded === run.id;
+        return (
+          <div key={run.id} style={{ borderBottom: `1px solid ${T.border}` }}>
+            <div onClick={() => setExpanded(isOpen ? null : run.id)} style={{
+              padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'pointer', fontSize: 12,
+            }}>
+              <span className="mono" style={{ color: T.muted, fontSize: 11, minWidth: 150 }}>
+                {new Date(run.triggered_at).toLocaleString()}
+              </span>
+              <ScheduledStatusBadge status={run.status} />
+              {run.duration_ms != null && (
+                <span className="mono" style={{ color: T.dim, fontSize: 10 }}>
+                  {run.duration_ms} ms
+                </span>
+              )}
+              {run.delivery_status && (
+                <span className="mono" style={{
+                  color: run.delivery_status === 'sent' ? T.green : T.amber,
+                  fontSize: 10, letterSpacing: '.04em',
+                }}>
+                  · {run.delivery_status}
+                </span>
+              )}
+              <span style={{ flex: 1, color: T.muted, fontSize: 11, overflow: 'hidden',
+                whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                {run.error || (run.output || '').slice(0, 120)}
+              </span>
+              <span className="mono" style={{ color: T.dim, fontSize: 10 }}>{isOpen ? '▾' : '▸'}</span>
+            </div>
+            {isOpen && (
+              <div style={{ padding: '10px 14px 14px', background: T.bg0 }}>
+                {run.error && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div className="mono" style={{ fontSize: 10, color: T.red, marginBottom: 4 }}>
+                      ERROR
+                    </div>
+                    <pre className="mono" style={{
+                      margin: 0, padding: '8px 10px', background: '#2a0f12',
+                      border: `1px solid ${T.red}33`, color: T.text, fontSize: 11,
+                      whiteSpace: 'pre-wrap',
+                    }}>{run.error}</pre>
+                  </div>
+                )}
+                {run.output && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div className="mono" style={{ fontSize: 10, color: T.dim, marginBottom: 4 }}>
+                      OUTPUT
+                    </div>
+                    <pre className="mono" style={{
+                      margin: 0, padding: '8px 10px', background: T.bg1,
+                      border: `1px solid ${T.border}`, color: T.text, fontSize: 11,
+                      whiteSpace: 'pre-wrap', maxHeight: 320, overflowY: 'auto',
+                    }}>{run.output}</pre>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="mono" style={{ fontSize: 10, color: T.dim }}>
+                    delivery: {run.delivery_status || '—'}
+                    {run.delivery_status_detail && <> · {run.delivery_status_detail}</>}
+                    {run.delivery_target && <> · {run.delivery_target}</>}
+                  </span>
+                  <button className="dlk-btn" onClick={() => onDelete(run.id)}
+                    style={{ borderColor: T.red + '66', color: T.red }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduledSection() {
+  const { addToast } = useContext(Ctx);
+  const [scheduled, setScheduled] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [reloading, setReloading] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      const [aResp, sResp] = await Promise.all([
+        fetch(`${API}/agents`),
+        fetch(`${API}/scheduler/status`),
+      ]);
+      const agents = aResp.ok ? await aResp.json() : [];
+      const scheduledList = agents.flatMap(a => {
+        const spec = parseScheduledManifest(a.manifest_yaml);
+        return spec ? [{ agent: a, spec }] : [];
+      });
+      setScheduled(scheduledList);
+      setStatus(sResp.ok ? await sResp.json() : null);
+    } catch {
+      setScheduled([]);
+      setStatus(null);
+    }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const jobByAgent = (() => {
+    const map = {};
+    (status?.jobs || []).forEach(j => { if (j.agent_id) map[j.agent_id] = j; });
+    return map;
+  })();
+
+  const reloadScheduler = async () => {
+    setReloading(true);
+    try {
+      const r = await fetch(`${API}/scheduler/reload`, { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+      addToast(`Reloaded · +${j.added} / ~${j.updated} / -${j.removed}`, 'ok');
+      reload();
+    } catch (e) {
+      addToast(`Reload failed: ${e.message}`, 'error');
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  return (
+    <BodyShell crumb="02 / CAPABILITIES → SCHEDULED" title="Scheduled agents"
+      desc="Agents whose manifest declares trigger.type=scheduled. The scheduler fires their trigger.message on a cron schedule and routes the result to the configured destination — Telegram, filesystem, or in-app notifications.">
+
+      <Card title="Scheduler" n="A"
+        right={
+          status?.disabled ? (
+            <span className="mono" style={{ fontSize: 10, color: T.amber, letterSpacing: '.08em' }}>
+              DISABLED (DIALEKT_DISABLE_SCHEDULER=1)
+            </span>
+          ) : status?.running ? (
+            <span className="mono" style={{ fontSize: 10, color: T.green, letterSpacing: '.08em' }}>
+              ● RUNNING · {(status.jobs || []).length} job(s)
+            </span>
+          ) : (
+            <span className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.08em' }}>
+              not started
+            </span>
+          )
+        }>
+        <Row label="Reload jobs from manifests"
+          sub="re-syncs APScheduler against the agents table" last>
+          <button className="dlk-btn" disabled={reloading} onClick={reloadScheduler}
+            style={{ opacity: reloading ? 0.5 : 1 }}>
+            {reloading ? 'Reloading…' : 'Reload'}
+          </button>
+        </Row>
+      </Card>
+
+      {scheduled === null ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : scheduled.length === 0 ? (
+        <Card>
+          <div style={{ padding: '40px 0', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: 12 }}>
+            <Icon name="sparkle" size={28} color={T.dim} />
+            <div style={{ color: T.dim, fontSize: 13, textAlign: 'center' }}>
+              No scheduled agents yet.<br />
+              Import a manifest with{' '}
+              <span className="mono" style={{ color: T.cyan }}>trigger.type: scheduled</span>{' '}
+              from the Builder Wizard or the YAML import endpoint.
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div>
+          {scheduled.map(({ agent, spec }) => (
+            <ScheduledAgentCard
+              key={agent.id}
+              agent={agent}
+              schedSpec={spec}
+              schedulerJob={jobByAgent[agent.id]}
+              onChanged={reload}
+            />
+          ))}
+        </div>
+      )}
+    </BodyShell>
+  );
+}
+
 // ── Section: Admin ───────────────────────────────────────────────────────────
 
 function AdminSection() {
@@ -3622,6 +4450,7 @@ const NAV_GROUPS = [
   { title: 'Setup', items: [
     { k: 'Models',      icon: 'sparkle' },
     { k: 'Personality', icon: 'chat'    },
+    { k: 'Branding',    icon: 'diamond' },
     { k: 'Appearance',  icon: 'diamond' },
     { k: 'Shortcuts',   icon: 'terminal'},
   ]},
@@ -3632,9 +4461,11 @@ const NAV_GROUPS = [
     { k: 'Browser',         icon: 'globe'   },
     { k: 'Screen control',  icon: 'screen'  },
     { k: 'MCP Servers',     icon: 'cog' },
+    { k: 'Web Search',      icon: 'globe'   },
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
     { k: 'Instagram',       icon: 'sparkle' },
+    { k: 'Scheduled',       icon: 'sparkle' },
   ]},
   { title: 'System', items: [
     { k: 'Storage & memory',   icon: 'file'   },
@@ -3651,6 +4482,7 @@ function renderSection(s) {
     case 'Permissions':        return <PermissionsSection />;
     case 'Models':             return <ModelsSection />;
     case 'Personality':        return <PersonalitySection />;
+    case 'Branding':           return <BrandingSection />;
     case 'Appearance':         return <AppearanceSection />;
     case 'Shortcuts':          return <ShortcutsSection />;
     case 'Filesystem':         return <FilesystemSection />;
@@ -3658,9 +4490,11 @@ function renderSection(s) {
     case 'Browser':            return <BrowserSection />;
     case 'Screen control':     return <ScreenSection />;
     case 'MCP Servers':        return <MCPSection />;
+    case 'Web Search':         return <WebSearchSection />;
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
     case 'Instagram':          return <InstagramSection />;
+    case 'Scheduled':          return <ScheduledSection />;
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;

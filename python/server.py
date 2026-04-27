@@ -156,7 +156,7 @@ def save_settings(data: dict) -> None:
 
 
 import aiosqlite
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -605,6 +605,13 @@ CREATE INDEX IF NOT EXISTS idx_batch_jobs_status   ON batch_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_batch_files_job_id  ON batch_job_files(job_id, ordinal);
 """
 
+# Pulled in here so a single executescript at boot brings up every
+# table the server depends on. Importing at module level keeps the
+# boot path linear; the scheduler runtime itself is lazy-imported
+# inside lifespan() once the DB connection is available.
+from dialekt.scheduler import SCHEDULED_RUNS_SCHEMA  # noqa: E402
+_SCHEMA = _SCHEMA + "\n" + SCHEDULED_RUNS_SCHEMA
+
 
 async def _init_db():
     await db.executescript(_SCHEMA)
@@ -734,11 +741,30 @@ async def lifespan(app: FastAPI):
     set_context(_build_plugin_context(app))
     log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
 
+    # v0.27 §3.2: scheduled-trigger runtime. Boots once the DB is up so
+    # SCHEDULED_RUNS_SCHEMA exists when start() inserts catch-up rows.
+    # Skipped only when the env var DIALEKT_DISABLE_SCHEDULER=1 — the
+    # test suite uses that escape hatch when a test would otherwise
+    # race a real cron tick against its assertions.
+    app.state.scheduler = None
+    if os.environ.get("DIALEKT_DISABLE_SCHEDULER") != "1":
+        try:
+            from dialekt.scheduler import DialektScheduler
+            app.state.scheduler = DialektScheduler(db)
+            await app.state.scheduler.start()
+        except Exception:
+            log.exception("scheduler boot failed — interactive agents still work")
+
     yield
     from mcp_servers.postgres_mcp import close_all_pools
     from mcp_servers.mysql_mcp import close_all_pools_mysql
     await close_all_pools()
     await close_all_pools_mysql()
+    if getattr(app.state, "scheduler", None) is not None:
+        try:
+            await app.state.scheduler.stop()
+        except Exception:
+            log.exception("scheduler shutdown failed")
     try:
         await stop_refresher(app.state.license_refresher)
     except Exception:
@@ -999,6 +1025,16 @@ async def admin_reload_schema():
             reloaded.append(modname)
         except Exception as e:
             errors.append(f"{modname}: {type(e).__name__}: {e}")
+
+    # Re-apply dialekt's runtime capability patch — reload wiped it.
+    # Without this, capability groups dialekt ships ahead of the
+    # validator (e.g. web_search) disappear after the first reload,
+    # which would silently break agent validation in-process.
+    try:
+        from dialekt.manifest_capabilities import apply_runtime_patch
+        apply_runtime_patch()
+    except Exception as e:
+        errors.append(f"runtime capability patch: {type(e).__name__}: {e}")
 
     # Surface the new constants so the UI can show them in a toast and
     # the user knows the reload actually took effect.
@@ -1666,6 +1702,20 @@ async def license_trial():
 
 # ── Agent endpoints ───────────────────────────────────────────────────────────
 
+
+async def _scheduler_reload_safe() -> None:
+    """Best-effort reload — agent CRUD must succeed even if the
+    scheduler is disabled (DIALEKT_DISABLE_SCHEDULER=1) or boot
+    failed. Re-syncs cron jobs after a manifest changes shape."""
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        return
+    try:
+        await sched.reload()
+    except Exception:
+        log.exception("scheduler reload failed (CRUD continued)")
+
+
 @app.get("/agents")
 async def list_agents_endpoint():
     return await db_list_agents()
@@ -1683,6 +1733,7 @@ async def create_agent_endpoint(body: dict):
         manifest_yaml=body.get("manifest_yaml"),
         version=body.get("version", "1.0.0"),
     )
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": name}
 
 
@@ -1699,6 +1750,7 @@ async def update_agent_endpoint(agent_id: str, body: dict):
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_update_agent(agent_id, **body)
+    await _scheduler_reload_safe()
     return {"ok": True}
 
 
@@ -1707,7 +1759,104 @@ async def delete_agent_endpoint(agent_id: str):
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_delete_agent(agent_id)
+    await _scheduler_reload_safe()
     return {"ok": True}
+
+
+# ── Scheduled runs surface (v0.27 §3.2) ──────────────────────────────────────
+#
+# Reads off the scheduled_runs table populated by the scheduler runtime
+# and exposes the manual fire path. Settings → Agents → Scheduled
+# consumes everything here; agent CRUD elsewhere triggers reload().
+
+@app.get("/agents/{agent_id}/runs")
+async def list_agent_runs(agent_id: str, limit: int = 50):
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    n = max(1, min(int(limit), 200))
+    cur = await db.execute(
+        "SELECT id, agent_id, session_id, status, triggered_at, completed_at, "
+        "duration_ms, output, error, delivery_status, delivery_status_detail, "
+        "delivery_target FROM scheduled_runs WHERE agent_id=? "
+        "ORDER BY triggered_at DESC, id DESC LIMIT ?",
+        (agent_id, n),
+    )
+    rows = await cur.fetchall()
+    return {"rows": [dict(r) for r in rows]}
+
+
+@app.get("/agents/{agent_id}/runs/{run_id}")
+async def get_agent_run(agent_id: str, run_id: str):
+    cur = await db.execute(
+        "SELECT id, agent_id, session_id, status, triggered_at, completed_at, "
+        "duration_ms, output, error, delivery_status, delivery_status_detail, "
+        "delivery_target FROM scheduled_runs WHERE agent_id=? AND id=?",
+        (agent_id, run_id),
+    )
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Run not found")
+    return dict(row)
+
+
+@app.delete("/agents/{agent_id}/runs/{run_id}", status_code=204)
+async def delete_agent_run(agent_id: str, run_id: str):
+    cur = await db.execute(
+        "DELETE FROM scheduled_runs WHERE agent_id=? AND id=?",
+        (agent_id, run_id),
+    )
+    await db.commit()
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Run not found")
+    return Response(status_code=204)
+
+
+@app.post("/agents/{agent_id}/run-now")
+async def run_agent_now(agent_id: str, body: dict | None = None):
+    """Manual fire path. Body is optional — when ``message`` is null
+    (or absent) the agent's manifest trigger.message is used; pass an
+    explicit string to override it for one-off testing.
+    """
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        raise HTTPException(503, "scheduler is not running on this server")
+    override = (body or {}).get("message")
+    if override is not None and not isinstance(override, str):
+        raise HTTPException(400, "message must be a string when provided")
+    try:
+        result = await sched.run_now(agent_id, override_message=override)
+    except RuntimeError as e:
+        raise HTTPException(404, str(e))
+    return {
+        "run_id": result.run_id,
+        "session_id": result.session_id,
+        "status": result.status,
+        "duration_ms": result.duration_ms,
+        "started": True,
+    }
+
+
+@app.get("/scheduler/status")
+async def scheduler_status():
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        return {"running": False, "jobs": [], "disabled": True}
+    return await sched.status()
+
+
+@app.post("/scheduler/reload")
+async def scheduler_reload():
+    """Re-sync APScheduler against the agents table. Useful after a
+    manifest edit when the auto-reload didn't fire (e.g. the agent
+    was edited directly through the DB, or the user reverted a YAML
+    file on disk and re-imported it).
+    """
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        raise HTTPException(503, "scheduler is not running on this server")
+    return await sched.reload()
 
 
 @app.post("/agents/import")
@@ -1732,6 +1881,7 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
         version=version,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": name, "warnings": warnings}
 
 
@@ -1769,6 +1919,7 @@ async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
         source_template_id=source_template_id,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": m.metadata.name, "warnings": warnings}
 
 
@@ -3444,9 +3595,12 @@ COMFY_OUTPUT = Path(_comfy_output_env) if _comfy_output_env else _HOME / "projec
 async def serve_file(path: str):
     from fastapi.responses import FileResponse
     p = Path(path).resolve()
+    visual_root_env = os.environ.get("DIALEKT_VISUAL_ROOT")
+    visual_root = Path(visual_root_env) if visual_root_env else Path.home() / ".dialekt" / "visual"
     allowed = [
         COMFY_OUTPUT.resolve(),
         Path("/tmp/dialekt_files").resolve(),
+        (visual_root / "out").resolve(),
     ]
     if not any(str(p).startswith(str(a)) for a in allowed):
         raise HTTPException(403, "path not allowed")
@@ -4028,6 +4182,518 @@ async def comfy_txt2vid(body: dict):
         files = await _comfy_run(wf, timeout=1800)
         return {"ok": True, "files": files, "seed": seed}
     except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ── Visual templates (HTML → PNG) ────────────────────────────────────────────
+
+@app.get("/visual/templates")
+async def visual_templates():
+    """List all HTML templates discovered under ~/.dialekt/visual/templates/."""
+    from dialekt.tools.visual import list_templates
+    return {
+        "ok": True,
+        "templates": [
+            {
+                "id": t.id,
+                "set": t.set_name,
+                "name": t.name,
+                "description": t.description,
+                "width": t.width,
+                "height": t.height,
+                "variables": t.variables,
+            }
+            for t in list_templates()
+        ],
+    }
+
+
+@app.post("/visual/render")
+async def visual_render(body: dict):
+    """Render an HTML template to PNG.
+
+    Body: ``{"template_id": "default.announcement_1x1", "fields": {...},
+    "brand_id": "iba"}``. ``brand_id`` is optional — when set, the
+    matching brand's CSS variables, logo and font are injected before
+    the template's own ``<head>``. Returns ``{ok, file, files,
+    size_bytes, ms, template_id, width, height, brand_id}``.
+    """
+    from dialekt.tools.visual import render
+    from dialekt.tools.visual.template_registry import (
+        TemplateNotFoundError,
+        TemplateValidationError,
+    )
+
+    template_id = body.get("template_id")
+    fields = body.get("fields", {}) or {}
+    brand_id = body.get("brand_id") or None
+    if not template_id:
+        return {"ok": False, "error": "template_id is required"}
+    if not isinstance(fields, dict):
+        return {"ok": False, "error": "fields must be an object"}
+
+    try:
+        # Playwright sync API blocks the event loop — push to a worker thread.
+        return await asyncio.to_thread(render, template_id, fields, brand_id=brand_id)
+    except TemplateNotFoundError:
+        return {"ok": False, "error": f"unknown template_id: {template_id}"}
+    except TemplateValidationError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        log.exception("visual render failed")
+        return {"ok": False, "error": str(e)}
+
+
+# ── Branding (brand profiles + asset uploads) ────────────────────────────────
+#
+# Endpoints:
+#   POST   /branding/upload           — multipart create-or-replace
+#   GET    /branding                  — list all profiles
+#   GET    /branding/{brand_id}       — read one profile
+#   DELETE /branding/{brand_id}       — drop profile + assets
+#   POST   /branding/{brand_id}/preview — render a synthetic showcase
+#       PNG built from the brand's own colors / logo / font; lets the
+#       Settings UI confirm the upload landed without depending on a
+#       specific named template
+#
+# Storage is filesystem-backed (see dialekt.branding.profile). No DB
+# rows because brand assets are inherently file-shaped — JSON profile
+# alongside binary blobs — and a 100-pilot deployment still fits in
+# a single directory.
+
+
+_BRAND_PREVIEW_TEMPLATE = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>brand preview · {{NAME}}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1080px; height: 1080px; overflow: hidden;
+    background: var(--brand-background, #FFFFFF);
+    color: var(--brand-text, #111111);
+    font-family: var(--brand-font, 'Inter', system-ui, sans-serif);
+  }
+  .frame {
+    width: 100%; height: 100%; padding: 80px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .head {
+    display: flex; align-items: center; gap: 28px;
+  }
+  .brand-logo {
+    width: 96px; height: 96px;
+    border: 1px solid currentColor;
+    background-color: rgba(255,255,255,0.04);
+  }
+  .name {
+    font-size: 56px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .label {
+    font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase;
+    opacity: 0.6;
+  }
+  .swatches {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
+    margin-top: 56px;
+  }
+  .swatch {
+    border: 1px solid rgba(127,127,127,0.25);
+    padding: 24px;
+    display: flex; flex-direction: column; gap: 12px;
+    min-height: 180px;
+  }
+  .swatch .chip {
+    width: 100%; height: 64px;
+  }
+  .swatch .row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px;
+  }
+  .swatch .role {
+    font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .sample {
+    margin-top: 48px;
+    padding: 32px;
+    border-top: 1px solid rgba(127,127,127,0.25);
+    border-bottom: 1px solid rgba(127,127,127,0.25);
+  }
+  .sample h2 {
+    font-size: 88px; font-weight: 800; letter-spacing: -0.03em;
+    color: var(--brand-primary, #000);
+  }
+  .sample p {
+    font-size: 22px; line-height: 1.4; margin-top: 20px;
+    max-width: 780px;
+  }
+  .footer {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div>
+      <div class="head">
+        <div class="brand-logo"></div>
+        <div>
+          <div class="label">brand preview</div>
+          <div class="name">{{NAME}}</div>
+        </div>
+      </div>
+
+      <div class="swatches">
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-primary, transparent);"></div>
+          <div class="row"><span class="role">Primary</span><span>{{PRIMARY}}</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-secondary, transparent);"></div>
+          <div class="row"><span class="role">Secondary</span><span>{{SECONDARY}}</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-background, transparent); border: 1px solid currentColor;"></div>
+          <div class="row"><span class="role">Background</span><span>{{BACKGROUND}}</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-text, transparent);"></div>
+          <div class="row"><span class="role">Text</span><span>{{TEXT}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sample">
+      <h2>Sample Headline</h2>
+      <p>The quick brown fox jumps over the lazy dog. — A pangram in your brand voice.</p>
+    </div>
+
+    <div class="footer">
+      <span>{{NAME}}</span>
+      <span>{{FONT_LABEL}}</span>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def _branding_to_dict(b) -> dict:
+    """Public shape — strips runtime asset existence info."""
+    d = b.to_dict()
+    return {
+        "id": d["id"],
+        "name": d["name"],
+        "colors": d["colors"],
+        "has_logo": bool(b.absolute_logo_path and b.absolute_logo_path.exists()),
+        "has_font": bool(b.absolute_font_path and b.absolute_font_path.exists()),
+        "font_family": d["font_family"],
+        "logo_rel_path": d["logo_rel_path"],
+        "font_rel_path": d["font_rel_path"],
+        "created_at": d["created_at"],
+        "updated_at": d["updated_at"],
+    }
+
+
+@app.post("/branding/upload")
+async def branding_upload(
+    brand_id: str = Form(...),
+    name: str = Form(...),
+    primary_color: str = Form(...),
+    secondary_color: str = Form(""),
+    background_color: str = Form("#FFFFFF"),
+    text_color: str = Form("#111111"),
+    font_family: str = Form(""),
+    logo: UploadFile | None = File(None),
+    font: UploadFile | None = File(None),
+):
+    """Create or update a brand profile. Multipart so the logo + font
+    binary can ride along with the JSON-ish fields in a single POST.
+
+    Required: ``brand_id``, ``name``, ``primary_color``.
+    Optional: ``secondary_color``, ``background_color``, ``text_color``,
+    ``font_family``, ``logo`` (PNG/SVG/JPG/WebP), ``font`` (TTF/OTF/
+    WOFF/WOFF2). Re-uploading replaces the prior asset.
+    """
+    from dialekt.branding import (
+        BrandColors, BrandProfile, BrandValidationError,
+        load_brand, save_brand, coerce_hex,
+    )
+
+    try:
+        # Load existing profile (preserve uploaded assets across edits)
+        # or initialise a fresh one.
+        try:
+            profile = load_brand(brand_id)
+            profile.name = name
+        except KeyError:
+            profile = BrandProfile(
+                id=brand_id,
+                name=name,
+                colors=BrandColors(primary="#000000"),
+            )
+
+        profile.colors = BrandColors(
+            primary=coerce_hex(primary_color, fallback="#000000") or "#000000",
+            secondary=coerce_hex(secondary_color, fallback="") or "",
+            background=coerce_hex(background_color, fallback="#FFFFFF") or "#FFFFFF",
+            text=coerce_hex(text_color, fallback="#111111") or "#111111",
+        )
+
+        if logo is not None and logo.filename:
+            ext = (logo.filename.rsplit(".", 1)[-1] if "." in logo.filename else "").lower()
+            data = await logo.read()
+            if not data:
+                raise BrandValidationError("logo file is empty")
+            profile.write_logo(data=data, ext=ext)
+
+        if font is not None and font.filename:
+            ext = (font.filename.rsplit(".", 1)[-1] if "." in font.filename else "").lower()
+            data = await font.read()
+            if not data:
+                raise BrandValidationError("font file is empty")
+            profile.write_font(data=data, ext=ext, family=font_family.strip() or None)
+        elif font_family.strip():
+            # User changed the font-family alias without re-uploading the
+            # font — honour it so the @font-face declaration uses the
+            # new name.
+            profile.font_family = font_family.strip()
+
+        save_brand(profile)
+        return {"ok": True, "brand": _branding_to_dict(profile)}
+    except BrandValidationError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        log.exception("branding upload failed")
+        raise HTTPException(500, str(e))
+
+
+@app.get("/branding")
+async def branding_list():
+    from dialekt.branding import list_brands
+    return {"brands": [_branding_to_dict(b) for b in list_brands()]}
+
+
+@app.get("/branding/{brand_id}")
+async def branding_get(brand_id: str):
+    from dialekt.branding import load_brand, BrandValidationError
+    try:
+        return {"brand": _branding_to_dict(load_brand(brand_id))}
+    except KeyError:
+        raise HTTPException(404, f"brand {brand_id} not found")
+    except BrandValidationError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.delete("/branding/{brand_id}")
+async def branding_delete(brand_id: str):
+    from dialekt.branding import delete_brand, BrandValidationError
+    try:
+        existed = delete_brand(brand_id)
+    except BrandValidationError as e:
+        raise HTTPException(422, str(e))
+    return {"ok": True, "deleted": existed}
+
+
+@app.post("/branding/{brand_id}/preview")
+async def branding_preview(brand_id: str):
+    """Render a synthetic showcase PNG for the brand. Builds a
+    self-contained HTML string (4 swatches + sample headline + logo
+    well + footer) and runs it through the visual engine with the
+    brand's CSS prelude attached. Result lands in
+    ``~/.dialekt/visual/out/`` like any other render."""
+    from dialekt.branding import load_brand
+    from dialekt.tools.visual.html_to_png import render_template
+    from dialekt.tools.visual.template_registry import _out_dir
+    import uuid as _uuid
+    import tempfile as _tmp
+
+    try:
+        brand = load_brand(brand_id)
+    except KeyError:
+        raise HTTPException(404, f"brand {brand_id} not found")
+
+    try:
+        out_path = _out_dir() / f"brand_preview_{brand_id}_{_uuid.uuid4().hex[:8]}.png"
+        prelude = brand.css_prelude()
+
+        def _do_render() -> dict:
+            with _tmp.NamedTemporaryFile(
+                "w", suffix=".html", delete=False, encoding="utf-8",
+            ) as f:
+                f.write(_BRAND_PREVIEW_TEMPLATE)
+                tmp_html = f.name
+            try:
+                file_path = render_template(
+                    html_path=tmp_html,
+                    variables={
+                        "NAME": brand.name,
+                        "PRIMARY": brand.colors.primary,
+                        "SECONDARY": brand.colors.secondary or "—",
+                        "BACKGROUND": brand.colors.background,
+                        "TEXT": brand.colors.text,
+                        "FONT_LABEL": brand.font_family or "system",
+                    },
+                    output_path=out_path,
+                    width=1080, height=1080,
+                    head_prelude=prelude,
+                )
+            finally:
+                try:
+                    Path(tmp_html).unlink()
+                except OSError:
+                    pass
+            return {
+                "ok": True,
+                "file": file_path,
+                "files": [file_path],
+                "brand_id": brand_id,
+                "size_bytes": Path(file_path).stat().st_size,
+            }
+
+        return await asyncio.to_thread(_do_render)
+    except Exception as e:
+        log.exception("brand preview failed")
+        raise HTTPException(500, str(e))
+
+
+# ── Web search providers (Tavily / Brave / DuckDuckGo) ───────────────────────
+
+@app.get("/search/providers")
+async def search_providers():
+    """Return the configured-state of every search provider.
+
+    Drives the Settings → Web Search dropdown — the UI greys out
+    providers that don't have a key set, and shows the "default"
+    indicator for whichever the user picked in settings.
+    """
+    from dialekt.tools.search.router import (
+        PROVIDER_NAMES,
+        SECRET_KEY_BY_PROVIDER,
+        _build_provider,
+    )
+
+    settings = load_settings()
+    default = settings.get("web_search_provider")
+    return {
+        "ok": True,
+        "default": default,
+        "providers": [
+            {
+                "name": name,
+                "configured": _build_provider(name).is_configured(),
+                "needs_api_key": SECRET_KEY_BY_PROVIDER.get(name) is not None,
+                "secret_key": SECRET_KEY_BY_PROVIDER.get(name),
+            }
+            for name in PROVIDER_NAMES
+        ],
+    }
+
+
+@app.post("/search/providers/{provider}/credentials")
+async def search_save_credentials(provider: str, body: dict):
+    """Save (or clear) the API key for a search provider.
+
+    Empty/null/missing api_key deletes the stored secret — same shape as
+    the LLM-provider credential endpoints so the frontend can reuse one
+    save/clear pattern.
+    """
+    from dialekt.tools.search.router import SECRET_KEY_BY_PROVIDER
+    from dialekt.secrets import set_secret, delete_secret
+
+    secret_key = SECRET_KEY_BY_PROVIDER.get(provider)
+    if secret_key is None:
+        # DuckDuckGo or unknown: nothing to store.
+        if provider in SECRET_KEY_BY_PROVIDER:
+            return {"ok": True, "stored": False, "note": "provider needs no API key"}
+        raise HTTPException(404, f"unknown provider: {provider}")
+
+    api_key = (body.get("api_key") or "").strip()
+    if not api_key:
+        delete_secret(secret_key)
+        return {"ok": True, "stored": False, "cleared": True}
+    set_secret(secret_key, api_key)
+    return {"ok": True, "stored": True}
+
+
+@app.delete("/search/providers/{provider}/credentials")
+async def search_clear_credentials(provider: str):
+    from dialekt.tools.search.router import SECRET_KEY_BY_PROVIDER
+    from dialekt.secrets import delete_secret
+
+    secret_key = SECRET_KEY_BY_PROVIDER.get(provider)
+    if secret_key is None:
+        if provider in SECRET_KEY_BY_PROVIDER:
+            return {"ok": True, "cleared": False}
+        raise HTTPException(404, f"unknown provider: {provider}")
+    delete_secret(secret_key)
+    return {"ok": True, "cleared": True}
+
+
+@app.post("/search/providers/{provider}/test")
+async def search_test_provider(provider: str):
+    """Probe the provider — light query through the live API.
+
+    Wired to the "Проверить" button in Settings → Web Search. Runs in a
+    worker thread because every adapter uses sync httpx.
+    """
+    from dialekt.tools.search.router import _build_provider, PROVIDER_NAMES
+
+    if provider not in PROVIDER_NAMES:
+        raise HTTPException(404, f"unknown provider: {provider}")
+    p = _build_provider(provider)
+    return await asyncio.to_thread(p.test_connection)
+
+
+@app.post("/search/web")
+async def search_web(body: dict):
+    """Run a web search through the configured (or requested) provider.
+
+    Body:
+      ``{"query": "...", "max_results": 10, "provider": null,
+         "include_raw_content": false}``
+
+    Returns:
+      ``{"ok": true, "provider": "tavily", "query": "...",
+         "results": [{"url","title","snippet","score","extras"}, ...]}``
+    """
+    from dialekt.tools.search.router import search as _search
+    from dialekt.tools.search.provider import SearchProviderError
+
+    query = (body.get("query") or "").strip()
+    if not query:
+        return {"ok": False, "error": "query is required"}
+
+    max_results = int(body.get("max_results", 10))
+    provider = body.get("provider") or None
+    settings = load_settings()
+    default_provider = settings.get("web_search_provider")
+
+    options = {
+        k: body[k]
+        for k in ("include_raw_content", "search_depth", "country",
+                  "search_lang", "safesearch", "region")
+        if k in body
+    }
+
+    try:
+        result = await asyncio.to_thread(
+            _search,
+            query,
+            max_results,
+            provider=provider,
+            default_provider=default_provider,
+            **options,
+        )
+        return {"ok": True, **result}
+    except SearchProviderError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        log.exception("search failed")
         return {"ok": False, "error": str(e)}
 
 

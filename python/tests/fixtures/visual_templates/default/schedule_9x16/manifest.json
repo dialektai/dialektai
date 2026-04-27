@@ -1,0 +1,34 @@
+{
+  "id": "default.schedule_9x16",
+  "name": "Schedule — Story (9:16)",
+  "description": "Расписание/повестка дня для Instagram/TikTok story.",
+  "width": 1080,
+  "height": 1920,
+  "html": "template.html",
+  "variables": {
+    "EYEBROW": {
+      "type": "string",
+      "required": false,
+      "default": "SCHEDULE",
+      "example": "TODAY · WED 27 APR"
+    },
+    "TITLE": {
+      "type": "string",
+      "required": true,
+      "example": "Day 03 — Strategy Sprint"
+    },
+    "SLOT_1_TIME": {"type": "string", "required": false, "default": "", "example": "09:30"},
+    "SLOT_1_LABEL": {"type": "string", "required": false, "default": "", "example": "Opening keynote"},
+    "SLOT_1_NOTE": {"type": "string", "required": false, "default": "", "example": "Hall A · live"},
+    "SLOT_2_TIME": {"type": "string", "required": false, "default": "", "example": "11:00"},
+    "SLOT_2_LABEL": {"type": "string", "required": false, "default": "", "example": "Workshop — pricing"},
+    "SLOT_2_NOTE": {"type": "string", "required": false, "default": "", "example": "Studio 2"},
+    "SLOT_3_TIME": {"type": "string", "required": false, "default": "", "example": "14:30"},
+    "SLOT_3_LABEL": {"type": "string", "required": false, "default": "", "example": "Panel discussion"},
+    "SLOT_3_NOTE": {"type": "string", "required": false, "default": "", "example": "Hall A"},
+    "SLOT_4_TIME": {"type": "string", "required": false, "default": "", "example": "17:00"},
+    "SLOT_4_LABEL": {"type": "string", "required": false, "default": "", "example": "Networking"},
+    "SLOT_4_NOTE": {"type": "string", "required": false, "default": "", "example": "Rooftop"},
+    "FOOTER": {"type": "string", "required": false, "default": "", "example": "iba.kz"}
+  }
+}

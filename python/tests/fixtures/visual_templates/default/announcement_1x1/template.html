@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>announcement_1x1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    color: #f5f1ea;
+    background: #0c1014;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1080px;
+    padding: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background:
+      radial-gradient(ellipse at 18% 12%, rgba(255, 86, 41, 0.22), transparent 55%),
+      radial-gradient(ellipse at 88% 92%, rgba(58, 90, 220, 0.18), transparent 55%),
+      linear-gradient(180deg, #0c1014 0%, #14181f 100%);
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.07;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay;
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+  }
+
+  .eyebrow {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: #ff5629;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 32px;
+    height: 1px;
+    background: #ff5629;
+    display: inline-block;
+  }
+
+  .corner-mark {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 28px;
+    color: rgba(245, 241, 234, 0.45);
+  }
+
+  .body {
+    position: relative;
+    z-index: 2;
+  }
+
+  .title {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 132px;
+    line-height: 0.94;
+    letter-spacing: -0.02em;
+    color: #f5f1ea;
+    max-width: 900px;
+  }
+
+  .title em {
+    font-style: italic;
+    color: #ff5629;
+  }
+
+  .subtitle {
+    margin-top: 36px;
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: rgba(245, 241, 234, 0.72);
+    max-width: 760px;
+  }
+
+  .bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    position: relative;
+    z-index: 2;
+  }
+
+  .date {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    color: #f5f1ea;
+  }
+
+  .footer {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(245, 241, 234, 0.55);
+    text-align: right;
+  }
+
+  .rule {
+    position: absolute;
+    left: 80px;
+    right: 80px;
+    bottom: 200px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(245, 241, 234, 0.25), transparent);
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="grain"></div>
+
+    <div class="top">
+      <span class="eyebrow">{{EYEBROW}}</span>
+      <span class="corner-mark">№ 01</span>
+    </div>
+
+    <div class="body">
+      <h1 class="title">{{TITLE}}</h1>
+      <p class="subtitle">{{SUBTITLE}}</p>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="bottom">
+      <span class="date">{{DATE}}</span>
+      <span class="footer">{{FOOTER}}</span>
+    </div>
+  </div>
+</body>
+</html>

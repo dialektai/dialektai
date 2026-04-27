@@ -23,6 +23,13 @@ asyncpg>=0.29.0
 aiomysql>=0.2.0
 clickhouse-connect>=0.7.0
 keyring>=25.0.0
+# Scheduled-trigger runtime (v0.27). MemoryJobStore is enough — we re-
+# register every scheduled agent from the agents table on boot, so we
+# don't need APScheduler's SQLAlchemyJobStore (which would pull in
+# SQLAlchemy as a transitive dep). croniter is already pulled in by
+# dialekt-manifest-validator for cron validation; APScheduler reuses it.
+apscheduler>=3.10,<4
+croniter>=2.0.0
 # All published sqlite-vec versions cap at python<3.12. On most platforms
 # pip pulls a prebuilt wheel that ignores that bound, but Windows ARM64
 # has no wheel, so pip falls back to the metadata-respecting sdist and
@@ -39,6 +46,14 @@ sqlite-vec>=0.1.9; platform_machine != "ARM64"
 # Rationale: docs/M2_MCP_DESIGN.md Decision 1 addendum.
 mcp>=1.25,<1.27
 sse-starlette<3
+
+# Visual content engine (HTML → PNG via headless Chromium). After
+# installing Python deps, run `playwright install chromium` once to
+# fetch the browser binaries (~150MB). Pillow ships with PIL.Image
+# which the engine uses for read-back / dimension probes and which
+# agents can call from their Python code blocks for ad-hoc image ops.
+playwright>=1.50,<2
+Pillow>=10.0
 
 # Dev / test only
 pytest>=8.0.0
