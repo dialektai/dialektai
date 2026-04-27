@@ -114,29 +114,27 @@ async def test_revoke_rejects_unknown_key(client, admin_headers):
     assert r.status_code == 404
 
 
-async def test_admin_auth_required(client, tenant_id):
+async def test_admin_auth_required(app, tenant_id):
     """No X-Admin-Key → 401/403; the endpoint must not silently expose
-    keys or usage."""
-    # The session-scoped client may carry an admin session cookie set by
-    # earlier tests (test_admin_2fa). Strip it for the duration of this
-    # test so we exercise the unauthenticated path, then restore.
-    saved_cookies = dict(client.cookies)
-    client.cookies.clear()
-    try:
-        r1 = await client.post(
+    keys or usage. Uses a fresh AsyncClient (not the session-scoped one)
+    to guarantee no admin cookies are carried over from test_admin_2fa.
+    """
+    from httpx import AsyncClient, ASGITransport
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test",
+    ) as fresh:
+        r1 = await fresh.post(
             f"/admin/tenants/{tenant_id}/relay-keys", json={"name": "x"},
         )
         assert r1.status_code in (401, 403)
 
-        r2 = await client.get(f"/admin/tenants/{tenant_id}/relay-keys")
+        r2 = await fresh.get(f"/admin/tenants/{tenant_id}/relay-keys")
         assert r2.status_code in (401, 403)
 
         import uuid
-        r3 = await client.delete(f"/admin/relay-keys/{uuid.uuid4()}")
+        r3 = await fresh.delete(f"/admin/relay-keys/{uuid.uuid4()}")
         assert r3.status_code in (401, 403)
-    finally:
-        for k, v in saved_cookies.items():
-            client.cookies.set(k, v)
 
 
 async def test_usage_rollup_returns_empty_for_unused_tenant(
