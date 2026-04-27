@@ -75,24 +75,26 @@ class MockEmailService:
     def __init__(self):
         self.sent = []
 
-    async def send(self, *, to, subject, template, context, from_addr=None, reply_to=None):
+    async def send(self, *, to, template, context, locale="en", subject=None,
+                   from_addr=None, reply_to=None):
         self.sent.append({
             "to": to, "subject": subject,
-            "template": template, "context": context,
+            "template": template, "context": context, "locale": locale,
             "from_addr": from_addr, "reply_to": reply_to,
         })
         return True
 
-    async def send_invite(self, *, to, invite_token, company_name, landing_url):
-        self.sent.append({"type": "invite", "to": to, "token": invite_token})
+    async def send_invite(self, *, to, invite_token, company_name, landing_url, locale="en"):
+        self.sent.append({"type": "invite", "to": to, "token": invite_token, "locale": locale})
         return True
 
-    async def send_license_activated(self, *, to, license_key, company_name, plan, seats, landing_url):
-        self.sent.append({"type": "license_activated", "to": to, "key": license_key})
+    async def send_license_activated(self, *, to, license_key, company_name,
+                                     plan, seats, landing_url, locale="en"):
+        self.sent.append({"type": "license_activated", "to": to, "key": license_key, "locale": locale})
         return True
 
-    async def send_welcome(self, *, to, company_name, landing_url):
-        self.sent.append({"type": "welcome", "to": to})
+    async def send_welcome(self, *, to, company_name, landing_url, locale="en"):
+        self.sent.append({"type": "welcome", "to": to, "locale": locale})
         return True
 
     async def send_trial_expiring(self, **kwargs):

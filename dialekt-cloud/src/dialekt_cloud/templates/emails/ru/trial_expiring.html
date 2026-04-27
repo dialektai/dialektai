@@ -1,0 +1,70 @@
+{% extends "_layout.html" %}
+{% block lang %}ru{% endblock %}
+{% block subject %}{% autoescape false %}{% if expired %}Пробный период dialekt.ai закончился — продолжим?{% elif days_left == 1 %}1 день до окончания пробного периода dialekt.ai{% else %}{{ days_left }} дн. до окончания пробного периода dialekt.ai{% endif %}{% endautoescape %}{% endblock %}
+{% block preheader %}{% if expired %}Облачные функции лицензии приостановлены. Локальный Ollama и ваши данные не затронуты.{% else %}Ответьте на письмо — пришлём платный тариф или продление.{% endif %}{% endblock %}
+{% block topmeta %}{% if expired %}Trial · Закончился{% else %}Trial · {{ days_left }} дн. до конца{% endif %}{% endblock %}
+
+{% block content %}
+{% if expired %}
+<h1 class="email-h1" style="margin:0 0 14px 0;font-family:'Source Serif 4','Source Serif Pro',Georgia,'Times New Roman',serif;font-size:30px;line-height:1.08;letter-spacing:-0.022em;font-weight:400;color:#0B1220;">
+  {{ full_name }}, ваш пробный период только что закончился.
+</h1>
+<p style="margin:0 0 18px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
+  30-дневный пробный период dialekt.ai истёк
+  <strong style="color:#0B1220;font-weight:500;">{{ expires_at_human }}</strong>.
+  Облачные функции лицензии в настольном приложении приостановлены — но
+  локальный Ollama и ваши данные на машине не затронуты.
+</p>
+<p style="margin:0 0 28px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
+  <strong style="color:#0B1220;font-weight:500;">Хотите продолжить?</strong>
+  Ответьте на это письмо и расскажите, что у вас получилось. Мы продлеваем пробные
+  периоды, у нас есть платные тарифы от $25 за место в месяц и бесплатный год
+  для design-партнёров и инди-разработчиков.
+</p>
+{% else %}
+<h1 class="email-h1" style="margin:0 0 14px 0;font-family:'Source Serif 4','Source Serif Pro',Georgia,'Times New Roman',serif;font-size:30px;line-height:1.08;letter-spacing:-0.022em;font-weight:400;color:#0B1220;">
+  {{ full_name }}, пробный период истекает {{ expires_at_human }}.
+</h1>
+<p style="margin:0 0 18px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
+  Пробный период dialekt.ai заканчивается через
+  <strong style="color:#0B1220;font-weight:500;">{{ days_left }} дн.</strong>
+  После этого облачные функции лицензии перестанут проходить проверку.
+  Локальный Ollama и ваши данные при этом остаются на вашей машине.
+</p>
+<p style="margin:0 0 14px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
+  <strong style="color:#0B1220;font-weight:500;">Если работа идёт:</strong>
+  ответьте — пришлём платный тариф или продление по ситуации.
+  Тарифы Starter — от $25 за место в месяц.
+</p>
+<p style="margin:0 0 28px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
+  <strong style="color:#0B1220;font-weight:500;">Если что-то не сложилось:</strong>
+  тоже ответьте — нам важно понять, что не зашло.
+  Мы маленькая команда, читаем каждое письмо.
+</p>
+{% endif %}
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-section" style="background:#FAFAFA;border:1px solid #E4E6EB;padding:18px 22px;margin:0 0 24px 0;">
+  <tr><td>
+    <p style="margin:0 0 8px 0;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;font-weight:500;">
+      Ваш ключ &nbsp;·&nbsp; для справки
+    </p>
+    <div style="background:#FFFFFF;border:1px solid #CDD1D9;padding:13px 16px;font-family:Menlo,Consolas,monospace;font-size:13px;color:#0B1220;word-break:break-all;letter-spacing:0.02em;">
+      {{ license_key }}
+    </div>
+  </td></tr>
+</table>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+  <tr><td style="background:#1E3A8A;border:1px solid #1E3A8A;border-radius:4px;">
+    <a href="mailto:hello@dialekt.ai?subject=dialekt.ai%20trial%20-%20{{ full_name }}" class="email-btn" style="display:inline-block;padding:13px 22px;font-family:'Inter',Arial,sans-serif;font-size:14.5px;font-weight:500;color:#FFFFFF;text-decoration:none;letter-spacing:-0.005em;">
+      Ответить на hello@dialekt.ai &rarr;
+    </a>
+  </td></tr>
+</table>
+{% endblock %}
+
+{% block footer_note %}
+Тарифы &middot;
+<a href="{{ landing_url }}/pricing.html" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">{{ landing_url }}/pricing.html</a> &nbsp;·&nbsp;
+<a href="mailto:hello@dialekt.ai" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">hello@dialekt.ai</a>
+{% endblock %}

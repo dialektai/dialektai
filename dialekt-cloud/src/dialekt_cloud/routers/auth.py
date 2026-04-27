@@ -339,7 +339,7 @@ async def signup(
         existing = await conn.fetchrow(
             """
             SELECT t.id, t.expires_at, t.email_verified_at, t.plan, t.status,
-                   l.license_key
+                   t.locale, l.license_key
             FROM tenants t
             LEFT JOIN licenses l ON l.tenant_id = t.id AND l.active = TRUE
             WHERE t.admin_email = $1
@@ -377,6 +377,7 @@ async def signup(
                     email_svc, email, body.full_name, verify_token,
                     license_key=existing["license_key"],
                     expires_at=existing["expires_at"],
+                    locale=existing["locale"] or "en",
                 )
             # Re-acceptance: the user clicked through the form again,
             # so log a new consent row. ToS audit is append-only.
@@ -468,6 +469,7 @@ async def signup(
         email_svc, email, body.full_name, verify_token,
         license_key=license_key,
         expires_at=expires_at,
+        locale=locale,
     )
 
     # Internal heads-up to the founder so leads land in the inbox without
@@ -507,6 +509,7 @@ async def _send_verify_email(
     license_key: str | None = None,
     expires_at: datetime | None = None,
     seats: int = TRIAL_SEATS,
+    locale: str = "en",
 ):
     """Send the verify-email message — also serves as the welcome email
     since download URLs + license key + verify link are bundled together.
@@ -529,8 +532,8 @@ async def _send_verify_email(
     try:
         await email_svc.send(
             to=email,
-            subject="Welcome to dialekt.ai — your trial + downloads",
             template="verify_email",
+            locale=locale,
             context={
                 "full_name": full_name,
                 "verify_url": verify_url,
@@ -555,7 +558,7 @@ async def verify_email(verify_token: str, pool=Depends(get_pool), email_svc=Depe
             SELECT v.id, v.tenant_id, v.email, v.verified_at, v.expires_at,
                    t.email_verified_at AS tenant_verified_at, t.company_name,
                    t.plan, t.seats_limit, t.expires_at AS tenant_expires_at,
-                   l.license_key
+                   t.locale, l.license_key
             FROM email_verifications v
             JOIN tenants t ON t.id = v.tenant_id
             LEFT JOIN licenses l ON l.tenant_id = t.id AND l.active = TRUE
@@ -581,7 +584,13 @@ async def verify_email(verify_token: str, pool=Depends(get_pool), email_svc=Depe
                 )
 
     if not already_verified and row["license_key"]:
-        # Send the welcome / license-activated email now that account is real
+        tenant_locale = row["locale"] or "en"
+        # Send the license-activated email (the "your key works now" message)
+        # followed by the welcome onboarding mail (the "here's where to go
+        # next" message). Two distinct beats — the first is transactional
+        # confirmation, the second is the onboarding nudge. Failures don't
+        # block the verify response since the user already has the key from
+        # signup.
         try:
             await email_svc.send_license_activated(
                 to=row["email"],
@@ -590,9 +599,19 @@ async def verify_email(verify_token: str, pool=Depends(get_pool), email_svc=Depe
                 plan=row["plan"],
                 seats=row["seats_limit"],
                 landing_url=settings.LANDING_URL,
+                locale=tenant_locale,
             )
         except Exception as exc:
             logger.warning("license_activated email failed for %s: %s", row["email"], exc)
+        try:
+            await email_svc.send_welcome(
+                to=row["email"],
+                company_name=row["company_name"],
+                landing_url=settings.LANDING_URL,
+                locale=tenant_locale,
+            )
+        except Exception as exc:
+            logger.warning("welcome email failed for %s: %s", row["email"], exc)
 
     return {
         "ok": True,
@@ -612,7 +631,7 @@ async def resend_verify(body: dict, pool=Depends(get_pool), email_svc=Depends(ge
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT t.id, t.email_verified_at, t.expires_at, t.seats_limit,
+            SELECT t.id, t.email_verified_at, t.expires_at, t.seats_limit, t.locale,
                    u.full_name, l.license_key
             FROM tenants t
             LEFT JOIN tenant_users u ON u.tenant_id = t.id AND u.email = t.admin_email
@@ -635,6 +654,7 @@ async def resend_verify(body: dict, pool=Depends(get_pool), email_svc=Depends(ge
         license_key=row["license_key"],
         expires_at=row["expires_at"],
         seats=row["seats_limit"] or TRIAL_SEATS,
+        locale=row["locale"] or "en",
     )
     return {"ok": True}
 
@@ -678,12 +698,13 @@ async def create_invite(
         )
 
         tenant_row = await conn.fetchrow(
-            "SELECT company_name FROM tenants WHERE id = $1", tenant_id
+            "SELECT company_name, locale FROM tenants WHERE id = $1", tenant_id
         )
 
     await email_svc.send_invite(
         to=body.email,
         invite_token=token,
+        locale=(tenant_row["locale"] if tenant_row else None) or "en",
         company_name=tenant_row["company_name"],
         landing_url=settings.LANDING_URL,
     )

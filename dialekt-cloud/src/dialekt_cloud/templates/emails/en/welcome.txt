@@ -1,0 +1,14 @@
+dialekt.ai — You're all set, {{ company_name }}
+
+Email verified. License active. From here it's a short hop to your first agent.
+
+THREE THINGS WORTH DOING FIRST
+  01. Pick your model. Local Ollama or 18 cloud providers — switch any time.
+  02. Grant tool permissions. File access, shell, web — granular, revocable.
+  03. Invite a teammate. Settings → Users. Up to your seat limit.
+
+Stuck on anything? We're a small team that reads every reply.
+hello@dialekt.ai
+
+—
+dialekt.ai · {{ landing_url }}

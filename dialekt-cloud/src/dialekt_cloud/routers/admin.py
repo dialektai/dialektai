@@ -918,6 +918,7 @@ async def activate_tenant(
         plan=tenant["plan"],
         seats=tenant["seats_limit"],
         landing_url=settings.LANDING_URL,
+        locale=tenant["locale"] or "en",
     )
 
     return {
@@ -953,7 +954,7 @@ async def extend_tenant(
         raise HTTPException(400, "reason required for audit log")
 
     async with pool.acquire() as conn:
-        tenant = await conn.fetchrow("SELECT id, expires_at, plan, seats_limit, status, admin_email FROM tenants WHERE id = $1", tenant_id)
+        tenant = await conn.fetchrow("SELECT id, expires_at, plan, seats_limit, status, admin_email, locale FROM tenants WHERE id = $1", tenant_id)
         if not tenant:
             raise HTTPException(404)
 
@@ -1025,6 +1026,7 @@ async def extend_tenant(
             new_expires_at_human=new_expires.strftime("%d %b %Y"),
             days_added=body.days,
             landing_url=settings.LANDING_URL,
+            locale=tenant["locale"] or "en",
         )
     except Exception as exc:
         logger.warning("license-extended email failed for tenant %s: %s", tenant_id, exc)

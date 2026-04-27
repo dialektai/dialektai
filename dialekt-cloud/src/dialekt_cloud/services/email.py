@@ -96,17 +96,20 @@ class EmailService:
 
         try:
             html_tpl = self._env.get_template(self._resolve(locale, template, "html"))
-            html_module = html_tpl.make_module(context)
-            html = str(html_module)
+            html = html_tpl.render(**context)
 
             # Subject: prefer caller override, else pull from template block.
+            # Children declare {% block subject %}{% autoescape false %}...{%
+            # endautoescape %}{% endblock %}, which the layout exposes as the
+            # <title> element. Render the block in isolation to get a clean
+            # header value (no HTML/whitespace).
             if subject is None:
-                block_subject = getattr(html_module, "subject", None)
-                if block_subject is None:
+                if "subject" not in html_tpl.blocks:
                     raise RuntimeError(
                         f"template {template} has no {{% block subject %}} and no subject= passed"
                     )
-                subject = str(block_subject)
+                block_ctx = html_tpl.new_context(vars=context)
+                subject = "".join(html_tpl.blocks["subject"](block_ctx))
             # Strip CR/LF to defend against header injection via interpolated
             # values (e.g. a malicious full_name containing "\nBcc: attacker@").
             subject = subject.replace("\r", " ").replace("\n", " ").strip()

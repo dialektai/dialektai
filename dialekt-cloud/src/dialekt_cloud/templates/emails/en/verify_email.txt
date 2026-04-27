@@ -1,0 +1,30 @@
+dialekt.ai — Welcome, {{ full_name }}
+
+Your 30-day trial is created. Three short steps:
+
+01 · DOWNLOAD DIALEKT
+The app runs locally — your prompts never leave your machine by default.
+{% if downloads %}{% for d in downloads %}
+  {{ d.platform }} ({{ d.ext }}): {{ d.url }}{% endfor %}{% endif %}
+All releases: {{ releases_page }}
+
+02 · YOUR LICENSE KEY
+Paste this on the License screen at first launch.
+It activates after you verify your email below.
+
+  {{ license_key }}
+
+Plan: Trial · Seats: {{ seats }} · Expires: {{ expires_at_human }}
+
+03 · VERIFY YOUR EMAIL
+Open this link to activate your license:
+
+  {{ verify_url }}
+
+Link expires in 7 days. Lost it? Email hello@dialekt.ai.
+
+—
+dialekt.ai · local-first AI agent platform
+{{ landing_url }}
+You're receiving this because you signed up for a 30-day trial.
+We do not send marketing emails.

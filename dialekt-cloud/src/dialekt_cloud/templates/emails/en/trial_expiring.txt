@@ -1,0 +1,31 @@
+{% if expired -%}
+dialekt.ai — Your trial just ended, {{ full_name }}
+
+Your 30-day trial expired on {{ expires_at_human }}. The desktop app's
+cloud-license features are now paused — but local Ollama and your data
+on your machine are untouched.
+
+Want to keep going? Reply to this email and tell us what you've built.
+We extend trials, run paid plans from $25/seat/mo, and offer a free year
+for design partners and indie devs.
+{%- else -%}
+dialekt.ai — Heads up, {{ full_name }} — your trial expires {{ expires_at_human }}
+
+Your trial ends in {{ days_left }} day{% if days_left != 1 %}s{% endif %}.
+After that, the desktop app's cloud-license features stop validating.
+Local Ollama and your data stay on your machine regardless.
+
+If it's working out: reply and we'll send a paid plan or a comp extension.
+Plans start at $25/seat/mo for Starter.
+
+If it's not working out: reply too — we'd genuinely like to know what
+didn't click. We're a small team that reads every reply.
+{%- endif %}
+
+YOUR LICENSE KEY (for reference)
+  {{ license_key }}
+
+Reply: hello@dialekt.ai
+
+—
+dialekt.ai · {{ landing_url }}/pricing.html

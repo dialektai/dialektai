@@ -1,0 +1,48 @@
+{% extends "_layout.html" %}
+{% block lang %}en{% endblock %}
+{% block subject %}{% autoescape false %}You're all set, {{ company_name }}{% endautoescape %}{% endblock %}
+{% block preheader %}Email verified, license active. Here's where to go from here.{% endblock %}
+{% block topmeta %}Account · Verified{% endblock %}
+
+{% block content %}
+<h1 class="email-h1" style="margin:0 0 14px 0;font-family:'Source Serif 4','Source Serif Pro',Georgia,'Times New Roman',serif;font-size:32px;line-height:1.06;letter-spacing:-0.022em;font-weight:400;color:#0B1220;">
+  You're all set, {{ company_name }}.
+</h1>
+<p style="margin:0 0 24px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.55;color:#3F4657;">
+  Email verified. License active. From here it's a short hop to your first agent.
+</p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="email-section" style="background:#FAFAFA;border:1px solid #E4E6EB;padding:22px 24px;margin:0 0 24px 0;">
+  <tr><td>
+    <p style="margin:0 0 12px 0;font-family:'Inter',Arial,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#1E3A8A;font-weight:600;">
+      Three things worth doing first
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      {% for step in [
+        ("Pick your model", "Local Ollama or 18 cloud providers — switch any time."),
+        ("Grant tool permissions", "File access, shell, web — granular, revocable."),
+        ("Invite a teammate", "Settings &rarr; Users. Up to your seat limit.")
+      ] %}
+      <tr>
+        <td width="28" valign="top" style="padding:8px 0;font-family:'Inter',Arial,sans-serif;font-size:13px;color:#1E3A8A;font-weight:600;letter-spacing:0.06em;">
+          0{{ loop.index }}
+        </td>
+        <td valign="top" style="padding:8px 0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.6;color:#0B1220;">
+          <strong style="font-weight:500;">{{ step[0]|safe }}.</strong>
+          <span style="color:#3F4657;">{{ step[1]|safe }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+</table>
+
+<p style="margin:0;font-family:'Inter',Arial,sans-serif;font-size:14px;line-height:1.65;color:#3F4657;">
+  Stuck on anything? We're a small team that reads every reply.
+  <a href="mailto:hello@dialekt.ai" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">hello@dialekt.ai</a>.
+</p>
+{% endblock %}
+
+{% block footer_note %}
+You're receiving this because you just verified your email at {{ landing_url }}.
+{% endblock %}

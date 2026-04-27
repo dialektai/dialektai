@@ -1,0 +1,21 @@
+dialekt.ai — Your license is active
+
+Payment from {{ company_name }} confirmed. Your subscription is live.
+
+LICENSE KEY
+  {{ license_key }}
+
+Plan: {{ plan }}
+Seats: {{ seats }}
+
+HOW TO ACTIVATE
+  01. Open dialekt on your computer
+  02. On the License screen, paste the key above
+  03. Wait for confirmation — takes a few seconds
+  04. Invite teammates via Settings → Users
+
+Questions? Reply to this email or write to hello@dialekt.ai.
+
+—
+dialekt.ai · Save this key somewhere safe.
+{{ landing_url }}

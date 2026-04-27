@@ -1,0 +1,22 @@
+dialekt.ai — You're invited
+
+{{ company_name }} invites you to join their dialekt.ai workspace —
+the local-first place to run AI agents.
+
+YOUR PERSONAL LINK
+  {{ invite_url }}
+
+OR ENTER THE CODE MANUALLY IN THE APP
+  {{ invite_token }}
+
+The code is valid for 7 days. After that, ask the workspace
+administrator to send a new one.
+
+HOW TO JOIN
+  01. Download dialekt at {{ landing_url }}
+  02. Install and launch the app
+  03. On the welcome screen pick "I have an invitation"
+  04. Paste the code above
+
+—
+dialekt.ai · If you didn't expect this invitation, just ignore this email.
