@@ -260,14 +260,14 @@ function SubscriptionTab() {
       <div style={{ background: T.bg1, border: `1px solid ${T.border}`, padding: 24, marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 16 }}>Current Plan</div>
         {!license?.valid ? (
-          <div style={{ color: T.amber, fontSize: 13 }}>No active license. <a href="mailto:hello@dialekt.ai" style={{ color: T.cyan }}>Contact us</a></div>
+          <div style={{ color: T.amber, fontSize: 13 }}>No active license. <a href="mailto:hello@dias.now" style={{ color: T.cyan }}>Contact us</a></div>
         ) : license?.trial ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <Badge text="Trial" color={T.amber} />
               <span style={{ fontSize: 13, color: T.muted }}>30-day free trial</span>
             </div>
-            <div style={{ fontSize: 12, color: T.dim }}>3 seats · all features. To activate a paid plan, contact <a href="mailto:hello@dialekt.ai" style={{ color: T.cyan }}>hello@dialekt.ai</a></div>
+            <div style={{ fontSize: 12, color: T.dim }}>3 seats · all features. To activate a paid plan, contact <a href="mailto:hello@dias.now" style={{ color: T.cyan }}>hello@dias.now</a></div>
           </div>
         ) : (
           <div>
@@ -291,9 +291,9 @@ function SubscriptionTab() {
           dialekt uses invoice-based billing. To upgrade, add seats, or extend your subscription,
           contact the founder directly.
         </div>
-        <a href="mailto:hello@dialekt.ai?subject=dialekt%20subscription"
+        <a href="mailto:hello@dias.now?subject=dialekt%20subscription"
           style={{ display: 'inline-block', padding: '9px 20px', background: T.bg2, border: `1px solid ${T.border}`, color: T.text, fontSize: 12, fontWeight: 600, textDecoration: 'none', letterSpacing: '.04em' }}>
-          CONTACT → hello@dialekt.ai
+          CONTACT → hello@dias.now
         </a>
       </div>
     </div>
@@ -308,7 +308,7 @@ export default function AdminDashboardScreen({ onNav }) {
   const [activeTab, setActiveTab] = useState('Users');
 
   return (
-    <AppFrame title="dialekt.ai — Admin">
+    <AppFrame title="dias.now — Admin">
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: T.bg0, minWidth: 0, overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ background: T.bg1, borderBottom: `1px solid ${T.border}`, padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

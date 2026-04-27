@@ -11,7 +11,7 @@ const steps = [
 
 export default function OnboardingShell({ step, title, blurb, cta = 'Continue', loading = false, onCtaClick, onNav, children }) {
   return (
-    <AppFrame title={`dialekt.ai — onboarding · step ${step}`}>
+    <AppFrame title={`dias.now — onboarding · step ${step}`}>
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
         <div style={{ width: 320, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '36px 32px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>

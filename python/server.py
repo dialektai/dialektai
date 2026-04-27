@@ -1,5 +1,5 @@
 """
-dialekt.ai — FastAPI + Open Interpreter backend
+dias.now — FastAPI + Open Interpreter backend
 WebSocket at /ws  — streaming chat (includes session_id in start event)
 REST:
   GET  /health

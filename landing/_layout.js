@@ -1,4 +1,4 @@
-/* dialekt.ai — shared-layout injector for static pages.
+/* dias.now — shared-layout injector for static pages.
    Pages add <div data-layout="nav"></div> and <div data-layout="footer"></div>
    placeholders, then load:
      <script src="/_i18n.js" defer></script>
@@ -11,7 +11,7 @@
   const navHtml = `
     <nav class="nav">
       <div class="nav-inner">
-        <a href="/" class="brand" aria-label="dialekt.ai">
+        <a href="/" class="brand" aria-label="dias.now">
           <b>dialekt</b><span class="accent">.ai</span>
         </a>
         <div class="nav-links" id="nav-links">
@@ -57,12 +57,12 @@
             <a data-href-en="/privacy.html" data-href-ru="/privacy-ru.html" data-i18n="footer.legal.privacy">Privacy</a>
             <a data-href-en="/terms.html" data-href-ru="/terms-ru.html" data-i18n="footer.legal.terms">Terms</a>
             <a href="/dpa.html" data-i18n="footer.legal.dpa">DPA</a>
-            <a href="mailto:hello@dialekt.ai" data-i18n="footer.company.contact">Contact</a>
+            <a href="mailto:hello@dias.now" data-i18n="footer.company.contact">Contact</a>
           </div>
         </div>
       </div>
       <div class="footer-bottom">
-        <span data-i18n="footer.copy">© 2026 dialekt.ai</span>
+        <span data-i18n="footer.copy">© 2026 dias.now</span>
         <span data-i18n="footer.principle">Local-first · No telemetry · No account required</span>
       </div>
     </footer>

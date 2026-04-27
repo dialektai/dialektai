@@ -63,7 +63,7 @@
     <tbody>
       <tr>
         <td>1</td>
-        <td>Подписка dialekt.ai ({{ plan }}), {{ seats }} мест{{ ', ' + period_months|string + ' мес.' if period_months > 1 else ', 1 мес.' }}</td>
+        <td>Подписка dias.now ({{ plan }}), {{ seats }} мест{{ ', ' + period_months|string + ' мес.' if period_months > 1 else ', 1 мес.' }}</td>
         <td style="text-align:center">1</td>
         <td style="text-align:center">услуга</td>
         <td style="text-align:right">{{ amount_kzt_fmt }}</td>
@@ -97,7 +97,7 @@
     <tr><th>Банк</th><td>{{ seller.bank }}</td></tr>
     <tr><th>БИК</th><td>{{ seller.bik }}</td></tr>
     <tr><th>Получатель</th><td>{{ seller.name }}</td></tr>
-    <tr><th>Назначение платежа</th><td>Оплата по счёту {{ invoice_number }} за подписку dialekt.ai</td></tr>
+    <tr><th>Назначение платежа</th><td>Оплата по счёту {{ invoice_number }} за подписку dias.now</td></tr>
   </table>
 </div>
 

@@ -1,6 +1,25 @@
 # dialekt — Claude Code guidance
 
-Project-local instructions for Claude Code working на dialekt.ai.
+Project-local instructions for Claude Code working on dialekt.
+
+## Naming: dialekt (working) vs dias.now (production)
+
+- **`dialekt`** is the **working name** — used in code identifiers, file
+  paths, package names, module names, repo name (`dialektai/dialektai`),
+  database names (`dialekt_cloud`, `dialekt_cloud_test`), Python imports
+  (`from dialekt_cloud import ...`), CLI commands (`dialekt-admin`).
+  Don't rename these — they are internal identity, not brand.
+- **`dias.now`** is the **production / user-facing brand**. Use it in
+  every visible string the customer will see: landing copy, email
+  subjects/bodies, SMTP `From:` display names (`dias.now <hello@dias.now>`),
+  legal documents, app UI strings, invoices, OG / SEO meta, support
+  inboxes (`hello@dias.now`, `security@dias.now`).
+- When in doubt: if a developer reads it → `dialekt`. If a customer
+  reads it → `dias.now`.
+
+The repo-wide rename happened on the `ux-ui` branch — every literal
+`dialekt.ai` string was replaced with `dias.now`. Don't reintroduce
+`dialekt.ai` in user-visible copy.
 
 ## When to invoke mentor agent
 

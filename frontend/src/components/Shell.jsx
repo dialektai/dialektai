@@ -126,7 +126,7 @@ function WinLinuxControls() {
   );
 }
 
-export function AppFrame({ children, title = 'dialekt.ai', ollamaOnline }) {
+export function AppFrame({ children, title = 'dias.now', ollamaOnline }) {
   const showOllama = ollamaOnline !== undefined;
   const dotColor = ollamaOnline ? '#27c93f' : '#ff5f56';
   const dotTitle = ollamaOnline ? 'Ollama running' : 'Ollama offline';

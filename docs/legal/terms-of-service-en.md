@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Product:** dialekt.ai
+**Product:** dias.now
 **Provider:** Limited Liability Partnership "Dialekt.ai" (TOO "Dialekt.ai")
 **Effective date:** 25 April 2026
 **Version:** 1.0
@@ -9,9 +9,9 @@
 
 ## 1. Acceptance of these Terms
 
-These Terms of Service (the "**Terms**") constitute a binding agreement between you (the "**Customer**", "**you**") and Limited Liability Partnership "Dialekt.ai" (BIN 260140001608, registered at Republic of Kazakhstan, Astana, Esil district, Е 652 Street, building 4, premise 1, postal code 010000; "**dialekt**", "**we**", "**us**") regarding your access to and use of the dialekt.ai software product, the dialekt.ai website at https://dialekt.ai, and the dialekt-cloud licensing infrastructure (collectively, the "**Services**").
+These Terms of Service (the "**Terms**") constitute a binding agreement between you (the "**Customer**", "**you**") and Limited Liability Partnership "Dialekt.ai" (BIN 260140001608, registered at Republic of Kazakhstan, Astana, Esil district, Е 652 Street, building 4, premise 1, postal code 010000; "**dialekt**", "**we**", "**us**") regarding your access to and use of the dias.now software product, the dias.now website at https://dias.now, and the dialekt-cloud licensing infrastructure (collectively, the "**Services**").
 
-By creating an account, downloading the Product, activating a licence key, or otherwise using the Services, you acknowledge that you have read, understood, and agreed to be bound by these Terms and our Privacy Policy at https://dialekt.ai/legal/privacy. If you do not agree, do not use the Services.
+By creating an account, downloading the Product, activating a licence key, or otherwise using the Services, you acknowledge that you have read, understood, and agreed to be bound by these Terms and our Privacy Policy at https://dias.now/legal/privacy. If you do not agree, do not use the Services.
 
 If you are entering into these Terms on behalf of a legal entity, you represent that you have the authority to bind that entity, and "Customer" refers to that entity.
 
@@ -23,12 +23,12 @@ Capitalised terms not otherwise defined have the meanings set out below or in th
 - **"Authorised User"** means an individual employee, contractor, or agent of the Customer who has been granted access to the Services via a Seat.
 - **"Cloud LLM Provider"** means a third-party Large Language Model service (such as Anthropic, OpenAI, Google, AWS, and others enumerated in our Privacy Policy) that the Customer or Authorised User may optionally enable from within the Product.
 - **"Customer Data"** means any data, content, prompts, files, code, or other materials submitted by the Customer or Authorised Users into or through the Product.
-- **"Documentation"** means the user documentation for the Product available at https://dialekt.ai/docs.
+- **"Documentation"** means the user documentation for the Product available at https://dias.now/docs.
 - **"Local Device"** means the computer of an Authorised User on which the Product is installed.
 - **"Order"** means an order for Seats and a Subscription Plan, accepted by both parties (typically by issuance of an invoice and its payment).
-- **"Product"** means the dialekt.ai desktop application and any associated components (including the local FastAPI backend running on the Authorised User's Local Device).
+- **"Product"** means the dias.now desktop application and any associated components (including the local FastAPI backend running on the Authorised User's Local Device).
 - **"Seat"** means a single named-user licence permitting one Authorised User to use the Product.
-- **"Subscription Plan"** means the plan tier purchased by the Customer (Starter, Professional, Enterprise) as defined in our Pricing Page at https://dialekt.ai/pricing.
+- **"Subscription Plan"** means the plan tier purchased by the Customer (Starter, Professional, Enterprise) as defined in our Pricing Page at https://dias.now/pricing.
 - **"Subscription Term"** means the period for which the Customer has purchased Seats, beginning on the date of activation and continuing for the term specified in the applicable Order.
 - **"Trial"** means a free, time-limited evaluation of the Product, currently 30 days unless otherwise stated.
 
@@ -100,7 +100,7 @@ At the end of the Trial period, access to paid features ceases unless the Custom
 
 ### 6.1 Pricing
 
-Subscription Plans, Seat pricing, and minimum Seat requirements are published on the Pricing Page at https://dialekt.ai/pricing. The applicable fees for each Order are those in effect on the Pricing Page on the date of the Order, unless we have agreed different terms in writing with the Customer.
+Subscription Plans, Seat pricing, and minimum Seat requirements are published on the Pricing Page at https://dias.now/pricing. The applicable fees for each Order are those in effect on the Pricing Page on the date of the Order, unless we have agreed different terms in writing with the Customer.
 
 ### 6.2 Invoicing and payment
 
@@ -182,7 +182,7 @@ To the extent that Customer Data includes personal data within the meaning of ap
 
 - with respect to personal data submitted to Cloud LLM Providers, the Customer is the controller and the Cloud LLM Provider is an independent controller or processor; dialekt is not a processor of such data;
 - with respect to Account information (Authorised User names, email addresses, billing details), dialekt is the controller as described in the Privacy Policy;
-- where the Customer requires a written Data Processing Agreement reflecting any processing of Customer Data by dialekt that does occur (for example, backup of Account metadata), we make our standard DPA template available at https://dialekt.ai/dpa.html, and execute a per-customer copy on Enterprise plans on request to legal@dias.now.
+- where the Customer requires a written Data Processing Agreement reflecting any processing of Customer Data by dialekt that does occur (for example, backup of Account metadata), we make our standard DPA template available at https://dias.now/dpa.html, and execute a per-customer copy on Enterprise plans on request to legal@dias.now.
 
 ## 9. Intellectual property
 
@@ -338,7 +338,7 @@ The current Subscription Plan tiers are:
 | **Professional** | For SMBs. All 18 supported Cloud LLM Providers. Priority email support. Audit log. SLA per Section 15.2. |
 | **Enterprise** | For larger organisations. SSO, SLA per Section 15.2, named technical contact, on-premise option, regulated_mode preconfiguration, custom DPA on request. |
 
-Detailed feature lists, Seat pricing, and minimum Seat requirements are at https://dialekt.ai/pricing.
+Detailed feature lists, Seat pricing, and minimum Seat requirements are at https://dias.now/pricing.
 
 ### 15.2 Service Level Agreement (Professional and Enterprise)
 

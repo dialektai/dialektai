@@ -13,7 +13,7 @@ def _make_service():
         port=1025,
         user="",
         password="",
-        from_addr="test@dialekt.ai",
+        from_addr="test@dias.now",
         use_tls=False,
     )
 

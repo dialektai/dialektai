@@ -102,7 +102,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
   };
 
   return (
-    <AppFrame title="dialekt.ai — new conversation">
+    <AppFrame title="dias.now — new conversation">
       <LeftPanel active={-1} onNav={onNav} />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: T.bg0, minWidth: 0 }}>
         <header style={{

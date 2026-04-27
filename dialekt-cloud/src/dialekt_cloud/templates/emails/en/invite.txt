@@ -1,6 +1,6 @@
-dialekt.ai — You're invited
+dias.now — You're invited
 
-{{ company_name }} invites you to join their dialekt.ai workspace —
+{{ company_name }} invites you to join their dias.now workspace —
 the local-first place to run AI agents.
 
 YOUR PERSONAL LINK
@@ -19,4 +19,4 @@ HOW TO JOIN
   04. Paste the code above
 
 —
-dialekt.ai · If you didn't expect this invitation, just ignore this email.
+dias.now · If you didn't expect this invitation, just ignore this email.

@@ -1,4 +1,4 @@
-dialekt.ai — Здравствуйте, {{ full_name }}
+dias.now — Здравствуйте, {{ full_name }}
 
 Ваш 30-дневный пробный период создан. Три коротких шага:
 
@@ -21,10 +21,10 @@ dialekt.ai — Здравствуйте, {{ full_name }}
 
   {{ verify_url }}
 
-Ссылка действует 7 дней. Потеряли её? Напишите на hello@dialekt.ai.
+Ссылка действует 7 дней. Потеряли её? Напишите на hello@dias.now.
 
 —
-dialekt.ai · local-first AI agent platform
+dias.now · local-first AI agent platform
 {{ landing_url }}
 Вы получили это письмо, потому что зарегистрировали 30-дневный пробный период.
 Маркетинговые рассылки мы не отправляем.

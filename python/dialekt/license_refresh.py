@@ -75,7 +75,7 @@ async def refresh_once(load_settings: Callable[[], dict],
     if not license_key:
         return {"status": "no-license", "reason": "nothing to validate"}
 
-    cloud_url = s.get("cloud_api_url") or "https://api.dialekt.ai"
+    cloud_url = s.get("cloud_api_url") or "https://api.dias.now"
     try:
         data = await _call_cloud(cloud_url, license_key)
     except Exception as e:

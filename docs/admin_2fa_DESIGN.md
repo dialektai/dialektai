@@ -113,7 +113,7 @@ The static `DIALEKT_ADMIN_KEY` env var is **kept** but its semantics change:
 
 **Lost phone AND lost backup codes, have password + SSH:** SSH to the server, run:
 ```bash
-$ uv run dialekt-admin reset-2fa --email=dias@dialekt.ai
+$ uv run dialekt-admin reset-2fa --email=dias@dias.now
 TOTP secret cleared. Next login will trigger re-enrollment.
 ```
 
@@ -130,7 +130,7 @@ TOTP secret cleared. Next login will trigger re-enrollment.
 ## 8. Crypto + library choices
 
 - Password hash: **argon2id** via `argon2-cffi`. Params: `time_cost=3, memory_cost=64MB, parallelism=4`. (OWASP 2024 baseline.)
-- TOTP: **`pyotp`** (RFC 6238). 6-digit codes, 30s period. Provisioning URI format: `otpauth://totp/dialekt.ai:dias%40dialekt.ai?secret=BASE32&issuer=dialekt.ai`.
+- TOTP: **`pyotp`** (RFC 6238). 6-digit codes, 30s period. Provisioning URI format: `otpauth://totp/dias.now:dias%40dias.now?secret=BASE32&issuer=dias.now`.
 - TOTP secret encryption at rest: **AES-256-GCM** with key from `DIALEKT_ADMIN_TOTP_KEY` env var (32 bytes, base64). Rotation runbook: re-encrypt all `totp_secret_encrypted` rows in a single migration.
 - Backup codes: 10 codes, 8 chars `[A-Z0-9]` (no ambiguous chars: no 0/O/1/I/L). Hashed with argon2id. Plaintext shown ONCE at generation time, downloadable as `dialekt-admin-backup-codes-YYYYMMDD.txt`.
 - QR code: server generates SVG inline via `qrcode[svg]` lib (no external image fetches).
@@ -188,7 +188,7 @@ test_cli_reset_2fa_clears_secret
 
 1. Deploy schema migration (idempotent, adds tables only).
 2. Deploy backend with new endpoints. Existing `_require_admin` continues to accept env-key during the migration window.
-3. Run CLI: `dialekt-admin admin create --email=dias@dialekt.ai --password-prompt`.
+3. Run CLI: `dialekt-admin admin create --email=dias@dias.now --password-prompt`.
 4. First login from browser triggers TOTP enrollment; download backup codes.
 5. Deploy updated dashboard.html (no admin_key in HTML, cookie-only auth).
 6. Restart server with `DIALEKT_ADMIN_KEY` rotated to a new value (so the old shared key stops working everywhere). New value is the break-glass-only key.
@@ -261,7 +261,7 @@ Per Dias's directive ("admin emails always @dias.now, primary is zhumagaliyev@di
 - CLI `dialekt-admin admin create` — refuses non-policy emails before insert
 - `POST /admin/login` — refuses non-policy emails with the same `401 Invalid email or password` (no leak about whether the row exists vs. policy mismatch); failure logged with `failure_reason="domain_policy"`
 
-Tests run with `DIALEKT_ADMIN_EMAIL_DOMAIN=""` (no restriction) so throwaway `@dialekt.ai` admins still work; two new tests pin the policy when active.
+Tests run with `DIALEKT_ADMIN_EMAIL_DOMAIN=""` (no restriction) so throwaway `@dias.now` admins still work; two new tests pin the policy when active.
 
 **Frontend self-service** — Security tab in `templates/admin/dashboard.html`:
 - Topbar shows current admin email + `BREAK-GLASS` badge if env-key auth path
@@ -311,7 +311,7 @@ The multi-admin isolation tests guarantee that one admin's actions on `regenerat
 
 1. Pull main, deploy schema migration (idempotent — adds tables, no DROPs).
 2. Deploy backend with new admin auth.
-3. SSH to host: `dialekt-admin admin create --email=dias@dialekt.ai`. Set strong password.
+3. SSH to host: `dialekt-admin admin create --email=dias@dias.now`. Set strong password.
 4. Visit `https://admin.dias.now/admin/ui/login` from a clean browser. Sign in. First login triggers TOTP enrollment — scan QR with Google Authenticator / 1Password / Authy.
 5. Download the 10 backup codes (.txt) at the prompt. Store in 1Password / Bitwarden in a "dialekt break-glass" vault.
 6. Generate a fresh `DIALEKT_ADMIN_TOTP_KEY` (32 bytes base64): `python -c 'import base64,os;print(base64.b64encode(os.urandom(32)).decode())'`. Update `.env` and restart.

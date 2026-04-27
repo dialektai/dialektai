@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "dialekt.ai <hello@dias.now>"   # default sender (transactional)
+    SMTP_FROM: str = "dias.now <hello@dias.now>"   # default sender (transactional)
     SMTP_TLS: bool = True
 
     # ── Per-purpose From-addresses (Zoho aliases on @dias.now) ──────────────
@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     # security@, billing/invoices come from billing@, compliance from
     # privacy@. Keeps headers honest in inboxes and gives users somewhere
     # appropriate to reply.
-    SMTP_FROM_HELLO:    str = "dialekt.ai <hello@dias.now>"
-    SMTP_FROM_SECURITY: str = "dialekt.ai security <security@dias.now>"
-    SMTP_FROM_PRIVACY:  str = "dialekt.ai privacy <privacy@dias.now>"
-    SMTP_FROM_BILLING:  str = "dialekt.ai billing <billing@dias.now>"
+    SMTP_FROM_HELLO:    str = "dias.now <hello@dias.now>"
+    SMTP_FROM_SECURITY: str = "dias.now security <security@dias.now>"
+    SMTP_FROM_PRIVACY:  str = "dias.now privacy <privacy@dias.now>"
+    SMTP_FROM_BILLING:  str = "dias.now billing <billing@dias.now>"
     # Inbox that receives admin/internal notifications (new signups, lead
     # alerts, lockout broadcasts). Defaults to hello@ which fans out via
     # Zoho aliases; override to a personal mailbox for on-call.

@@ -1,4 +1,4 @@
-dialekt.ai — Welcome, {{ full_name }}
+dias.now — Welcome, {{ full_name }}
 
 Your 30-day trial is created. Three short steps:
 
@@ -21,10 +21,10 @@ Open this link to activate your license:
 
   {{ verify_url }}
 
-Link expires in 7 days. Lost it? Email hello@dialekt.ai.
+Link expires in 7 days. Lost it? Email hello@dias.now.
 
 —
-dialekt.ai · local-first AI agent platform
+dias.now · local-first AI agent platform
 {{ landing_url }}
 You're receiving this because you signed up for a 30-day trial.
 We do not send marketing emails.

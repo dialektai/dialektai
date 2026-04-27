@@ -22,7 +22,7 @@ async def test_dashboard_html_does_not_contain_admin_key(client):
     # Mint a real session cookie (multi-admin v1.1 shape) for the test.
     token = create_admin_session_token(
         admin_id="00000000-0000-0000-0000-000000000000",
-        email="test@dialekt.ai",
+        email="test@dias.now",
         secret=_cfg.JWT_SECRET,
         ttl=300,
     )
@@ -46,7 +46,7 @@ async def test_dashboard_html_does_not_contain_admin_key(client):
 async def fresh_admin(pool):
     """Insert a fresh admin row directly via SQL. Returns (email, password)."""
     from dialekt_cloud.services.admin_auth import hash_password
-    email = f"admin-{uuid.uuid4().hex[:8]}@dialekt.ai"
+    email = f"admin-{uuid.uuid4().hex[:8]}@dias.now"
     password = "correct-horse-battery-staple-2026"
     async with pool.acquire() as conn:
         await conn.execute(
@@ -111,7 +111,7 @@ async def test_enroll_totp_returns_provisioning_uri_and_qr(client, fresh_admin):
     body = r.json()
     assert r.status_code == 200
     assert body["secret"]
-    assert body["provisioning_uri"].startswith("otpauth://totp/dialekt.ai:")
+    assert body["provisioning_uri"].startswith("otpauth://totp/dias.now:")
     assert "<svg" in body["qr_svg"]
 
 
@@ -335,8 +335,8 @@ async def test_two_admins_isolated_regenerate_does_not_invalidate_other(client, 
 
     # Insert two admins directly (CLI path).
     pw_a, pw_b = "alpha-pass-12345!", "bravo-pass-67890@"
-    email_a = f"alpha-{uuid.uuid4().hex[:6]}@dialekt.ai"
-    email_b = f"bravo-{uuid.uuid4().hex[:6]}@dialekt.ai"
+    email_a = f"alpha-{uuid.uuid4().hex[:6]}@dias.now"
+    email_b = f"bravo-{uuid.uuid4().hex[:6]}@dias.now"
     async with pool.acquire() as conn:
         # Seed both with non-null backup_codes so we can detect mutation.
         from dialekt_cloud.services.admin_auth import generate_backup_codes

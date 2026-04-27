@@ -42,7 +42,7 @@ export default function LicenseScreen({ onNav }) {
 
       if (!data.valid) {
         setStatus('error');
-        setErrorMsg(data.message || 'License key not found or expired. Contact hello@dialekt.ai');
+        setErrorMsg(data.message || 'License key not found or expired. Contact hello@dias.now');
         return;
       }
 
@@ -76,7 +76,7 @@ export default function LicenseScreen({ onNav }) {
   };
 
   return (
-    <AppFrame title="dialekt.ai — License">
+    <AppFrame title="dias.now — License">
       <div style={{ flex: 1, display: 'flex', background: T.bg0, alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 480 }}>
           {/* Logo */}

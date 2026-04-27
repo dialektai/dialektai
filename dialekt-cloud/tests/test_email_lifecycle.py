@@ -207,7 +207,7 @@ async def enrolled_admin(client, pool, app):
     """Helper: insert + enroll an admin via the full flow.
     Returns (email, password, secret)."""
     from dialekt_cloud.services.admin_auth import hash_password
-    email = f"sec-{uuid.uuid4().hex[:6]}@dialekt.ai"
+    email = f"sec-{uuid.uuid4().hex[:6]}@dias.now"
     pw = "secure-admin-pass-2026!"
     async with pool.acquire() as conn:
         await conn.execute(
@@ -272,8 +272,8 @@ async def test_account_lockout_sends_alert_to_self_and_broadcasts(client, app, p
     from dialekt_cloud.services.admin_auth import hash_password
     # Two admins so we can verify the broadcast path
     pw = "lockout-test-2026!"
-    email_a = f"lockout-a-{uuid.uuid4().hex[:6]}@dialekt.ai"
-    email_b = f"lockout-b-{uuid.uuid4().hex[:6]}@dialekt.ai"
+    email_a = f"lockout-a-{uuid.uuid4().hex[:6]}@dias.now"
+    email_b = f"lockout-b-{uuid.uuid4().hex[:6]}@dias.now"
     async with pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO admins(email, password_hash) VALUES($1, $2), ($3, $2)",
@@ -307,7 +307,7 @@ async def test_account_lockout_sends_alert_to_self_and_broadcasts(client, app, p
 async def test_initial_totp_enrollment_does_not_alert(client, app, pool):
     """First-ever enrollment is part of onboarding — no alert."""
     from dialekt_cloud.services.admin_auth import hash_password
-    email = f"first-totp-{uuid.uuid4().hex[:6]}@dialekt.ai"
+    email = f"first-totp-{uuid.uuid4().hex[:6]}@dias.now"
     pw = "first-time-2026!"
     async with pool.acquire() as conn:
         await conn.execute(

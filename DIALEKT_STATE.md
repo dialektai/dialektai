@@ -27,7 +27,7 @@ Stage 2 COMPLETE — All goals 1–8 done, dialekt-cloud service + admin panel, 
 
 ## Goal 2 — License system — COMPLETE ✓
 - GET /license/status, POST /license/save, POST /license/trial (30-day, 3 seats)
-- LicenseScreen.jsx: validates against api.dialekt.ai/auth/validate-license
+- LicenseScreen.jsx: validates against api.dias.now/auth/validate-license
 - InviteRedemptionScreen.jsx: accepts inv_ tokens from cloud service
 - Manual activation flow: founder creates tenant → generates invoice → activates → system emails license_key
 
@@ -42,7 +42,7 @@ Stage 2 COMPLETE — All goals 1–8 done, dialekt-cloud service + admin panel, 
 
 ## Goal 6 — Admin Dashboard Screen — COMPLETE ✓
 - AdminDashboardScreen.jsx — 4 tabs: Users, Agents, Usage, Subscription
-- Users tab: invite form (POST api.dialekt.ai/auth/invite) + member list
+- Users tab: invite form (POST api.dias.now/auth/invite) + member list
 - Agents tab: list with export buttons
 - Usage tab: StatCards + per-agent breakdown bars
 - Subscription tab: plan info, seat count, contact link

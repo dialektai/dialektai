@@ -260,8 +260,8 @@ Expected response (200):
 ```
 
 Within 30 seconds, you should receive **two** emails to `hello@dias.now` (your alias):
-1. The verify-email with download links + license key (`Subject: Welcome to dialekt.ai — your trial + downloads`)
-2. The internal lead notification (`Subject: [lead] Deploy Smoke Test from KZ — dialekt.ai trial signup`)
+1. The verify-email with download links + license key (`Subject: Welcome to dias.now — your trial + downloads`)
+2. The internal lead notification (`Subject: [lead] Deploy Smoke Test from KZ — dias.now trial signup`)
 
 Click the verify link — you should land on `/verify-email.html?token=...` and see the "Email verified" success state with the license key copy button.
 
@@ -269,7 +269,7 @@ If emails don't arrive in 60 seconds:
 
 ```bash
 docker logs dialekt-api 2>&1 | grep -iE "email|smtp|verify"
-# Look for: "Email sent to test-deploy@dias.now (template=verify_email, from=dialekt.ai <hello@dias.now>)"
+# Look for: "Email sent to test-deploy@dias.now (template=verify_email, from=dias.now <hello@dias.now>)"
 # If you see "Failed to send email" — SMTP creds wrong or Zoho rate-limit
 ```
 
@@ -293,8 +293,8 @@ Trigger a password-changed alert on yourself to verify `security@dias.now` routi
 2. Enter old password + new password (≥12 chars) twice
 3. Click "СМЕНИТЬ ПАРОЛЬ" → "✓ Пароль обновлён"
 4. Within 30 seconds, you should receive an email at `zhumagaliyev@dias.now`:
-   - `Subject: [security] Your dialekt.ai admin password was changed`
-   - `From: dialekt.ai security <security@dias.now>`
+   - `Subject: [security] Your dias.now admin password was changed`
+   - `From: dias.now security <security@dias.now>`
 
 If the From address is `hello@dias.now` instead of `security@dias.now`, the per-purpose routing failed — `SMTP_FROM_SECURITY` env var isn't being read. Re-check `.env` and restart.
 

@@ -560,7 +560,7 @@ export default function OnboardingScreen({ onNav }) {
     : false;
 
   return (
-    <AppFrame title="dialekt.ai — welcome">
+    <AppFrame title="dias.now — welcome">
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
         {/* Left rail */}
         <div style={{ width: 320, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '36px 32px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>

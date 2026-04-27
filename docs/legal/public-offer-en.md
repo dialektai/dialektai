@@ -1,17 +1,17 @@
 # PUBLIC OFFER AGREEMENT
-## granting a non-exclusive licence to use the dialekt.ai software product
+## granting a non-exclusive licence to use the dias.now software product
 
 **Edition:** 1.0
 **Publication date:** 25 April 2026
 **Place of publication:** Republic of Kazakhstan, Astana
 
-> **Informational translation.** This is a courtesy English rendering of the Russian public offer. The Russian text published at https://dialekt.ai/public-offer.html is **authoritative**. In case of any discrepancy, the Russian version prevails.
+> **Informational translation.** This is a courtesy English rendering of the Russian public offer. The Russian text published at https://dias.now/public-offer.html is **authoritative**. In case of any discrepancy, the Russian version prevails.
 
 ---
 
 ## RECITALS
 
-This document constitutes a public offer (publichaya oferta) by Limited Liability Partnership "Dialekt.ai" (hereinafter — "**Licensor**") to an unlimited circle of persons to enter into an agreement granting a non-exclusive licence to use the dialekt.ai software product on the terms set out below (hereinafter — the "**Agreement**").
+This document constitutes a public offer (publichaya oferta) by Limited Liability Partnership "Dialekt.ai" (hereinafter — "**Licensor**") to an unlimited circle of persons to enter into an agreement granting a non-exclusive licence to use the dias.now software product on the terms set out below (hereinafter — the "**Agreement**").
 
 In accordance with Articles 395 and 396 of the Civil Code of the Republic of Kazakhstan, this offer contains all material terms of the Agreement. Full and unconditional acceptance of this offer constitutes conclusion of the Agreement between the Licensor and the accepting party (hereinafter — the "**Licensee**").
 
@@ -20,7 +20,7 @@ The offer is accepted by either of the following actions:
 (a) the Licensee paying an invoice issued by the Licensor based on the Licensee's request;
 (b) the Licensee using the software product after registering an Account and activating a Licence Key.
 
-By performing the actions in (a) or (b) above, the Licensee acknowledges that it has fully read, understood, and accepted all terms of this Agreement, the Privacy Policy, and the Terms of Service published at https://dialekt.ai/legal.
+By performing the actions in (a) or (b) above, the Licensee acknowledges that it has fully read, understood, and accepted all terms of this Agreement, the Privacy Policy, and the Terms of Service published at https://dias.now/legal.
 
 ---
 
@@ -52,9 +52,9 @@ By performing the actions in (a) or (b) above, the Licensee acknowledges that it
 
 The following terms are used in this Agreement:
 
-**1.1. "Software Product"** or **"Product"** — the dialekt.ai software, a desktop application for interacting with large language models (LLMs), including a local backend component running on the user's device and related cloud licensing components (dialekt-cloud).
+**1.1. "Software Product"** or **"Product"** — the dias.now software, a desktop application for interacting with large language models (LLMs), including a local backend component running on the user's device and related cloud licensing components (dialekt-cloud).
 
-**1.2. "Website"** — the Licensor's website at https://dialekt.ai.
+**1.2. "Website"** — the Licensor's website at https://dias.now.
 
 **1.3. "Licence"** — a non-exclusive right to use the Software Product, granted by the Licensor to the Licensee on the terms of this Agreement. One Licence grants usage rights to a single named Authorised User.
 
@@ -62,7 +62,7 @@ The following terms are used in this Agreement:
 
 **1.5. "Authorised User"** — a natural person (employee, contractor, or agent of the Licensee) to whom the Licensee has granted access to use the Licence. Sharing a single Licence between multiple persons is not permitted.
 
-**1.6. "Subscription Plan"** — the subscription tier (Starter, Professional, Enterprise) determining the set of Software Product features available to the Licensee. Subscription Plan descriptions are published at https://dialekt.ai/pricing.
+**1.6. "Subscription Plan"** — the subscription tier (Starter, Professional, Enterprise) determining the set of Software Product features available to the Licensee. Subscription Plan descriptions are published at https://dias.now/pricing.
 
 **1.7. "Licence Term"** — the period for which the Licensee is granted the right to use the Software Product, starting from the date of Licence Key activation.
 
@@ -72,9 +72,9 @@ The following terms are used in this Agreement:
 
 **1.10. "Regulated Mode"** (`regulated_mode`) — a configurable Software Product setting that disables all Cloud LLM Providers at the application level. Intended for Licensees in regulated industries (banks, healthcare organisations, government bodies, critical infrastructure operators).
 
-**1.11. "Privacy Policy"** — the document published at https://dialekt.ai/legal/privacy governing the Licensor's processing of personal data.
+**1.11. "Privacy Policy"** — the document published at https://dias.now/legal/privacy governing the Licensor's processing of personal data.
 
-**1.12. "Terms of Service"** — the document published at https://dialekt.ai/legal/terms containing the full terms of use of the Software Product.
+**1.12. "Terms of Service"** — the document published at https://dias.now/legal/terms containing the full terms of use of the Software Product.
 
 ---
 
@@ -119,7 +119,7 @@ The following terms are used in this Agreement:
 
 ## 4. CONSIDERATION AND PAYMENTS
 
-**4.1.** The amount payable for the Licence is determined by the Subscription Plan in force on the date the invoice is issued. Current rates are published at https://dialekt.ai/pricing.
+**4.1.** The amount payable for the Licence is determined by the Subscription Plan in force on the date the invoice is issued. Current rates are published at https://dias.now/pricing.
 
 **4.2.** All settlements between the parties are made in the national currency of the Republic of Kazakhstan — Kazakhstani Tenge (KZT) — by bank transfer to the Licensor's account. By agreement of the parties, settlements may be made in foreign currency where the Licensee holds a foreign-currency account; in such case the conversion rate is determined by the National Bank of the Republic of Kazakhstan rate on the invoice date.
 
@@ -209,13 +209,13 @@ The Licensee shall not, and shall not permit Authorised Users or third parties t
 
 **7.1.** In entering into and performing this Agreement, the Licensor processes personal data of natural persons on the Licensee's side (contact persons, Authorised Users) as a personal data operator within the meaning of Article 1 of the Law of the Republic of Kazakhstan dated 21 May 2013 No. 94-V "On Personal Data and Their Protection" (the "**Data Protection Law**").
 
-**7.2.** The procedure and conditions for the processing of personal data are set out in the Privacy Policy at https://dialekt.ai/legal/privacy. Conclusion of this Agreement constitutes the Licensee's consent to the Privacy Policy.
+**7.2.** The procedure and conditions for the processing of personal data are set out in the Privacy Policy at https://dias.now/legal/privacy. Conclusion of this Agreement constitutes the Licensee's consent to the Privacy Policy.
 
 **7.3.** The Licensee, acting as a legal entity, warrants that it has obtained all necessary consents from its employees and other natural persons whose personal data is transferred to the Licensor in connection with this Agreement, including consents to cross-border transfer of personal data under Articles 7 and 8 of the Data Protection Law where required.
 
 **7.4.** Where the Licensee processes personal data through Software Product features (including via Cloud LLM Providers), the Licensee acts as an independent personal data operator and bears separate responsibility for compliance with the Data Protection Law and other applicable law.
 
-**7.5.** Where the Licensee requires a separate written data processing agreement (DPA), the Licensor's standard DPA template is published at https://dialekt.ai/dpa.html. Execution of an individual DPA copy is available on Enterprise-tier Subscription Plans on request to legal@dias.now.
+**7.5.** Where the Licensee requires a separate written data processing agreement (DPA), the Licensor's standard DPA template is published at https://dias.now/dpa.html. Execution of an individual DPA copy is available on Enterprise-tier Subscription Plans on request to legal@dias.now.
 
 ---
 

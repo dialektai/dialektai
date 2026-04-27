@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>dialekt.ai — Admin Panel</title>
+<title>dias.now — Admin Panel</title>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14/dist/cdn.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,7 +66,7 @@ input:focus, select:focus, textarea:focus { border-color: #89dceb; }
 
 <!-- Topbar -->
 <div class="topbar">
-  <div class="logo">dialekt.ai / ADMIN</div>
+  <div class="logo">dias.now / ADMIN</div>
   <div style="display:flex;align-items:center;gap:20px">
     <span x-show="me?.email" style="font-size:11px;color:#89dceb;font-family:'JetBrains Mono',monospace" x-text="me?.email"></span>
     <span x-show="me?.via === 'break-glass-key'" style="font-size:10px;color:#f9e2af;border:1px solid #f9e2af;padding:2px 6px;letter-spacing:.08em">BREAK-GLASS</span>
@@ -597,7 +597,7 @@ function adminApp() {
     downloadBackupCodes() {
       // Client-side blob — plaintext never re-enters server memory
       const date = new Date().toISOString().slice(0, 10);
-      const text = `dialekt.ai admin backup codes — ${date}\n` +
+      const text = `dias.now admin backup codes — ${date}\n` +
         `email: ${this.me?.email || '?'}\n\n` +
         this.regenCodes.map((c, i) => `${(i + 1).toString().padStart(2, '0')}. ${c}`).join('\n') +
         `\n\nKeep these safe. Each code works once. Generated ${new Date().toString()}.\n`;

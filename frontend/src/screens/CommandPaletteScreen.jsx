@@ -101,7 +101,7 @@ export default function CommandPaletteScreen({ onNav }) {
   let globalIdx = 0;
 
   return (
-    <AppFrame title="dialekt.ai — ~/code/acme-api">
+    <AppFrame title="dias.now — ~/code/acme-api">
       <LeftPanel active={0} onNav={onNav} />
       <div style={{ flex: 1, position: 'relative', background: T.bg0, overflow: 'hidden' }}>
         <DimmedBackdrop />

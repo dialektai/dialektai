@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="dialekt-cloud",
     version="0.1.0",
-    description="dialekt.ai cloud service — license management and agent registry",
+    description="dias.now cloud service — license management and agent registry",
     docs_url="/docs" if settings.ENV != "production" else None,
     redoc_url=None,
     lifespan=lifespan,
@@ -136,7 +136,7 @@ _ROOT_HTML = """<!DOCTYPE html>
 <body>
 <div class="card">
   <h1>dialekt-cloud</h1>
-  <p>License, invite and agent-registry service for <a href="https://dialekt.dias.now">dialekt.ai</a>.</p>
+  <p>License, invite and agent-registry service for <a href="https://dialekt.dias.now">dias.now</a>.</p>
 
   <h2>If you're a user</h2>
   <p>Download the desktop app from <a href="https://dialekt.dias.now">dialekt.dias.now</a>.

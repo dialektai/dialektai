@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Product:** dialekt.ai
+**Product:** dias.now
 **Controller:** Limited Liability Partnership "Dialekt.ai" (TOO "Dialekt.ai")
 **Effective date:** 25 April 2026
 **Version:** 1.0
@@ -10,7 +10,7 @@
 
 ## 1. Introduction and scope
 
-This Privacy Policy describes how Limited Liability Partnership "Dialekt.ai" ("**dialekt**", "**we**", "**our**", "**us**") collects, processes, stores, and protects personal data of users of the dialekt.ai software product (the "**Product**"), the dialekt.ai website at https://dialekt.ai (the "**Website**"), and the dialekt-cloud licensing infrastructure (collectively, the "**Services**").
+This Privacy Policy describes how Limited Liability Partnership "Dialekt.ai" ("**dialekt**", "**we**", "**our**", "**us**") collects, processes, stores, and protects personal data of users of the dias.now software product (the "**Product**"), the dias.now website at https://dias.now (the "**Website**"), and the dialekt-cloud licensing infrastructure (collectively, the "**Services**").
 
 This Policy applies to:
 
@@ -248,7 +248,7 @@ The currently supported cloud LLM providers, their default jurisdictions, and li
 | Replicate | United States | https://replicate.com/privacy |
 | Z.AI / GLM | People's Republic of China | https://z.ai/privacy |
 
-This list is reproduced and kept up to date in the Cloud LLM Providers Reference Table available at https://dialekt.ai/legal/cloud-providers (the "**Reference Table**"). The Reference Table forms an integral part of this Policy.
+This list is reproduced and kept up to date in the Cloud LLM Providers Reference Table available at https://dias.now/legal/cloud-providers (the "**Reference Table**"). The Reference Table forms an integral part of this Policy.
 
 ### 7.3 Regulated mode
 

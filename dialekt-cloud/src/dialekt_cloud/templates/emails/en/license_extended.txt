@@ -1,7 +1,7 @@
-dialekt.ai — Your license was extended, {{ full_name }}
+dias.now — Your license was extended, {{ full_name }}
 
 We've added {{ days_added }} day{% if days_added != 1 %}s{% endif %} to your
-dialekt.ai license. Your existing key keeps working — nothing to do on your side.
+dias.now license. Your existing key keeps working — nothing to do on your side.
 
 Plan: {{ plan }}
 Seats: {{ seats_limit }}
@@ -11,4 +11,4 @@ Want to renew earlier, change plans, or have any questions — just reply
 to this email.
 
 —
-dialekt.ai · hello@dialekt.ai · {{ landing_url }}
+dias.now · hello@dias.now · {{ landing_url }}
