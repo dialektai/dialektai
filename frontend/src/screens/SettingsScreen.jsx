@@ -8,6 +8,7 @@ import McpTemplateModal from '../components/McpTemplateModal.jsx';
 import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
 import McpToolList from '../components/McpToolList.jsx';
 import MCPAuditDashboard from '../components/MCPAuditDashboard.jsx';
+import WebSearchSection from './Settings/WebSearchSection.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -4460,6 +4461,7 @@ const NAV_GROUPS = [
     { k: 'Browser',         icon: 'globe'   },
     { k: 'Screen control',  icon: 'screen'  },
     { k: 'MCP Servers',     icon: 'cog' },
+    { k: 'Web Search',      icon: 'globe'   },
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
     { k: 'Instagram',       icon: 'sparkle' },
@@ -4488,6 +4490,7 @@ function renderSection(s) {
     case 'Browser':            return <BrowserSection />;
     case 'Screen control':     return <ScreenSection />;
     case 'MCP Servers':        return <MCPSection />;
+    case 'Web Search':         return <WebSearchSection />;
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
     case 'Instagram':          return <InstagramSection />;
