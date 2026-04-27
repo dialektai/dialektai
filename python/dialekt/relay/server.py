@@ -24,10 +24,11 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
 
 import httpx
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 
 from dialekt.relay import __version__
+from dialekt.relay.auth import RateLimiterRegistry, RelayKeyContext, get_relay_context
 from dialekt.relay.config import RelayConfig, load_config
 
 log = logging.getLogger("dialekt.relay")
@@ -52,14 +53,34 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
         client = httpx.AsyncClient(base_url=cfg.ollama_url, timeout=timeout)
         app.state.ollama = client
         app.state.config = cfg
+        app.state.rate_limiter_registry = RateLimiterRegistry()
+
+        # asyncpg pool to dialekt_cloud for relay_keys lookups. When
+        # cloud_db_url is missing the relay still starts (so /relay/health
+        # works for connectivity probes), but get_relay_context raises 503
+        # for any authenticated endpoint.
+        if cfg.cloud_db_url:
+            import asyncpg
+            app.state.pool = await asyncpg.create_pool(
+                cfg.cloud_db_url, min_size=1, max_size=10,
+            )
+        else:
+            app.state.pool = None
+            log.warning(
+                "relay started without cloud_db_url — auth disabled, "
+                "/relay/{models,generate,chat,embeddings} will return 503"
+            )
+
         log.info(
-            "relay started — version=%s ollama=%s",
-            __version__, cfg.ollama_url,
+            "relay started — version=%s ollama=%s db=%s",
+            __version__, cfg.ollama_url, "yes" if cfg.cloud_db_url else "no",
         )
         try:
             yield
         finally:
             await client.aclose()
+            if app.state.pool is not None:
+                await app.state.pool.close()
 
     app = FastAPI(
         title="dialekt GPU Relay",
@@ -85,7 +106,10 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
         }
 
     @app.get("/relay/models")
-    async def models(request: Request) -> Response:
+    async def models(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
         client: httpx.AsyncClient = request.app.state.ollama
         r = await client.get("/api/tags")
         return Response(
@@ -95,15 +119,24 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
         )
 
     @app.post("/relay/generate")
-    async def generate(request: Request) -> Response:
+    async def generate(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
         return await _proxy_inference(request, "/api/generate")
 
     @app.post("/relay/chat")
-    async def chat(request: Request) -> Response:
+    async def chat(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
         return await _proxy_inference(request, "/api/chat")
 
     @app.post("/relay/embeddings")
-    async def embeddings(request: Request) -> Response:
+    async def embeddings(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
         client: httpx.AsyncClient = request.app.state.ollama
         body = await request.body()
         r = await client.post(
