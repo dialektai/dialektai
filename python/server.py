@@ -1344,6 +1344,151 @@ async def instagram_setup_callback(
     )
 
 
+async def _instagram_ensure_fresh_token() -> tuple[str, str]:
+    """Read token + ig_user_id from the keychain, refreshing in place
+    when we're inside the 7-day refresh window. Returns
+    ``(access_token, ig_user_id)`` or raises HTTPException(409).
+    """
+    from dialekt.secrets import get_secret, set_secret
+    from dialekt.tools.social import oauth_flow
+
+    token = get_secret("instagram_access_token")
+    ig_user_id = get_secret("instagram_ig_user_id")
+    if not token or not ig_user_id:
+        raise HTTPException(409, "Instagram is not connected — finish setup first")
+
+    expires = get_secret("instagram_token_expires")
+    if oauth_flow.needs_refresh(expires):
+        app_id = get_secret("instagram_app_id")
+        app_secret = get_secret("instagram_app_secret")
+        if not app_id or not app_secret:
+            raise HTTPException(409, "Instagram App credentials missing — re-run setup")
+        try:
+            payload = await oauth_flow.refresh_long_lived(app_id, app_secret, token)
+        except oauth_flow.OAuthError as e:
+            raise HTTPException(502, f"Instagram token refresh failed: {e}")
+        token = payload["access_token"]
+        set_secret("instagram_access_token", token)
+        set_secret(
+            "instagram_token_expires",
+            oauth_flow.expires_at_from_payload(payload),
+        )
+    return token, ig_user_id
+
+
+@app.post("/social/instagram/publish")
+async def instagram_publish(body: dict):
+    """Publish a feed post, story, or Reel to the connected account.
+
+    Body: ``{kind, media:[url,...], caption?, confirmed: true}``
+
+    ``confirmed`` MUST be ``true`` — the frontend sets it after the user
+    accepts the destructive ConfirmModal. Prevents an agent calling
+    this endpoint without a human in the loop.
+    """
+    import time
+    from dialekt.audit import log_event
+    from dialekt.tools.social.instagram_publisher import (
+        InstagramPublisher, PublishError,
+    )
+    from dialekt.tools.social.oauth_flow import OAuthError
+
+    if body.get("confirmed") is not True:
+        raise HTTPException(412, "confirmed=true required — destructive action")
+
+    kind = body.get("kind")
+    if kind not in ("feed_post", "story", "reel"):
+        raise HTTPException(400, "kind must be feed_post, story, or reel")
+
+    media = body.get("media") or []
+    if not isinstance(media, list) or not media:
+        raise HTTPException(400, "media must be a non-empty list of URLs")
+    primary = media[0]
+    if not isinstance(primary, str) or not primary.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            400,
+            "media[0] must be an HTTPS URL — Instagram Graph API does not "
+            "accept local file paths. Upload the file first and pass the URL.",
+        )
+
+    caption = body.get("caption") or ""
+    if not isinstance(caption, str):
+        raise HTTPException(400, "caption must be a string")
+
+    token, ig_user_id = await _instagram_ensure_fresh_token()
+
+    started = time.monotonic()
+    try:
+        async with InstagramPublisher(ig_user_id, token) as pub:
+            if kind == "feed_post":
+                media_id = await pub.publish_feed_post(primary, caption)
+            elif kind == "story":
+                media_id = await pub.publish_story(primary)
+            else:
+                media_id = await pub.publish_reel(primary, caption)
+    except (PublishError, OAuthError) as e:
+        await log_event(
+            db, kind="instagram_publish", action=kind, result="error",
+            target=ig_user_id, duration_ms=int((time.monotonic() - started) * 1000),
+            error_kind=type(e).__name__,
+            extra={"detail": str(e), "caption_len": len(caption)},
+        )
+        raise HTTPException(502, f"Instagram publish failed: {e}")
+
+    await log_event(
+        db, kind="instagram_publish", action=kind, result="success",
+        target=ig_user_id, duration_ms=int((time.monotonic() - started) * 1000),
+        extra={"media_id": media_id, "caption_len": len(caption)},
+    )
+    return {"media_id": media_id, "kind": kind}
+
+
+@app.get("/social/instagram/status")
+async def instagram_status():
+    """Snapshot of connection state for the Settings panel.
+
+    Never returns secret values — only presence flags and metadata
+    safe to render. The token-expiry stamp is exposed because the UI
+    surfaces "renews on …" copy.
+    """
+    from dialekt.secrets import get_secret
+    from dialekt.tools.social import oauth_flow
+
+    app_id = get_secret("instagram_app_id")
+    has_secret = bool(get_secret("instagram_app_secret"))
+    token = get_secret("instagram_access_token")
+    expires = get_secret("instagram_token_expires")
+    return {
+        "configured": bool(app_id and has_secret),
+        "has_token": bool(token),
+        "ig_user_id": get_secret("instagram_ig_user_id"),
+        "username": get_secret("instagram_username"),
+        "expires": expires,
+        "needs_refresh": oauth_flow.needs_refresh(expires) if token else False,
+        "app_id_prefix": (app_id[:6] + "…") if app_id else None,
+        "redirect_uri": _instagram_redirect_uri(),
+    }
+
+
+@app.delete("/social/instagram", status_code=204)
+async def instagram_disconnect():
+    """Wipe every Instagram secret. Used by the "Disconnect" button.
+
+    The FB App on the user's side is untouched — they revoke our token
+    from facebook.com if they want a complete teardown.
+    """
+    from dialekt.audit import log_event
+    from dialekt.secrets import delete_secret
+    for key in _INSTAGRAM_SECRET_KEYS:
+        try:
+            delete_secret(key)
+        except Exception:
+            pass
+    _instagram_oauth_state.clear()
+    await log_event(db, kind="instagram_oauth", action="disconnect", result="success")
+    return Response(status_code=204)
+
+
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
 
 @app.get("/schema-rag/model-status")
