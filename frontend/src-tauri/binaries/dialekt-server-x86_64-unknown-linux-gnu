@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
-# Development stub — runs the Python backend via venv
+# Development stub — runs the Python backend via venv.
 # In distribution builds, this is replaced by the PyInstaller binary.
+# Walks up from the script's directory until it finds python/start.sh,
+# so it works regardless of whether Tauri spawned us from
+# target/debug/, target/release/, or src-tauri/binaries/.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_DIR="$(cd "$SCRIPT_DIR/../../../../../python" && pwd)"
-exec "$PYTHON_DIR/start.sh" "$@"
+DIR="$SCRIPT_DIR"
+while [ "$DIR" != "/" ]; do
+  if [ -f "$DIR/python/start.sh" ]; then
+    exec "$DIR/python/start.sh" "$@"
+  fi
+  DIR="$(dirname "$DIR")"
+done
+echo "[dialekt-server] could not find python/start.sh anywhere above $SCRIPT_DIR" >&2
+exit 1
