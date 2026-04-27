@@ -117,17 +117,26 @@ async def test_revoke_rejects_unknown_key(client, admin_headers):
 async def test_admin_auth_required(client, tenant_id):
     """No X-Admin-Key → 401/403; the endpoint must not silently expose
     keys or usage."""
-    r1 = await client.post(
-        f"/admin/tenants/{tenant_id}/relay-keys", json={"name": "x"},
-    )
-    assert r1.status_code in (401, 403)
+    # The session-scoped client may carry an admin session cookie set by
+    # earlier tests (test_admin_2fa). Strip it for the duration of this
+    # test so we exercise the unauthenticated path, then restore.
+    saved_cookies = dict(client.cookies)
+    client.cookies.clear()
+    try:
+        r1 = await client.post(
+            f"/admin/tenants/{tenant_id}/relay-keys", json={"name": "x"},
+        )
+        assert r1.status_code in (401, 403)
 
-    r2 = await client.get(f"/admin/tenants/{tenant_id}/relay-keys")
-    assert r2.status_code in (401, 403)
+        r2 = await client.get(f"/admin/tenants/{tenant_id}/relay-keys")
+        assert r2.status_code in (401, 403)
 
-    import uuid
-    r3 = await client.delete(f"/admin/relay-keys/{uuid.uuid4()}")
-    assert r3.status_code in (401, 403)
+        import uuid
+        r3 = await client.delete(f"/admin/relay-keys/{uuid.uuid4()}")
+        assert r3.status_code in (401, 403)
+    finally:
+        for k, v in saved_cookies.items():
+            client.cookies.set(k, v)
 
 
 async def test_usage_rollup_returns_empty_for_unused_tenant(
