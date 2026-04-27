@@ -15,6 +15,7 @@ import OllamaInstallScreen from './screens/OllamaInstallScreen.jsx';
 import LicenseScreen from './screens/LicenseScreen.jsx';
 import InviteRedemptionScreen from './screens/InviteRedemptionScreen.jsx';
 import AdminDashboardScreen from './screens/AdminDashboardScreen.jsx';
+import LibraryScreen from './screens/LibraryScreen.jsx';
 
 const API = 'http://localhost:8765';
 
@@ -214,6 +215,7 @@ function AppRoutes() {
       {screen === 'license'            && <LicenseScreen onNav={nav} />}
       {screen === 'invite'             && <InviteRedemptionScreen onNav={nav} />}
       {screen === 'admin'              && <AdminDashboardScreen onNav={nav} />}
+      {screen === 'library'            && <LibraryScreen onNav={nav} />}
 
       {/* Ollama install guidance */}
       {screen === 'onboarding-install-ollama' && <OllamaInstallScreen onNav={nav} checkInfo={screenProps} />}

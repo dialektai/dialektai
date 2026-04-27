@@ -513,6 +513,7 @@ export default function LeftPanel({
       <div style={{ borderTop: `1px solid ${T.border}`, display: 'flex', background: T.bg1 }}>
         {[
           { icon: 'chat', screen: 'main', label: 'Chat' },
+          { icon: 'folder', screen: 'library', label: 'Library' },
           { icon: 'cog', screen: 'settings', label: 'Settings' },
         ].map(({ icon, screen, label }) => (
           <button
