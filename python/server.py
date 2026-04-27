@@ -3217,6 +3217,277 @@ async def ollama_pull_stream(model: str):
     )
 
 
+# ── Batch processing ──────────────────────────────────────────────────────────
+#
+# Run an agent over many files in one job. Endpoints:
+#   POST /batch                  — create + schedule
+#   GET  /batch/{id}             — JSON snapshot (job + per-file states)
+#   GET  /batch/{id}/stream      — SSE event stream until terminal
+#   GET  /batch/{id}/zip         — zip of completed outputs
+#   POST /batch/{id}/cancel      — set cancel flag (idempotent)
+#
+# Lifecycle: handler creates the DB row, registers a cancel Event +
+# subscribers list, fires asyncio.create_task(run_batch_job(...)).
+# Runner emits events via on_event → _batch_fanout pushes to every
+# subscribed asyncio.Queue. SSE endpoint pops from its queue until a
+# terminal event arrives.
+
+_active_batch_tasks: dict[str, asyncio.Task] = {}
+_batch_cancel_events: dict[str, threading.Event] = {}
+_batch_subscribers: dict[str, list[asyncio.Queue]] = {}
+
+_BATCH_TERMINAL_TYPES = {"completed", "failed", "cancelled"}
+
+
+def _batch_fanout(job_id: str, event: dict) -> None:
+    """Runner-side callback. Pushes to every subscriber queue.
+
+    Called from the runner's worker thread via the on_event hook —
+    must be thread-safe and never block. Uses asyncio.Queue's
+    ``put_nowait`` because subscribers should keep up; if a slow
+    consumer falls behind we drop events for that one rather than
+    stalling the whole batch.
+    """
+    subs = _batch_subscribers.get(job_id)
+    if not subs:
+        return
+    for q in subs:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            log.warning("batch %s — subscriber queue full, dropping event", job_id)
+
+
+async def _batch_run_wrapped(job_id: str) -> None:
+    """asyncio task body. Wraps the runner so we can swallow exceptions
+    into a 'failed' DB state instead of crashing the event loop, and
+    always clean up the global registries.
+    """
+    cancel = _batch_cancel_events.get(job_id) or threading.Event()
+    try:
+        from dialekt.batch import run_batch_job
+        await run_batch_job(
+            db, job_id,
+            on_event=lambda e: _batch_fanout(job_id, e),
+            cancel_event=cancel,
+        )
+    except Exception as exc:
+        log.exception("batch %s — runner crashed", job_id)
+        try:
+            from dialekt.batch import set_job_error
+            await set_job_error(db, job_id, f"runner crashed: {exc}")
+        except Exception:
+            pass
+        _batch_fanout(job_id, {"type": "failed", "job_id": job_id, "error": str(exc)})
+    finally:
+        _active_batch_tasks.pop(job_id, None)
+        _batch_cancel_events.pop(job_id, None)
+        # Wake any still-subscribed SSE streams so they can close cleanly.
+        for q in _batch_subscribers.pop(job_id, []):
+            try:
+                q.put_nowait({"type": "_eof"})
+            except asyncio.QueueFull:
+                pass
+
+
+@app.post("/batch", status_code=201)
+async def batch_create(body: dict):
+    """Create a batch job and schedule the runner.
+
+    Body:
+        agent_id: str (required) — must reference an existing agent
+        file_paths: list[str] (required, non-empty) — paths returned
+            by /upload, or any absolute path the dialekt process can
+            read. Aliased ``file_ids`` and ``files`` are also accepted
+            so callers don't have to remember the exact spelling
+        variables: dict (optional) — instruction (str), output_ext (str)
+        tenant_id: str (optional)
+
+    Returns: {job_id, status, total}
+    """
+    from dialekt.batch import create_job
+
+    agent_id = body.get("agent_id")
+    if not agent_id:
+        raise HTTPException(422, "agent_id required")
+
+    raw_files = (
+        body.get("file_paths")
+        or body.get("file_ids")
+        or body.get("files")
+        or []
+    )
+    file_paths: list[str] = []
+    for entry in raw_files:
+        if isinstance(entry, str):
+            file_paths.append(entry)
+        elif isinstance(entry, dict) and entry.get("path"):
+            file_paths.append(entry["path"])
+        else:
+            raise HTTPException(422, f"unsupported file entry: {entry!r}")
+    if not file_paths:
+        raise HTTPException(422, "file_paths must be a non-empty list")
+
+    variables = body.get("variables") or {}
+    if not isinstance(variables, dict):
+        raise HTTPException(422, "variables must be an object")
+
+    cursor = await db.execute("SELECT id FROM agents WHERE id = ?", (agent_id,))
+    if await cursor.fetchone() is None:
+        raise HTTPException(404, f"agent {agent_id} not found")
+
+    job = await create_job(
+        db,
+        agent_id=agent_id,
+        file_paths=file_paths,
+        variables=variables,
+        tenant_id=body.get("tenant_id"),
+    )
+
+    cancel = threading.Event()
+    _batch_cancel_events[job.id] = cancel
+    _batch_subscribers[job.id] = []
+    task = asyncio.create_task(_batch_run_wrapped(job.id))
+    _active_batch_tasks[job.id] = task
+
+    log.info("batch %s scheduled — agent %s, %d files", job.id, agent_id, job.total)
+    return {"job_id": job.id, "status": job.status, "total": job.total}
+
+
+@app.get("/batch/{job_id}")
+async def batch_get(job_id: str):
+    """Return the current job state plus per-file rows."""
+    from dialekt.batch import get_job, list_files
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    files = await list_files(db, job_id)
+    return {
+        "job": job.to_dict(),
+        "files": [f.to_dict() for f in files],
+        "running": job_id in _active_batch_tasks,
+    }
+
+
+@app.get("/batch/{job_id}/stream")
+async def batch_stream(job_id: str):
+    """Server-Sent Events stream of runner events until terminal state.
+
+    Late subscribers (job already finished): we send the final state
+    one-shot and close. Live subscribers: we replay the current state
+    first so the UI can render an in-progress job correctly even when
+    the page was refreshed mid-batch.
+    """
+    from fastapi.responses import StreamingResponse
+    from dialekt.batch import get_job, list_files
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=1024)
+    subs = _batch_subscribers.setdefault(job_id, [])
+    subs.append(queue)
+
+    async def gen():
+        try:
+            # Replay current state for late subscribers / page refresh.
+            files = await list_files(db, job_id)
+            snapshot = {
+                "type": "snapshot",
+                "job": job.to_dict(),
+                "files": [f.to_dict() for f in files],
+            }
+            yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+
+            # If the job is already terminal, no more events will come —
+            # close immediately after the snapshot.
+            if job.status in _BATCH_TERMINAL_TYPES:
+                return
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # Heartbeat keeps proxies (nginx, cloudflare) from
+                    # severing the connection mid-batch.
+                    yield ": heartbeat\n\n"
+                    continue
+                if event.get("type") == "_eof":
+                    return
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") in _BATCH_TERMINAL_TYPES:
+                    return
+        finally:
+            try:
+                _batch_subscribers.get(job_id, []).remove(queue)
+            except ValueError:
+                pass
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/batch/{job_id}/cancel")
+async def batch_cancel(job_id: str):
+    """Idempotent cancellation. Tripping the threading.Event is the
+    runner's signal; the runner does the actual DB status flip when
+    it observes the flag between files."""
+    from dialekt.batch import get_job
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    cancel = _batch_cancel_events.get(job_id)
+    if cancel is not None:
+        cancel.set()
+    return {"job_id": job_id, "cancel_requested": True, "status": job.status}
+
+
+@app.get("/batch/{job_id}/zip")
+async def batch_zip(job_id: str):
+    """Return a ZIP of every successful per-file output plus the
+    runner's _manifest.json. Available once the job is terminal —
+    while running, we 409 to keep the artefact deterministic."""
+    from fastapi.responses import StreamingResponse
+    import io
+    import zipfile
+    from dialekt.batch import get_job, list_files, DEFAULT_OUTPUT_ROOT
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    if job.status not in _BATCH_TERMINAL_TYPES:
+        raise HTTPException(409, f"batch is {job.status} — wait for terminal state")
+
+    files = await list_files(db, job_id)
+    out_dir = (DEFAULT_OUTPUT_ROOT / job_id).expanduser()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            if f.status != "done" or not f.output_path:
+                continue
+            p = Path(f.output_path)
+            if p.exists():
+                zf.write(p, arcname=p.name)
+        manifest = out_dir / "_manifest.json"
+        if manifest.exists():
+            zf.write(manifest, arcname="_manifest.json")
+
+    buf.seek(0)
+    fname = f"batch_{job_id[:8]}.zip"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 # ── ComfyUI integration ───────────────────────────────────────────────────────
 
 COMFY_URL = os.environ.get("DIALEKT_COMFY_URL", "http://127.0.0.1:8188")
