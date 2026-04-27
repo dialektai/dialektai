@@ -52,7 +52,7 @@ SMTP_HOST=mail.your-provider.com
 SMTP_PORT=587
 SMTP_USER=noreply@your-domain.com
 SMTP_PASSWORD=app-password-or-similar
-SMTP_FROM="dialekt.ai <noreply@your-domain.com>"
+SMTP_FROM="dias.now <noreply@your-domain.com>"
 SMTP_TLS=true
 
 APP_URL=https://api.dias.now

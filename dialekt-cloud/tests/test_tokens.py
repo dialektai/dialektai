@@ -80,11 +80,11 @@ def test_bearer_token_malformed():
 
 def test_admin_session_token_roundtrip():
     """Multi-admin v1.1: admin_id + email baked into payload, JWT_SECRET-only signing."""
-    token = create_admin_session_token(admin_id="abc-123", email="dias@dialekt.ai", secret=SECRET)
+    token = create_admin_session_token(admin_id="abc-123", email="dias@dias.now", secret=SECRET)
     payload = verify_admin_session_token(token, SECRET)
     assert payload is not None
     assert payload["admin_id"] == "abc-123"
-    assert payload["email"] == "dias@dialekt.ai"
+    assert payload["email"] == "dias@dias.now"
     assert payload["role"] == "founder_admin"
 
 

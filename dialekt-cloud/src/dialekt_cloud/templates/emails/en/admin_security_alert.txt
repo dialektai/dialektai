@@ -1,7 +1,7 @@
-[security] dialekt.ai admin alert — {{ kind }}
+[security] dias.now admin alert — {{ kind }}
 
 {% if kind == "password_changed" %}
-Hi {{ full_name }} — the password on your dialekt.ai admin account was changed.
+Hi {{ full_name }} — the password on your dias.now admin account was changed.
 
 If this WAS NOT you: someone has access. Run SSH:
   dialekt-admin admin reset-password --email=<your-email>
@@ -24,4 +24,4 @@ If this WAS NOT you: investigate via audit log + revoke unknown SSH key.
   IP:         {{ ip }}
   User-agent: {{ user_agent[:100] }}
 
-— dialekt.ai security · security@dias.now
+— dias.now security · security@dias.now

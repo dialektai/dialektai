@@ -1,17 +1,17 @@
 # Cross-Border Consent & UI Texts
-## Wording catalogue for the dialekt.ai user interface
+## Wording catalogue for the dias.now user interface
 
 **Version:** 1.0
 **Date:** 25 April 2026
 **Related:** Privacy Policy v1.0, Terms of Service v1.0, Public Offer v1.0
 
-> **Informational translation.** The Russian master document published at https://dialekt.ai/cross-border-consent.html is the authoritative source. The Russian version contains both EN and RU variants of every UI string side-by-side, plus the implementation notes and database schemas the development team relies on. This English summary lists the same sections and the English UI strings only. In case of any discrepancy, the Russian master prevails.
+> **Informational translation.** The Russian master document published at https://dias.now/cross-border-consent.html is the authoritative source. The Russian version contains both EN and RU variants of every UI string side-by-side, plus the implementation notes and database schemas the development team relies on. This English summary lists the same sections and the English UI strings only. In case of any discrepancy, the Russian master prevails.
 
 ---
 
 ## Purpose of the document
 
-This document collects ready-made consent and notification copy to embed in the dialekt.ai product UI. Each text is drafted to satisfy:
+This document collects ready-made consent and notification copy to embed in the dias.now product UI. Each text is drafted to satisfy:
 
 - Articles 7–8 of the Law of the Republic of Kazakhstan on Personal Data and Their Protection No. 94-V (as amended on 18 January 2026);
 - Articles 6, 7, 9, 13, and 49 of the GDPR;
@@ -27,14 +27,14 @@ This document collects ready-made consent and notification copy to embed in the 
 
 ## A. SIGNUP FORM — landing-page registration
 
-**Location:** https://dialekt.ai (signup form)
+**Location:** https://dias.now (signup form)
 **Context:** before an Account is created in dialekt-cloud.
 
 ### A.1 Primary consent for personal-data processing and acceptance of documents
 
 **Type:** required checkbox · **Default:** ☐ NOT pre-filled · **Blocks:** "Sign up" button
 
-> ☐ I have read and accept the [Privacy Policy](https://dialekt.ai/legal/privacy), [Terms of Service](https://dialekt.ai/legal/terms), and [Public Offer](https://dialekt.ai/legal/offer). I consent to the processing of my personal data (name, email, country, intended use, IP address) by TOO "Dialekt.ai" for the purposes of creating and maintaining my account, issuing the licence, and operational communication.
+> ☐ I have read and accept the [Privacy Policy](https://dias.now/legal/privacy), [Terms of Service](https://dias.now/legal/terms), and [Public Offer](https://dias.now/legal/offer). I consent to the processing of my personal data (name, email, country, intended use, IP address) by TOO "Dialekt.ai" for the purposes of creating and maintaining my account, issuing the licence, and operational communication.
 
 ### A.2 Consent to international transfer of personal data
 
@@ -42,7 +42,7 @@ This document collects ready-made consent and notification copy to embed in the 
 
 **Title:** Consent to International Transfer of Personal Data
 
-> To provide the Services, dialekt.ai transfers your registration data (name, email, country, intended use, IP address) to the following processors located outside Kazakhstan and outside the European Economic Area:
+> To provide the Services, dias.now transfers your registration data (name, email, country, intended use, IP address) to the following processors located outside Kazakhstan and outside the European Economic Area:
 >
 > | Recipient | Jurisdiction | Data transferred | Purpose |
 > |---|---|---|---|
@@ -50,7 +50,7 @@ This document collects ready-made consent and notification copy to embed in the 
 > | Cloudflare, Inc. | United States (with global edge network) | IP address, DNS metadata | DDoS protection, traffic routing |
 > | GitHub, Inc. | United States | IP address, download metadata | Distribution of Product binaries |
 >
-> **Duration of transfer and storage:** for the duration of your account. Following account deletion, data is deleted in the manner described in the [Privacy Policy](https://dialekt.ai/legal/privacy).
+> **Duration of transfer and storage:** for the duration of your account. Following account deletion, data is deleted in the manner described in the [Privacy Policy](https://dias.now/legal/privacy).
 >
 > **For EEA/UK residents:** transfers to Kazakhstan (where the controller is established) and to the United States are made on the basis of Standard Contractual Clauses adopted by the European Commission pursuant to Implementing Decision (EU) 2021/914, and (where applicable) the EU-U.S. Data Privacy Framework.
 >
@@ -70,7 +70,7 @@ This document collects ready-made consent and notification copy to embed in the 
 
 ## B. FIRST-RUN WIZARD — after Product installation
 
-**Location:** dialekt.ai desktop application, first launch · **Context:** before any functional use of the Product.
+**Location:** dias.now desktop application, first launch · **Context:** before any functional use of the Product.
 
 ### B.1 Informational notice on local processing
 
@@ -78,7 +78,7 @@ This document collects ready-made consent and notification copy to embed in the 
 
 > ### Your data stays on your device
 >
-> dialekt.ai is designed so that, by default, all your prompts, model responses, chat history, and files you grant access to are processed **locally on this device**.
+> dias.now is designed so that, by default, all your prompts, model responses, chat history, and files you grant access to are processed **locally on this device**.
 >
 > Only the following data is sent to our servers:
 > - your account and licence data;
@@ -89,17 +89,17 @@ This document collects ready-made consent and notification copy to embed in the 
 
 ### B.2 Optional telemetry collection (forward-looking)
 
-> **Note:** under the current architecture dialekt.ai collects no telemetry. This block is added to the UI **only** after optional telemetry is implemented and the Privacy Policy is updated. Until then, B.2 is not shown to users.
+> **Note:** under the current architecture dias.now collects no telemetry. This block is added to the UI **only** after optional telemetry is implemented and the Privacy Policy is updated. Until then, B.2 is not shown to users.
 
 **Type:** optional checkbox · **Default:** ☐ NOT pre-filled.
 
-> ☐ Help improve dialekt.ai: allow sending anonymous error reports and feature usage data. No content of prompts, responses, or files will be transmitted. See [Privacy Policy, Telemetry section](https://dialekt.ai/legal/privacy#telemetry) for details.
+> ☐ Help improve dias.now: allow sending anonymous error reports and feature usage data. No content of prompts, responses, or files will be transmitted. See [Privacy Policy, Telemetry section](https://dias.now/legal/privacy#telemetry) for details.
 
 ---
 
 ## C. CLOUD LLM PROVIDER ACTIVATION
 
-**Location:** dialekt.ai application, settings / model picker · **Context:** before first activation of each cloud LLM provider. Consent is requested **separately per provider** and **only once**.
+**Location:** dias.now application, settings / model picker · **Context:** before first activation of each cloud LLM provider. Consent is requested **separately per provider** and **only once**.
 
 ### C.1 Consent template — generic form
 
@@ -112,12 +112,12 @@ This document collects ready-made consent and notification copy to embed in the 
 > 1. **Where your data goes:**
 >    - Your prompts, attached files, and conversation context will be transmitted directly from this device to {PROVIDER_NAME}'s API.
 >    - {PROVIDER_NAME}'s servers are located in **{PROVIDER_JURISDICTION}**.
->    - Requests **do not pass through dialekt.ai's servers**.
+>    - Requests **do not pass through dias.now's servers**.
 >
 > 2. **Who is responsible for your data:**
 >    - {PROVIDER_NAME} becomes an independent controller of your data within the meaning of applicable law.
 >    - Use of {PROVIDER_NAME} is governed by that provider's own terms and privacy policy.
->    - dialekt.ai is not responsible for the provider's processing of your data.
+>    - dias.now is not responsible for the provider's processing of your data.
 >
 > 3. **What you need to do:**
 >    - Read the [{PROVIDER_NAME} terms of service]({PROVIDER_TOS_URL});
@@ -187,13 +187,13 @@ Withdrawal flows are confirmation modals with a clear effect statement (e.g. "Wi
 
 ## E. COOKIE BANNER — forward-looking
 
-dialekt.ai's landing site does not currently set non-essential cookies. The block below is the baseline banner to deploy if/when analytics or advertising cookies are introduced.
+dias.now's landing site does not currently set non-essential cookies. The block below is the baseline banner to deploy if/when analytics or advertising cookies are introduced.
 
 ### E.1 Baseline cookie banner
 
 Type: dismissible banner, persistent until choice is recorded.
 
-> ### Cookies on dialekt.ai
+> ### Cookies on dias.now
 >
 > We use a small number of strictly-necessary cookies to remember your language preference and authenticate you to the Account. These do not require consent.
 >
@@ -207,7 +207,7 @@ The "Customise" option opens a modal with per-category toggles (Essential / Anal
 
 ## F. AUDIT TRAIL — consent journalling
 
-The master document specifies the `consent_log` and `consent_versions` PostgreSQL schemas, the retention policy (3 years after withdrawal or account deletion), and the integrity-protection measures (append-only journal, hash-chained per-row signatures). Refer to the Russian master at https://dialekt.ai/cross-border-consent.html for the schema-level detail.
+The master document specifies the `consent_log` and `consent_versions` PostgreSQL schemas, the retention policy (3 years after withdrawal or account deletion), and the integrity-protection measures (append-only journal, hash-chained per-row signatures). Refer to the Russian master at https://dias.now/cross-border-consent.html for the schema-level detail.
 
 ---
 

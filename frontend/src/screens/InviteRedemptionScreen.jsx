@@ -48,7 +48,7 @@ export default function InviteRedemptionScreen({ onNav }) {
   };
 
   return (
-    <AppFrame title="dialekt.ai — Accept Invite">
+    <AppFrame title="dias.now — Accept Invite">
       <div style={{ flex: 1, display: 'flex', background: T.bg0, alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 460 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>

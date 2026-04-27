@@ -1,4 +1,4 @@
-dialekt.ai — You're all set, {{ company_name }}
+dias.now — You're all set, {{ company_name }}
 
 Email verified. License active. From here it's a short hop to your first agent.
 
@@ -8,7 +8,7 @@ THREE THINGS WORTH DOING FIRST
   03. Invite a teammate. Settings → Users. Up to your seat limit.
 
 Stuck on anything? We're a small team that reads every reply.
-hello@dialekt.ai
+hello@dias.now
 
 —
-dialekt.ai · {{ landing_url }}
+dias.now · {{ landing_url }}

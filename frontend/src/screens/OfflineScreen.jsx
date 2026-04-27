@@ -128,7 +128,7 @@ export default function OfflineScreen({ onNav }) {
   }, [check]);
 
   return (
-    <AppFrame title="dialekt.ai — connection error">
+    <AppFrame title="dias.now — connection error">
       <LeftPanel active={-1} running={false} model="— no model —" onNav={onNav} />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: T.bg0, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#2a0f12', borderBottom: `1px solid ${T.amber}55` }}>

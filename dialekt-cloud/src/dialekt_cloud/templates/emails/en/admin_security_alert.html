@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Security alert — dialekt.ai admin</title>
+<head><meta charset="utf-8"><title>Security alert — dias.now admin</title>
 <style>
   body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: #0a0e14; color: #cdd6f4; margin: 0; padding: 30px 20px; }
   .card { max-width: 560px; margin: 0 auto; background: #13181f; border: 1px solid #ef4444; padding: 32px; }
@@ -22,24 +22,24 @@
 
   {% if kind == "password_changed" %}
     <h1>Your admin password was changed</h1>
-    <p>Hi {{ full_name }} — the password on your dialekt.ai admin account was changed just now. If this was you, no action needed.</p>
+    <p>Hi {{ full_name }} — the password on your dias.now admin account was changed just now. If this was you, no action needed.</p>
     <div class="alert-amber"><strong>If this wasn't you:</strong> someone has access to your account. Reset immediately via SSH: <code>dialekt-admin admin reset-password --email=&lt;your-email&gt;</code> and revoke all sessions.</div>
   {% elif kind == "backup_codes_regenerated" %}
     <h1>Your backup codes were regenerated</h1>
-    <p>Hi {{ full_name }} — fresh 10 backup codes were generated for your dialekt.ai admin account. The previous codes are no longer valid.</p>
+    <p>Hi {{ full_name }} — fresh 10 backup codes were generated for your dias.now admin account. The previous codes are no longer valid.</p>
     <div class="alert-amber"><strong>If this wasn't you:</strong> someone has access to your account or session. Run <code>dialekt-admin admin reset-2fa --email=&lt;your-email&gt;</code> immediately and reset your password.</div>
   {% elif kind == "account_locked" %}
     {% if extra.broadcast %}
       <h1>Admin account locked: {{ extra.affected_email }}</h1>
-      <p>One of the dialekt.ai admin accounts was locked due to too many failed login attempts. Sharing this so the team can react if there's a real attack underway.</p>
+      <p>One of the dias.now admin accounts was locked due to too many failed login attempts. Sharing this so the team can react if there's a real attack underway.</p>
     {% else %}
       <h1>Your admin account was just locked</h1>
-      <p>Hi {{ full_name }} — too many failed password attempts on your dialekt.ai admin account. Locked for ~{{ extra.locked_minutes }} minutes.</p>
+      <p>Hi {{ full_name }} — too many failed password attempts on your dias.now admin account. Locked for ~{{ extra.locked_minutes }} minutes.</p>
       <div class="alert-amber"><strong>If you tried logging in and forgot your password:</strong> wait the cooldown or use SSH <code>dialekt-admin admin unlock --email=&lt;your-email&gt;</code>. <strong>If this wasn't you:</strong> someone is trying to brute-force your account.</div>
     {% endif %}
   {% elif kind == "totp_enrolled" %}
     <h1>A new authenticator was enrolled</h1>
-    <p>Hi {{ full_name }} — a new TOTP authenticator (Google Authenticator / 1Password / Authy) was enrolled on your dialekt.ai admin account. This usually follows a CLI <code>reset-2fa</code> recovery.</p>
+    <p>Hi {{ full_name }} — a new TOTP authenticator (Google Authenticator / 1Password / Authy) was enrolled on your dias.now admin account. This usually follows a CLI <code>reset-2fa</code> recovery.</p>
     <div class="alert-amber"><strong>If this wasn't you:</strong> someone with SSH access to the cloud host reset your 2FA. Investigate via the audit log + revoke their SSH key.</div>
   {% endif %}
 
@@ -51,7 +51,7 @@
   </div>
 
   <div class="footer">
-    <strong style="color:#cdd6f4">dialekt.ai security</strong><br>
+    <strong style="color:#cdd6f4">dias.now security</strong><br>
     Direct contact for incidents: <a href="mailto:security@dias.now">security@dias.now</a>
   </div>
 </div>

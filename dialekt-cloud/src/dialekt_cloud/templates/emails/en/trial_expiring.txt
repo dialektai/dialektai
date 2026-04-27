@@ -1,5 +1,5 @@
 {% if expired -%}
-dialekt.ai — Your trial just ended, {{ full_name }}
+dias.now — Your trial just ended, {{ full_name }}
 
 Your 30-day trial expired on {{ expires_at_human }}. The desktop app's
 cloud-license features are now paused — but local Ollama and your data
@@ -9,7 +9,7 @@ Want to keep going? Reply to this email and tell us what you've built.
 We extend trials, run paid plans from $25/seat/mo, and offer a free year
 for design partners and indie devs.
 {%- else -%}
-dialekt.ai — Heads up, {{ full_name }} — your trial expires {{ expires_at_human }}
+dias.now — Heads up, {{ full_name }} — your trial expires {{ expires_at_human }}
 
 Your trial ends in {{ days_left }} day{% if days_left != 1 %}s{% endif %}.
 After that, the desktop app's cloud-license features stop validating.
@@ -25,7 +25,7 @@ didn't click. We're a small team that reads every reply.
 YOUR LICENSE KEY (for reference)
   {{ license_key }}
 
-Reply: hello@dialekt.ai
+Reply: hello@dias.now
 
 —
-dialekt.ai · {{ landing_url }}/pricing.html
+dias.now · {{ landing_url }}/pricing.html

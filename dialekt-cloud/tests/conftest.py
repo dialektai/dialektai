@@ -31,7 +31,7 @@ os.environ.setdefault("SMTP_PASSWORD", "")
 # test workers share the same IP (127.0.0.1) which would otherwise trip
 # the 3-per-week production limit after the third signup test.
 os.environ.setdefault("DIALEKT_SIGNUP_IP_LIMIT", "10000")
-# Tests create admins via the helper fixture with throwaway @dialekt.ai
+# Tests create admins via the helper fixture with throwaway @dias.now
 # emails. Production policy enforces @dias.now; we relax it here so the
 # tests don't require knowledge of the production domain.
 os.environ.setdefault("DIALEKT_ADMIN_EMAIL_DOMAIN", "")

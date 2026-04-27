@@ -17,7 +17,7 @@ def _seller():
         "bik": "CASPKZKA",
         "address": "г. Алматы, ул. Тестовая, 1",
         "phone": "+7 700 000 0000",
-        "email": "test@dialekt.ai",
+        "email": "test@dias.now",
     }
 
 
@@ -112,5 +112,5 @@ def test_invoice_html_template_renders():
     assert "INV-2026-0001" in html
     assert "ТОО Покупатель" in html
     assert "150 000" in html
-    assert "dialekt.ai" in html
+    assert "dias.now" in html
     assert "Kaspi Bank" in html

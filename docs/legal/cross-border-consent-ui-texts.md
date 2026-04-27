@@ -1,5 +1,5 @@
 # Cross-Border Consent & UI Texts
-## Формулировки для интерфейса dialekt.ai
+## Формулировки для интерфейса dias.now
 
 **Версия:** 1.0
 **Дата:** 25 апреля 2026 г.
@@ -9,7 +9,7 @@
 
 ## Назначение документа
 
-Настоящий документ содержит готовые тексты согласий и информационных уведомлений для встраивания в пользовательский интерфейс продукта dialekt.ai. Каждый текст разработан с учётом требований:
+Настоящий документ содержит готовые тексты согласий и информационных уведомлений для встраивания в пользовательский интерфейс продукта dias.now. Каждый текст разработан с учётом требований:
 
 - статей 7–8 Закона РК «О персональных данных и их защите» №94-V (с изменениями от 18.01.2026);
 - статей 6, 7, 9, 13, 49 GDPR;
@@ -25,7 +25,7 @@
 
 ## A. SIGNUP FORM — регистрация на лендинге
 
-**Локация:** https://dialekt.ai (форма регистрации)
+**Локация:** https://dias.now (форма регистрации)
 **Контекст:** до создания Учётной записи в dialekt-cloud.
 
 ### A.1 Основное согласие на обработку ПДн и принятие документов
@@ -36,11 +36,11 @@
 
 #### Русский текст:
 
-> ☐ Я ознакомился(-ась) и принимаю условия [Политики конфиденциальности](https://dialekt.ai/legal/privacy), [Условий использования](https://dialekt.ai/legal/terms) и [Публичного договора-оферты](https://dialekt.ai/legal/offer). Я даю согласие на обработку моих персональных данных (имя, email, страна, цели использования, IP-адрес) ТОО «Dialekt.ai» в целях создания и поддержания учётной записи, выдачи лицензии и операционной коммуникации.
+> ☐ Я ознакомился(-ась) и принимаю условия [Политики конфиденциальности](https://dias.now/legal/privacy), [Условий использования](https://dias.now/legal/terms) и [Публичного договора-оферты](https://dias.now/legal/offer). Я даю согласие на обработку моих персональных данных (имя, email, страна, цели использования, IP-адрес) ТОО «Dialekt.ai» в целях создания и поддержания учётной записи, выдачи лицензии и операционной коммуникации.
 
 #### English text:
 
-> ☐ I have read and accept the [Privacy Policy](https://dialekt.ai/legal/privacy), [Terms of Service](https://dialekt.ai/legal/terms), and [Public Offer](https://dialekt.ai/legal/offer). I consent to the processing of my personal data (name, email, country, intended use, IP address) by TOO "Dialekt.ai" for the purposes of creating and maintaining my account, issuing the licence, and operational communication.
+> ☐ I have read and accept the [Privacy Policy](https://dias.now/legal/privacy), [Terms of Service](https://dias.now/legal/terms), and [Public Offer](https://dias.now/legal/offer). I consent to the processing of my personal data (name, email, country, intended use, IP address) by TOO "Dialekt.ai" for the purposes of creating and maintaining my account, issuing the licence, and operational communication.
 
 #### Технические требования:
 
@@ -63,7 +63,7 @@
 
 **Раскрывающийся блок (по клику «Подробнее»):**
 
-> В целях оказания Сервисов dialekt.ai передаёт ваши регистрационные данные (имя, email, страна, цели использования, IP-адрес) следующим обработчикам, расположенным за пределами Республики Казахстан:
+> В целях оказания Сервисов dias.now передаёт ваши регистрационные данные (имя, email, страна, цели использования, IP-адрес) следующим обработчикам, расположенным за пределами Республики Казахстан:
 >
 > | Получатель | Юрисдикция | Передаваемые данные | Цель |
 > |---|---|---|---|
@@ -71,7 +71,7 @@
 > | Cloudflare, Inc. | Соединённые Штаты Америки (с глобальной edge-сетью) | IP-адрес, метаданные DNS-запросов | Защита от DDoS, маршрутизация трафика |
 > | GitHub, Inc. | Соединённые Штаты Америки | IP-адрес, метаданные загрузок | Доставка установочных файлов Программного продукта |
 >
-> **Срок передачи и хранения:** в течение срока действия вашей учётной записи. После удаления учётной записи данные удаляются в порядке, описанном в [Политике конфиденциальности](https://dialekt.ai/legal/privacy).
+> **Срок передачи и хранения:** в течение срока действия вашей учётной записи. После удаления учётной записи данные удаляются в порядке, описанном в [Политике конфиденциальности](https://dias.now/legal/privacy).
 >
 > **Уровень защиты:** Соединённые Штаты Америки в настоящее время не входят в перечень государств, обеспечивающих адекватный уровень защиты персональных данных в значении Закона РК «О персональных данных и их защите» №94-V. С каждым из вышеуказанных получателей заключено соглашение об обработке персональных данных (DPA), обязывающее их применять меры защиты не ниже уровня, установленного законодательством РК.
 >
@@ -87,7 +87,7 @@
 
 **Expandable block (on "Learn more" click):**
 
-> To provide the Services, dialekt.ai transfers your registration data (name, email, country, intended use, IP address) to the following processors located outside Kazakhstan and outside the European Economic Area:
+> To provide the Services, dias.now transfers your registration data (name, email, country, intended use, IP address) to the following processors located outside Kazakhstan and outside the European Economic Area:
 >
 > | Recipient | Jurisdiction | Data transferred | Purpose |
 > |---|---|---|---|
@@ -95,7 +95,7 @@
 > | Cloudflare, Inc. | United States (with global edge network) | IP address, DNS metadata | DDoS protection, traffic routing |
 > | GitHub, Inc. | United States | IP address, download metadata | Distribution of Product binaries |
 >
-> **Duration of transfer and storage:** for the duration of your account. Following account deletion, data is deleted in the manner described in the [Privacy Policy](https://dialekt.ai/legal/privacy).
+> **Duration of transfer and storage:** for the duration of your account. Following account deletion, data is deleted in the manner described in the [Privacy Policy](https://dias.now/legal/privacy).
 >
 > **For EEA/UK residents:** transfers to Kazakhstan (where the controller is established) and to the United States are made on the basis of Standard Contractual Clauses adopted by the European Commission pursuant to Implementing Decision (EU) 2021/914, and (where applicable) the EU-U.S. Data Privacy Framework.
 >
@@ -137,7 +137,7 @@
 
 ## B. FIRST-RUN WIZARD — после установки Продукта
 
-**Локация:** Программный продукт dialekt.ai, первый запуск
+**Локация:** Программный продукт dias.now, первый запуск
 **Контекст:** до начала функционального использования Продукта.
 
 ### B.1 Информационное уведомление о локальной обработке данных
@@ -149,7 +149,7 @@
 
 > ### Ваши данные остаются на вашем устройстве
 >
-> dialekt.ai разработан так, чтобы по умолчанию все ваши промпты, ответы моделей, история переписки и файлы, к которым вы предоставляете доступ, обрабатывались **локально на этом устройстве**.
+> dias.now разработан так, чтобы по умолчанию все ваши промпты, ответы моделей, история переписки и файлы, к которым вы предоставляете доступ, обрабатывались **локально на этом устройстве**.
 >
 > На наши серверы передаются только:
 > - данные вашей учётной записи и лицензии;
@@ -162,7 +162,7 @@
 
 > ### Your data stays on your device
 >
-> dialekt.ai is designed so that, by default, all your prompts, model responses, chat history, and files you grant access to are processed **locally on this device**.
+> dias.now is designed so that, by default, all your prompts, model responses, chat history, and files you grant access to are processed **locally on this device**.
 >
 > Only the following data is sent to our servers:
 > - your account and licence data;
@@ -175,24 +175,24 @@
 
 ### B.2 Опциональный сбор телеметрии (если будете добавлять в будущем)
 
-> **Примечание:** в текущей архитектуре dialekt.ai телеметрия не собирается. Этот блок добавляется в UI **только** после реализации опциональной телеметрии и обновления Privacy Policy. До этого момента раздел B.2 не отображается пользователю.
+> **Примечание:** в текущей архитектуре dias.now телеметрия не собирается. Этот блок добавляется в UI **только** после реализации опциональной телеметрии и обновления Privacy Policy. До этого момента раздел B.2 не отображается пользователю.
 
 **Тип:** опциональный чекбокс
 **По умолчанию:** ☐ НЕ предзаполнен
 
 #### Русский текст:
 
-> ☐ Помочь улучшить dialekt.ai: разрешить отправку анонимных данных об ошибках и использовании функций. Никакое содержимое промптов, ответов или файлов передаваться не будет. Подробнее см. [Политику конфиденциальности, раздел Телеметрия](https://dialekt.ai/legal/privacy#telemetry).
+> ☐ Помочь улучшить dias.now: разрешить отправку анонимных данных об ошибках и использовании функций. Никакое содержимое промптов, ответов или файлов передаваться не будет. Подробнее см. [Политику конфиденциальности, раздел Телеметрия](https://dias.now/legal/privacy#telemetry).
 
 #### English text:
 
-> ☐ Help improve dialekt.ai: allow sending anonymous error reports and feature usage data. No content of prompts, responses, or files will be transmitted. See [Privacy Policy, Telemetry section](https://dialekt.ai/legal/privacy#telemetry) for details.
+> ☐ Help improve dias.now: allow sending anonymous error reports and feature usage data. No content of prompts, responses, or files will be transmitted. See [Privacy Policy, Telemetry section](https://dias.now/legal/privacy#telemetry) for details.
 
 ---
 
 ## C. CLOUD LLM PROVIDER ACTIVATION — активация облачного LLM-провайдера
 
-**Локация:** Программный продукт dialekt.ai, экран настроек / выбор модели
+**Локация:** Программный продукт dias.now, экран настроек / выбор модели
 **Контекст:** перед первой активацией каждого облачного LLM-провайдера. Согласие запрашивается **отдельно для каждого провайдера** и **только один раз** (повторный запрос не требуется при последующих использованиях того же провайдера).
 
 ### C.1 Шаблон согласия — общая форма
@@ -210,12 +210,12 @@
 > 1. **Куда передаются ваши данные:**
 >    - Ваши промпты, прикреплённые файлы и контекст диалога будут передаваться напрямую с этого устройства в API {PROVIDER_NAME}.
 >    - Серверы {PROVIDER_NAME} расположены в **{PROVIDER_JURISDICTION}**.
->    - Запросы **не проходят через серверы dialekt.ai**.
+>    - Запросы **не проходят через серверы dias.now**.
 >
 > 2. **Кто отвечает за ваши данные:**
 >    - {PROVIDER_NAME} становится самостоятельным оператором ваших данных в значении применимого законодательства.
 >    - Использование {PROVIDER_NAME} регулируется собственными условиями и политикой конфиденциальности этого провайдера.
->    - dialekt.ai не несёт ответственности за обработку ваших данных провайдером.
+>    - dias.now не несёт ответственности за обработку ваших данных провайдером.
 >
 > 3. **Что вам нужно сделать:**
 >    - Ознакомиться с [условиями обслуживания {PROVIDER_NAME}]({PROVIDER_TOS_URL});
@@ -247,12 +247,12 @@
 > 1. **Where your data goes:**
 >    - Your prompts, attached files, and conversation context will be transmitted directly from this device to {PROVIDER_NAME}'s API.
 >    - {PROVIDER_NAME}'s servers are located in **{PROVIDER_JURISDICTION}**.
->    - Requests **do not transit through dialekt.ai servers**.
+>    - Requests **do not transit through dias.now servers**.
 >
 > 2. **Who is responsible for your data:**
 >    - {PROVIDER_NAME} becomes an independent controller of your data under applicable law.
 >    - Use of {PROVIDER_NAME} is governed by that provider's own terms and privacy policy.
->    - dialekt.ai is not responsible for the provider's processing of your data.
+>    - dias.now is not responsible for the provider's processing of your data.
 >
 > 3. **What you need to do:**
 >    - Review [{PROVIDER_NAME}'s terms of service]({PROVIDER_TOS_URL});
@@ -288,7 +288,7 @@
 
 > ### Активация облачных LLM-провайдеров отключена
 >
-> Ваш экземпляр dialekt.ai работает в **регулируемом режиме** (regulated_mode). В этом режиме разрешено использование только локально размещённых моделей (Ollama).
+> Ваш экземпляр dias.now работает в **регулируемом режиме** (regulated_mode). В этом режиме разрешено использование только локально размещённых моделей (Ollama).
 >
 > Активация {PROVIDER_NAME} и других облачных провайдеров заблокирована для обеспечения соответствия требованиям регулируемых отраслей (банковский сектор, медицина, государственные органы).
 >
@@ -298,7 +298,7 @@
 
 > ### Cloud LLM provider activation is disabled
 >
-> Your instance of dialekt.ai is running in **regulated mode**. In this mode, only locally-hosted models (Ollama) are permitted.
+> Your instance of dias.now is running in **regulated mode**. In this mode, only locally-hosted models (Ollama) are permitted.
 >
 > Activation of {PROVIDER_NAME} and other cloud providers is blocked to ensure compliance with the requirements of regulated industries (banking, healthcare, government).
 >
@@ -373,7 +373,7 @@
 
 > ### Использование cookie
 >
-> Мы используем cookie для обеспечения работы сайта и (с вашего согласия) для понимания того, как посетители используют наш сайт. Подробнее см. [Политику конфиденциальности](https://dialekt.ai/legal/privacy#cookies).
+> Мы используем cookie для обеспечения работы сайта и (с вашего согласия) для понимания того, как посетители используют наш сайт. Подробнее см. [Политику конфиденциальности](https://dias.now/legal/privacy#cookies).
 >
 > [Принять все] [Только необходимые] [Настроить]
 
@@ -381,7 +381,7 @@
 
 > ### Use of Cookies
 >
-> We use cookies to operate the site and (with your consent) to understand how visitors use our site. See our [Privacy Policy](https://dialekt.ai/legal/privacy#cookies) for details.
+> We use cookies to operate the site and (with your consent) to understand how visitors use our site. See our [Privacy Policy](https://dias.now/legal/privacy#cookies) for details.
 >
 > [Accept all] [Necessary only] [Customise]
 
@@ -464,7 +464,7 @@ CREATE TABLE consent_versions (
 
 > ### Обновление условий обработки данных
 >
-> Мы обновили [Политику конфиденциальности](https://dialekt.ai/legal/privacy) и [Условия использования](https://dialekt.ai/legal/terms). Существенные изменения:
+> Мы обновили [Политику конфиденциальности](https://dias.now/legal/privacy) и [Условия использования](https://dias.now/legal/terms). Существенные изменения:
 >
 > - {CHANGE_LIST}
 >
@@ -479,7 +479,7 @@ CREATE TABLE consent_versions (
 
 ## H. ЧЕКЛИСТ ВНЕДРЕНИЯ
 
-Перед публичным релизом dialekt.ai разработчик подтверждает следующее:
+Перед публичным релизом dias.now разработчик подтверждает следующее:
 
 - [ ] **A.1** реализован: чекбокс не предзаполнен, блокирует submit, ведёт лог в `consent_log`.
 - [ ] **A.2** реализован: раскрывающийся блок с актуальным списком sub-processors, чекбокс не предзаполнен, лог записывается с указанием получателей.

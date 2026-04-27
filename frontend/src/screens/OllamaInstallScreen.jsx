@@ -223,7 +223,7 @@ export default function OllamaInstallScreen({ onNav, checkInfo }) {
   const canAutoInstall = isLinux && preview?.supported && preview?.sha256 && !installed;
 
   return (
-    <AppFrame title="dialekt.ai — Setup">
+    <AppFrame title="dias.now — Setup">
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
         {/* Sidebar */}
         <div style={{ width: 300, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '40px 28px', display: 'flex', flexDirection: 'column' }}>

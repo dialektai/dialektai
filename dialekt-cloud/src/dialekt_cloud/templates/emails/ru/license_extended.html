@@ -1,6 +1,6 @@
 {% extends "_layout.html" %}
 {% block lang %}ru{% endblock %}
-{% block subject %}{% autoescape false %}Ваша лицензия dialekt.ai продлена{% endautoescape %}{% endblock %}
+{% block subject %}{% autoescape false %}Ваша лицензия dias.now продлена{% endautoescape %}{% endblock %}
 {% block preheader %}+{{ days_added }} дн. Существующий ключ продолжает работать.{% endblock %}
 {% block topmeta %}Лицензия · Продлена{% endblock %}
 
@@ -10,7 +10,7 @@
 </h1>
 <p style="margin:0 0 24px 0;font-family:'Inter',Arial,sans-serif;font-size:16px;line-height:1.6;color:#3F4657;">
   Мы добавили <strong style="color:#0B1220;font-weight:500;">{{ days_added }} дн.</strong>
-  к вашей лицензии dialekt.ai. Существующий ключ продолжает работать —
+  к вашей лицензии dias.now. Существующий ключ продолжает работать —
   с вашей стороны делать ничего не нужно.
 </p>
 
@@ -36,6 +36,6 @@
 {% endblock %}
 
 {% block footer_note %}
-<a href="mailto:hello@dialekt.ai" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">hello@dialekt.ai</a> &nbsp;·&nbsp;
+<a href="mailto:hello@dias.now" style="color:#1E3A8A;text-decoration:none;border-bottom:1px solid #CDD1D9;">hello@dias.now</a> &nbsp;·&nbsp;
 <a href="{{ landing_url }}" style="color:#6B7280;text-decoration:none;border-bottom:1px solid #E4E6EB;">{{ landing_url }}</a>
 {% endblock %}

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dialekt-cloud"
 version = "0.1.0"
-description = "dialekt.ai cloud service — license management, invite flow, agent registry"
+description = "dias.now cloud service — license management, invite flow, agent registry"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

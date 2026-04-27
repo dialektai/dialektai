@@ -140,7 +140,7 @@ docker compose pull
 docker compose up -d --build
 ```
 
-Verify: `curl https://api.dialekt.ai/health`
+Verify: `curl https://api.dias.now/health`
 
 ---
 

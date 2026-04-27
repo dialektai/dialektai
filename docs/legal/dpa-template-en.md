@@ -1,7 +1,7 @@
 # DATA PROCESSING AGREEMENT
 
 **Template version:** 1.0
-**Reference:** dialekt.ai DPA-2026-v1
+**Reference:** dias.now DPA-2026-v1
 **Effective date:** [TO BE COMPLETED ON SIGNATURE]
 
 ---
@@ -20,7 +20,7 @@ each a "**Party**" and together the "**Parties**".
 
 ## RECITALS
 
-(A) The Parties have entered into a Subscription Agreement, Order Form, or accepted the Public Offer (collectively, the "**Principal Agreement**") under which the Processor provides the dialekt.ai software product and related services (the "**Services**") to the Controller.
+(A) The Parties have entered into a Subscription Agreement, Order Form, or accepted the Public Offer (collectively, the "**Principal Agreement**") under which the Processor provides the dias.now software product and related services (the "**Services**") to the Controller.
 
 (B) In the course of providing the Services, the Processor may process personal data on behalf of the Controller as a processor within the meaning of Article 4(8) of Regulation (EU) 2016/679 (the "**GDPR**") and equivalent terms under the Law of the Republic of Kazakhstan No. 94-V dated 21 May 2013 "On Personal Data and Their Protection" (the "**Kazakhstan Data Protection Law**").
 
@@ -38,7 +38,7 @@ NOW THEREFORE, the Parties agree as follows:
 
 - **"Affiliate"** means any entity that, directly or indirectly, controls, is controlled by, or is under common control with a Party.
 - **"Applicable Data Protection Law"** means all laws relating to data protection and privacy that apply to the processing of Personal Data under this DPA, including the GDPR, the UK GDPR, the Swiss Federal Act on Data Protection, the Kazakhstan Data Protection Law, and any binding guidance issued by competent authorities under those laws.
-- **"Cloud LLM Provider"** means a third-party Large Language Model service that the Controller or its authorised users may activate from within the Services (such as Anthropic, OpenAI, Google, AWS Bedrock, Mistral AI, and others, as listed at https://dialekt.ai/legal/cloud-providers).
+- **"Cloud LLM Provider"** means a third-party Large Language Model service that the Controller or its authorised users may activate from within the Services (such as Anthropic, OpenAI, Google, AWS Bedrock, Mistral AI, and others, as listed at https://dias.now/legal/cloud-providers).
 - **"Controller"** means the Customer named above, acting in the capacity of a "controller" within the meaning of Article 4(7) GDPR and equivalent terms under other Applicable Data Protection Law.
 - **"Data Subject"** means an identified or identifiable natural person to whom Personal Data relates.
 - **"Personal Data"** means any information processed by the Processor on behalf of the Controller in connection with the Services that constitutes "personal data" within the meaning of Applicable Data Protection Law. The categories of Personal Data processed under this DPA are set out in Annex 1.
@@ -67,7 +67,7 @@ NOW THEREFORE, the Parties agree as follows:
 
 (b) **Cloud LLM Provider routing:** Where the Controller or its authorised users activate a Cloud LLM Provider, prompts and responses are transmitted directly from the user's device to that provider's API, do not transit through the Processor's infrastructure, and are processed by the Cloud LLM Provider as an independent controller or processor under that provider's own terms. The Processor is not a processor of such data, and this DPA does not regulate that processing.
 
-(c) **Account, billing, and authentication data:** With respect to data such as the names, email addresses, billing details, and authentication credentials of the Controller's authorised users (collectively, "**Administrative Data**"), the Processor acts as a controller as described in the Privacy Policy at https://dialekt.ai/legal/privacy. This DPA does not modify the Processor's obligations as a controller of Administrative Data.
+(c) **Account, billing, and authentication data:** With respect to data such as the names, email addresses, billing details, and authentication credentials of the Controller's authorised users (collectively, "**Administrative Data**"), the Processor acts as a controller as described in the Privacy Policy at https://dias.now/legal/privacy. This DPA does not modify the Processor's obligations as a controller of Administrative Data.
 
 2.4 **Documented instructions.** The Controller's instructions for processing Personal Data are set out in this DPA, the Principal Agreement, the Privacy Policy, and any further written instructions given by the Controller from time to time. The Processor will process Personal Data only on documented instructions from the Controller, including with regard to international transfers, unless required to do otherwise by law to which the Processor is subject; in such case the Processor will inform the Controller of that legal requirement before processing, unless that law prohibits such information on important grounds of public interest.
 
@@ -130,11 +130,11 @@ Where it is not possible to provide all information at the same time, the inform
 
 5.1 **General authorisation.** The Controller grants the Processor general authorisation to engage Sub-processors for the processing of Personal Data, subject to the conditions in this Section 5.
 
-5.2 **Current Sub-processors.** A list of current Sub-processors is set out in Annex 3 and is also published at https://dialekt.ai/legal/sub-processors.
+5.2 **Current Sub-processors.** A list of current Sub-processors is set out in Annex 3 and is also published at https://dias.now/legal/sub-processors.
 
 5.3 **Sub-processor obligations.** The Processor will impose on each Sub-processor, by means of a written contract, data protection obligations no less protective than those imposed on the Processor under this DPA. The Processor remains liable to the Controller for the performance of each Sub-processor's obligations.
 
-5.4 **Notification of changes.** The Processor will notify the Controller of any intended addition or replacement of Sub-processors at least **30 days** in advance, by email to the email address designated by the Controller for this purpose, or by publishing the change at https://dialekt.ai/legal/sub-processors and notifying customers who have subscribed to the change feed.
+5.4 **Notification of changes.** The Processor will notify the Controller of any intended addition or replacement of Sub-processors at least **30 days** in advance, by email to the email address designated by the Controller for this purpose, or by publishing the change at https://dias.now/legal/sub-processors and notifying customers who have subscribed to the change feed.
 
 5.5 **Right to object.** The Controller may object to a new Sub-processor on reasonable grounds related to data protection by giving written notice within 30 days of the notification under Section 5.4. The Parties will discuss the objection in good faith. If the objection cannot be reasonably resolved within 30 days, the Controller may, as its sole and exclusive remedy, terminate the Principal Agreement (or the affected portion of the Services) without penalty by giving written notice; the Processor will refund any prepaid fees for the unused remainder of the then-current term of the affected Services.
 
@@ -281,7 +281,7 @@ This Annex sets out the details of the processing of Personal Data by the Proces
 | Address | [Address] |
 | Contact person | [Name, position] |
 | Email | [Email] |
-| Activities relevant to data transferred | Use of dialekt.ai Services for internal business purposes |
+| Activities relevant to data transferred | Use of dias.now Services for internal business purposes |
 | Role | Controller |
 
 **Data importer (Processor):**
@@ -292,7 +292,7 @@ This Annex sets out the details of the processing of Personal Data by the Proces
 | Address | Republic of Kazakhstan, Astana, Esil district, Е 652 Street, building 4, premise 1, postal code 010000 |
 | Contact person | Dias Zhumagaliyev Kaisaruly, Director |
 | Email | dpo@dias.now |
-| Activities relevant to data transferred | Provision of dialekt.ai software product, licensing, and support services |
+| Activities relevant to data transferred | Provision of dias.now software product, licensing, and support services |
 | Role | Processor |
 
 ## B. Description of Transfer
@@ -420,7 +420,7 @@ The Processor implements and maintains the following technical and organisationa
 | Breach notification | The Processor will notify the Controller of any Personal Data Breach in accordance with Section 3.8 of the DPA. |
 | Reporting channel | Security reports may be submitted to security@dias.now. |
 
-## 10. Architectural measures specific to dialekt.ai
+## 10. Architectural measures specific to dias.now
 
 | Measure | Description |
 |---|---|
@@ -435,7 +435,7 @@ This Annex 2 may be updated by the Processor from time to time to reflect improv
 
 # ANNEX 3 — APPROVED SUB-PROCESSORS
 
-The Processor engages the following Sub-processors for the processing of Personal Data on behalf of the Controller. The current authoritative list is published at https://dialekt.ai/legal/sub-processors.
+The Processor engages the following Sub-processors for the processing of Personal Data on behalf of the Controller. The current authoritative list is published at https://dias.now/legal/sub-processors.
 
 | Sub-processor | Legal entity | Address | Country | Service provided | Categories of Personal Data |
 |---|---|---|---|---|---|
@@ -443,7 +443,7 @@ The Processor engages the following Sub-processors for the processing of Persona
 | GitHub, Inc. | GitHub, Inc. (subsidiary of Microsoft Corporation) | 88 Colin P Kelly Jr Street, San Francisco, CA 94107 | United States | Hosting and distribution of Product binary releases | IP addresses, download metadata |
 | Zoho Corporation Pvt. Ltd. | Zoho Corporation | 4141 Hacienda Drive, Pleasanton, CA 94588 | United States | Email communications (transactional and operational) | Email addresses, names, contents of communications |
 
-**Cloud LLM Providers are NOT Sub-processors of the Processor.** Where the Controller activates a Cloud LLM Provider, that provider acts as an independent controller or processor of Personal Data submitted to it by the Controller's authorised users, under the provider's own terms. The Processor is not a party to that processing relationship and does not engage Cloud LLM Providers as Sub-processors. The current list of supported Cloud LLM Providers (for informational purposes) is published at https://dialekt.ai/legal/cloud-providers.
+**Cloud LLM Providers are NOT Sub-processors of the Processor.** Where the Controller activates a Cloud LLM Provider, that provider acts as an independent controller or processor of Personal Data submitted to it by the Controller's authorised users, under the provider's own terms. The Processor is not a party to that processing relationship and does not engage Cloud LLM Providers as Sub-processors. The current list of supported Cloud LLM Providers (for informational purposes) is published at https://dias.now/legal/cloud-providers.
 
 ---
 

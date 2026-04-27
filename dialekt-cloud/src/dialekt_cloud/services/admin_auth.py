@@ -85,8 +85,8 @@ def new_totp_secret() -> str:
 
 
 def provisioning_uri(secret_b32: str, email: str) -> str:
-    """Format: otpauth://totp/dialekt.ai:dias%40dialekt.ai?secret=...&issuer=dialekt.ai"""
-    return pyotp.totp.TOTP(secret_b32).provisioning_uri(name=email, issuer_name="dialekt.ai")
+    """Format: otpauth://totp/dias.now:dias%40dias.now?secret=...&issuer=dias.now"""
+    return pyotp.totp.TOTP(secret_b32).provisioning_uri(name=email, issuer_name="dias.now")
 
 
 def verify_totp(secret_b32: str, code: str, valid_window: int = 1) -> bool:

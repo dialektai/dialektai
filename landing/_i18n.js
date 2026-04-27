@@ -1,4 +1,4 @@
-/* dialekt.ai — shared i18n for static landing pages.
+/* dias.now — shared i18n for static landing pages.
    Pages mark translatable nodes:
      <span data-i18n="nav.product">Product</span>
      <input data-i18n-attr="placeholder:form.email.ph">
@@ -36,7 +36,7 @@
       "footer.legal.privacy": "Privacy",
       "footer.legal.terms": "Terms",
       "footer.legal.dpa": "DPA",
-      "footer.copy": "© 2026 dialekt.ai",
+      "footer.copy": "© 2026 dias.now",
       "footer.principle": "Local-first · No telemetry · No account required",
     },
     ru: {
@@ -65,7 +65,7 @@
       "footer.legal.privacy": "Конфиденциальность",
       "footer.legal.terms": "Условия",
       "footer.legal.dpa": "DPA",
-      "footer.copy": "© 2026 dialekt.ai",
+      "footer.copy": "© 2026 dias.now",
       "footer.principle": "Локально · без телеметрии · без аккаунта",
     },
   };

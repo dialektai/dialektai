@@ -1736,7 +1736,7 @@ function StepTrigger({ data, setData }) {
           <span style={{ color: T.amber }}>NOTE</span>{'  '}
           The <span style={{ color: T.text }}>{selectedOpt.label}</span> trigger
           is coming in a future release — contact{' '}
-          <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for early access.
+          <span style={{ color: T.cyan }}>hello@dias.now</span> for early access.
           Publish is disabled until you switch to Interactive.
         </div>
       )}
@@ -1871,7 +1871,7 @@ function StepPublish({ data, saving, onSave }) {
           <span style={{ color: T.amber }}>⚠ PUBLISH BLOCKED</span>{'  '}
           This agent is configured with a trigger that isn't available yet.
           Go back to step 8 and pick <span style={{ color: T.text }}>Interactive</span>,
-          or contact <span style={{ color: T.cyan }}>hello@dialekt.ai</span> for
+          or contact <span style={{ color: T.cyan }}>hello@dias.now</span> for
           early access to scheduled / webhook / event triggers.
         </div>
       )}
@@ -2124,7 +2124,7 @@ export default function AgentWizardScreen({ onNav }) {
   };
 
   return (
-    <AppFrame title="dialekt.ai — New Agent">
+    <AppFrame title="dias.now — New Agent">
       {/* ── Body ── */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
 

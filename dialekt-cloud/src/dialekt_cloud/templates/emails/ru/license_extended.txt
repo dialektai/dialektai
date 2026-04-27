@@ -1,6 +1,6 @@
-dialekt.ai — {{ full_name }}, ваша лицензия продлена
+dias.now — {{ full_name }}, ваша лицензия продлена
 
-Мы добавили {{ days_added }} дн. к вашей лицензии dialekt.ai.
+Мы добавили {{ days_added }} дн. к вашей лицензии dias.now.
 Существующий ключ продолжает работать — с вашей стороны делать
 ничего не нужно.
 
@@ -12,4 +12,4 @@ dialekt.ai — {{ full_name }}, ваша лицензия продлена
 ответьте на это письмо.
 
 —
-dialekt.ai · hello@dialekt.ai · {{ landing_url }}
+dias.now · hello@dias.now · {{ landing_url }}

@@ -45,7 +45,7 @@
 |---|---|---|
 | 1.1 | ✅ WORKS | App launches, license screen rendered, no white screen, no console errors |
 | 1.2 | ✅ WORKS | License entry is the first screen |
-| 1.3 | ✅ WORKS | Invalid key → inline error "License key not found or expired. Contact hello@dialekt.ai" + red-border input |
+| 1.3 | ✅ WORKS | Invalid key → inline error "License key not found or expired. Contact hello@dias.now" + red-border input |
 | 1.4 | ✅ WORKS | Valid key (Acceptance Test Bank) → green success card "License activated — team plan · 3 seats" |
 | 1.5 | ⚠️ PARTIAL | Modes are **"Builder / User"**, not "Desktop / Cloud" as the test plan expected. Labels make sense for the actual product — test plan is stale |
 | 1.6 | ✅ WORKS | Selecting mode enables "Continue as Builder" |

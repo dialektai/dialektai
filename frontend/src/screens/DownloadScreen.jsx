@@ -161,7 +161,7 @@ export default function DownloadScreen({ onNav, model: modelProp, onComplete }) 
   const statusColor = { done: T.green, error: T.red, cancelled: T.amber }[overallStatus] || T.cyan;
 
   return (
-    <AppFrame title={`dialekt.ai — pulling ${modelName}`}>
+    <AppFrame title={`dias.now — pulling ${modelName}`}>
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
         {/* Sidebar */}
         <div style={{ width: 300, background: T.bg1, borderRight: `1px solid ${T.border}`, padding: '36px 28px', display: 'flex', flexDirection: 'column' }}>

@@ -1,4 +1,4 @@
-# dialekt.ai
+# dias.now
 
 [![CI](https://github.com/dialektai/dialektai/actions/workflows/ci.yml/badge.svg)](https://github.com/dialektai/dialektai/actions/workflows/ci.yml)
 [![E2E Integration](https://github.com/dialektai/dialektai/actions/workflows/e2e-integration.yml/badge.svg)](https://github.com/dialektai/dialektai/actions/workflows/e2e-integration.yml)

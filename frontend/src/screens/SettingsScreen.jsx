@@ -2035,7 +2035,7 @@ function LicenseSection() {
         return;
       }
       if (!data?.valid) {
-        addToast(data?.message || 'License key not found or expired. Contact hello@dialekt.ai', 'error');
+        addToast(data?.message || 'License key not found or expired. Contact hello@dias.now', 'error');
         return;
       }
       const tenant = {
@@ -2203,7 +2203,7 @@ function LicenseSection() {
                     }}
                   />
                   <div style={{ fontSize: 11, color: T.dim }}>
-                    Validated against <span className="mono">api.dialekt.ai</span>. License + bearer token are stored in your OS keychain.
+                    Validated against <span className="mono">api.dias.now</span>. License + bearer token are stored in your OS keychain.
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={submitKey} disabled={busy || !key.trim()} style={{
@@ -2250,7 +2250,7 @@ function LicenseSection() {
           </Card>
 
           <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
-            Need a license key? Email <span className="mono" style={{ color: T.muted }}>hello@dialekt.ai</span> with your company name and seat count.
+            Need a license key? Email <span className="mono" style={{ color: T.muted }}>hello@dias.now</span> with your company name and seat count.
           </div>
         </>
       )}
@@ -3239,7 +3239,7 @@ export default function SettingsScreen({ onNav, initialSection, focusAgentId }) 
 
   return (
     <Ctx.Provider value={ctx}>
-      <AppFrame title={`dialekt.ai — ${section.toLowerCase()}`}>
+      <AppFrame title={`dias.now — ${section.toLowerCase()}`}>
         <LeftPanel active={-1} onNav={onNav} />
         <main style={{ flex: 1, display: 'flex', minWidth: 0, background: T.bg0 }}>
           <SettingsNav active={section} onSelect={setSection} />
