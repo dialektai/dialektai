@@ -59,6 +59,47 @@ _current_mcp_runtime: ContextVar[Any] = ContextVar(
 log = logging.getLogger("dialekt.plugin_context")
 
 _DEFAULT_BASE_URL = "http://127.0.0.1:8765"
+_OLLAMA_LOCAL_BASE = "http://localhost:11434"
+
+
+class InferenceTarget:
+    """Where Ollama-shaped inference calls should go.
+
+    Local mode → ``http://localhost:11434`` with no extra headers.
+    Relay mode → ``https://gpu-relay.dias.now`` with a Bearer header.
+
+    Both surfaces honour the same Ollama API paths (/api/tags,
+    /api/chat, /api/generate, /api/embed, /api/embeddings) — the relay
+    aliases them onto its auth + billing chain. Callers therefore don't
+    need path translation; only the base URL and the Bearer header
+    change between modes.
+    """
+
+    __slots__ = ("base_url", "headers", "api_key", "is_relay")
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        headers: Optional[dict] = None,
+        api_key: Optional[str] = None,
+        is_relay: bool = False,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.headers = dict(headers) if headers else {}
+        self.api_key = api_key
+        self.is_relay = is_relay
+
+    def url(self, path: str) -> str:
+        if not path.startswith("/"):
+            path = "/" + path
+        return self.base_url + path
+
+    def __repr__(self) -> str:
+        return (
+            f"InferenceTarget(base_url={self.base_url!r}, "
+            f"is_relay={self.is_relay}, has_auth={bool(self.headers)})"
+        )
 
 
 class _PersistentASGIClient:
@@ -159,6 +200,9 @@ class PluginContext:
         self,
         app: Any = None,
         base_url: Optional[str] = None,
+        *,
+        relay_url: Optional[str] = None,
+        relay_api_key: Optional[str] = None,
     ) -> None:
         self.app = app
         # Resolve base_url at init time so that monkeypatching env in tests
@@ -166,6 +210,13 @@ class PluginContext:
         self.base_url = base_url or os.environ.get(
             "DIALEKT_BACKEND_URL", _DEFAULT_BASE_URL
         )
+        # GPU Relay mode (Cloud-Assisted tier). When both relay_url and
+        # relay_api_key are set, ``inference_target()`` returns the relay
+        # endpoint + Bearer; otherwise it falls back to local Ollama.
+        # Configured at startup from ~/.dialekt/relay.toml; rebuilt via
+        # set_context() when the user toggles the setting in the UI.
+        self.relay_url = (relay_url or "").rstrip("/") or None
+        self.relay_api_key = relay_api_key or None
         self._client = None  # TestClient OR httpx.Client; built on first use
         # close() is terminal — once called, any subsequent HTTP-verb method
         # raises instead of lazily rebuilding a fresh client. This prevents
@@ -240,7 +291,29 @@ class PluginContext:
             "mode": "in-process" if self.app is not None else "http",
             "base_url": self.base_url,
             "has_app": self.app is not None,
+            "relay_enabled": self.inference_target().is_relay,
         }
+
+    # ── Inference target (Ollama / GPU Relay) ──────────────────────────────
+
+    def inference_target(self) -> InferenceTarget:
+        """Where to send Ollama-shaped inference calls (chat, generate,
+        tags, embed, embeddings).
+
+        Returns the relay target when both ``relay_url`` and
+        ``relay_api_key`` are configured; falls back to local Ollama
+        otherwise. Resolver and few-shot memory call this on every
+        request so a context swap (set_context after the user toggles
+        in the UI) takes effect on the very next inference.
+        """
+        if self.relay_url and self.relay_api_key:
+            return InferenceTarget(
+                base_url=self.relay_url,
+                headers={"Authorization": f"Bearer {self.relay_api_key}"},
+                api_key=self.relay_api_key,
+                is_relay=True,
+            )
+        return InferenceTarget(base_url=_OLLAMA_LOCAL_BASE)
 
     # ── MCP integration (Этап 1) ───────────────────────────────────────────
 

@@ -108,11 +108,18 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
             "ollama_reachable": ollama_reachable,
         }
 
-    @app.get("/relay/models")
-    async def models(
-        request: Request,
-        ctx: RelayKeyContext = Depends(get_relay_context),
-    ) -> Response:
+    # Two parallel route surfaces, same auth + billing on each:
+    #
+    #   /relay/*   explicit relay-aware paths from the user spec
+    #   /api/*     drop-in Ollama compatibility — litellm and any other
+    #              Ollama client just point ``api_base`` at the relay
+    #              and everything works without path translation.
+    #
+    # The handlers themselves are plain async helpers; FastAPI routes
+    # call them and the Depends(get_relay_context) chain enforces auth
+    # at the route layer.
+
+    async def _models_handler(request: Request) -> Response:
         client: httpx.AsyncClient = request.app.state.ollama
         r = await client.get("/api/tags")
         return Response(
@@ -121,29 +128,11 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
             media_type=r.headers.get("content-type", "application/json"),
         )
 
-    @app.post("/relay/generate")
-    async def generate(
-        request: Request,
-        ctx: RelayKeyContext = Depends(get_relay_context),
-    ) -> Response:
-        return await _proxy_inference(request, "/api/generate", ctx)
-
-    @app.post("/relay/chat")
-    async def chat(
-        request: Request,
-        ctx: RelayKeyContext = Depends(get_relay_context),
-    ) -> Response:
-        return await _proxy_inference(request, "/api/chat", ctx)
-
-    @app.post("/relay/embeddings")
-    async def embeddings(
-        request: Request,
-        ctx: RelayKeyContext = Depends(get_relay_context),
-    ) -> Response:
+    async def _embeddings_handler(request: Request, ollama_path: str) -> Response:
         client: httpx.AsyncClient = request.app.state.ollama
         body = await request.body()
         r = await client.post(
-            "/api/embeddings",
+            ollama_path,
             content=body,
             headers={
                 "content-type": request.headers.get(
@@ -156,6 +145,80 @@ def create_app(config: Optional[RelayConfig] = None) -> FastAPI:
             status_code=r.status_code,
             media_type=r.headers.get("content-type", "application/json"),
         )
+
+    # ── /relay/* surface (explicit, relay-aware clients) ───────────────────
+
+    @app.get("/relay/models")
+    async def relay_models(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _models_handler(request)
+
+    @app.post("/relay/generate")
+    async def relay_generate(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _proxy_inference(request, "/api/generate", ctx)
+
+    @app.post("/relay/chat")
+    async def relay_chat(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _proxy_inference(request, "/api/chat", ctx)
+
+    @app.post("/relay/embeddings")
+    async def relay_embeddings(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _embeddings_handler(request, "/api/embeddings")
+
+    @app.post("/relay/embed")
+    async def relay_embed(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _embeddings_handler(request, "/api/embed")
+
+    # ── /api/* surface (drop-in Ollama proxy for litellm + raw clients) ────
+
+    @app.get("/api/tags")
+    async def api_tags(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _models_handler(request)
+
+    @app.post("/api/generate")
+    async def api_generate(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _proxy_inference(request, "/api/generate", ctx)
+
+    @app.post("/api/chat")
+    async def api_chat(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _proxy_inference(request, "/api/chat", ctx)
+
+    @app.post("/api/embeddings")
+    async def api_embeddings(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _embeddings_handler(request, "/api/embeddings")
+
+    @app.post("/api/embed")
+    async def api_embed(
+        request: Request,
+        ctx: RelayKeyContext = Depends(get_relay_context),
+    ) -> Response:
+        return await _embeddings_handler(request, "/api/embed")
 
     return app
 

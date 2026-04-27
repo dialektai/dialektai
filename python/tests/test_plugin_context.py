@@ -33,6 +33,7 @@ def test_default_context_reads_env(monkeypatch):
         "mode": "http",
         "base_url": "http://127.0.0.1:8765",
         "has_app": False,
+        "relay_enabled": False,
     }
 
 

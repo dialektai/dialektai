@@ -693,8 +693,14 @@ async def lifespan(app: FastAPI):
     # back into this very app instead of a network hop to localhost:8765.
     # Plugins (DialektSQL, retry_loop) read the context via get_context(),
     # so they pick up the in-process routing without any direct call.
+    #
+    # GPU Relay (2026-04-27): also pick up ~/.dialekt/relay.toml so that
+    # resolver / few_shot_memory route Ollama traffic through the relay
+    # when Cloud GPU mode is enabled. The /relay/config POST handler
+    # rebuilds the context after a save so the change applies without
+    # a restart.
     from dialekt.llm._plugin_context import PluginContext, set_context
-    set_context(PluginContext(app=app))
+    set_context(_build_plugin_context(app))
     log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
 
     yield
@@ -1789,7 +1795,9 @@ async def get_relay_config():
 
 @app.post("/relay/config")
 async def set_relay_config(body: dict):
-    """Replace ~/.dialekt/relay.toml.
+    """Replace ~/.dialekt/relay.toml and rebuild the active
+    PluginContext so the change applies on the very next inference
+    (no restart needed).
 
     Body fields:
       url      str   relay base URL (no trailing slash)
@@ -1803,7 +1811,34 @@ async def set_relay_config(body: dict):
     if api_key is None or api_key == "":
         api_key = current["api_key"]
     save_relay_config({"url": url, "api_key": api_key, "enabled": enabled})
+
+    # Rebuild the plugin context so resolver / few_shot pick up the new
+    # toggle on the next call. Wrapped in try because tests may invoke
+    # this handler before a context exists.
+    try:
+        from dialekt.llm._plugin_context import set_context
+        set_context(_build_plugin_context(app))
+    except Exception:
+        log.exception("failed to rebuild plugin context after relay save")
+
     return await get_relay_config()
+
+
+def _build_plugin_context(fastapi_app):
+    """Build a PluginContext that honours ~/.dialekt/relay.toml.
+
+    Lifted out of the lifespan so the /relay/config handler can call it
+    too — every save pushes a fresh context through ``set_context``.
+    """
+    from dialekt.llm._plugin_context import PluginContext
+    cfg = load_relay_config()
+    if cfg.get("enabled") and cfg.get("url") and cfg.get("api_key"):
+        return PluginContext(
+            app=fastapi_app,
+            relay_url=cfg["url"],
+            relay_api_key=cfg["api_key"],
+        )
+    return PluginContext(app=fastapi_app)
 
 
 @app.post("/relay/test")

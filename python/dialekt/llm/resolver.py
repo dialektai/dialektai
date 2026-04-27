@@ -14,11 +14,22 @@ import time
 from typing import TypedDict
 
 from dialekt.llm.catalog import get_provider, CLOUD_PROVIDERS
+from dialekt.llm._plugin_context import get_context
 from dialekt.secrets import get_secret
 
 
 OLLAMA_LOCAL_BASE = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "gemma3:12b"
+
+
+def _ollama_target():
+    """Current inference target for Ollama-shaped calls.
+
+    Honours GPU Relay mode (Cloud-Assisted tier): when the active
+    PluginContext has ``relay_url`` + ``relay_api_key`` set, returns
+    the relay endpoint + Bearer header. Otherwise local Ollama.
+    """
+    return get_context().inference_target()
 
 # Cache of installed Ollama models (5s TTL). Used by _ollama_canonical to
 # prefer the user's literal model name over the legacy mangle when the
@@ -30,13 +41,19 @@ _OLLAMA_TAGS_TTL = 5.0
 def _installed_ollama_tags() -> frozenset:
     """Best-effort sync fetch of /api/tags. On any failure returns the
     last-known set (so the legacy canonical mangle still applies — the
-    fallback path remains intact for cold start / offline pilots)."""
+    fallback path remains intact for cold start / offline pilots).
+
+    Honours relay mode: when Cloud GPU is enabled the call goes to the
+    relay's /api/tags alias with the Bearer header. Either way the
+    response shape is identical (Ollama-compatible).
+    """
     now = time.monotonic()
     if now - _OLLAMA_TAGS_CACHE["ts"] < _OLLAMA_TAGS_TTL:
         return _OLLAMA_TAGS_CACHE["names"]
     try:
         import httpx
-        r = httpx.get(f"{OLLAMA_LOCAL_BASE}/api/tags", timeout=0.4)
+        target = _ollama_target()
+        r = httpx.get(target.url("/api/tags"), headers=target.headers, timeout=0.4)
         if r.status_code == 200:
             data = r.json()
             names = {m.get("name", "") for m in data.get("models", [])}
@@ -89,24 +106,30 @@ def resolve_litellm_model(settings: dict) -> ResolvedModel:
     model: str = settings.get("model") or DEFAULT_OLLAMA_MODEL
 
     if provider_id == "ollama":
+        # Cloud GPU mode swaps api_base to the relay and supplies the
+        # Bearer key as ``api_key`` — litellm sends that as the
+        # Authorization header on its outbound /api/chat call. The
+        # rest of OI's ollama_chat machinery is unchanged.
+        target = _ollama_target()
         return {
             "model": f"ollama_chat/{_ollama_canonical(model)}",
-            "api_base": OLLAMA_LOCAL_BASE,
-            "api_key": None,
+            "api_base": target.base_url,
+            "api_key": target.api_key,
             "extra": {},
             "provider": "ollama",
-            "is_local": True,
+            "is_local": not target.is_relay,
         }
 
     provider = get_provider(provider_id)
     if provider is None:
+        target = _ollama_target()
         return {
             "model": f"ollama_chat/{_ollama_canonical(DEFAULT_OLLAMA_MODEL)}",
-            "api_base": OLLAMA_LOCAL_BASE,
-            "api_key": None,
+            "api_base": target.base_url,
+            "api_key": target.api_key,
             "extra": {},
             "provider": "ollama",
-            "is_local": True,
+            "is_local": not target.is_relay,
         }
 
     model_str = f"{provider.litellm_prefix}{model}"
