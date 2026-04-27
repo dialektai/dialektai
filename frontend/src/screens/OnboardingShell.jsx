@@ -9,7 +9,7 @@ const steps = [
   { n: '05', t: 'First conversation' },
 ];
 
-export default function OnboardingShell({ step, title, blurb, cta = 'Continue', onCtaClick, onNav, children }) {
+export default function OnboardingShell({ step, title, blurb, cta = 'Continue', loading = false, onCtaClick, onNav, children }) {
   return (
     <AppFrame title={`dialekt.ai — onboarding · step ${step}`}>
       <div style={{ flex: 1, display: 'flex', background: T.bg0, minWidth: 0 }}>
@@ -54,11 +54,14 @@ export default function OnboardingShell({ step, title, blurb, cta = 'Continue', 
               <span style={{ fontSize: 11, color: T.dim }}>step {step} of 5 · </span>
               <span style={{ fontSize: 11, color: T.muted }}>you can change all of this later</span>
             </div>
-            <button className="dlk-btn" onClick={() => onNav?.(`onboarding-step${step - 1}`)}>Back</button>
-            <button className="dlk-btn" onClick={() => step < 5 ? onNav?.(`onboarding-step${step + 1}`) : onNav?.('main')}>Skip</button>
-            <button className="dlk-btn primary" style={{ padding: '7px 16px' }}
+            <button className="dlk-btn" onClick={() => onNav?.(`onboarding-step${step - 1}`)} disabled={loading}>Back</button>
+            <button className="dlk-btn" onClick={() => step < 5 ? onNav?.(`onboarding-step${step + 1}`) : onNav?.('main')} disabled={loading}>Skip</button>
+            <button className="dlk-btn primary"
+              style={{ padding: '7px 16px', opacity: loading ? 0.6 : 1, cursor: loading ? 'wait' : 'pointer' }}
+              disabled={loading}
               onClick={onCtaClick || (() => step < 5 ? onNav?.(`onboarding-step${step + 1}`) : onNav?.('main'))}>
-              {cta} <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
+              {loading ? 'Saving…' : cta}
+              {!loading && <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>}
             </button>
           </div>
         </div>

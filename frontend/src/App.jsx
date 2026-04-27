@@ -192,17 +192,21 @@ function AppRoutes() {
       {screen === 'palette'            && <CommandPaletteScreen onNav={nav} />}
       {screen === 'offline'            && <OfflineScreen onNav={nav} />}
       {screen === 'onboarding-step3'   && <OnboardingScreen onNav={nav} />}
-      {screen === 'onboarding-step4'   && <OnboardingPermsScreen onNav={nav} onComplete={() => {
-          // Mark onboarding complete
+      {screen === 'onboarding-step4'   && <OnboardingPermsScreen onNav={nav} onComplete={async () => {
+          // Mark onboarding complete (fire-and-forget — don't block nav)
           fetch(`${API}/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ onboarding_completed: true }),
           }).catch(() => {});
-          // User mode → first chat; builder mode → main
-          fetch(`${API}/config/mode`).then(r => r.json()).then(d => {
+          // User mode → first chat; builder mode → main. Await so the
+          // child can keep its loading state on while we resolve the mode.
+          try {
+            const d = await fetch(`${API}/config/mode`).then(r => r.json());
             nav(d.mode === 'user' ? 'onboarding-step5' : 'main');
-          }).catch(() => nav('main'));
+          } catch {
+            nav('main');
+          }
         }} />}
       {screen === 'onboarding-step5'   && <OnboardingFirstChatScreen onNav={nav} />}
       {screen === 'mode-setup'         && <ModeSetupScreen onNav={nav} />}
