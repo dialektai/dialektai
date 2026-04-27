@@ -91,7 +91,26 @@ def get_email_service(request: Request):
 
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 
-class CreateTenantRequest(BaseModel):
+class TenantBillingFields(BaseModel):
+    """KZ legal billing details rendered into the invoice "Покупатель" block.
+    All optional — drafts and trial tenants don't need them; admin fills
+    before issuing the first invoice. ``talon_number`` is only meaningful
+    when ``legal_form='ИП'`` (УВД-issued registration receipt — corporates
+    don't have one)."""
+    legal_form: str | None = None
+    bin: str | None = None
+    talon_number: str | None = None
+    postal_code: str | None = None
+    legal_address: str | None = None
+    phone: str | None = None
+    bank_iban: str | None = None
+    bank_name: str | None = None
+    bank_bik: str | None = None
+    kbe: str | None = None
+    signatory_name: str | None = None
+
+
+class CreateTenantRequest(TenantBillingFields):
     company_name: str
     admin_email: str
     plan: str = "team"
@@ -100,7 +119,7 @@ class CreateTenantRequest(BaseModel):
     notes: str | None = None
 
 
-class UpdateTenantRequest(BaseModel):
+class UpdateTenantRequest(TenantBillingFields):
     plan: str | None = None
     seats: int | None = None
     status: str | None = None
@@ -113,6 +132,15 @@ class GenerateInvoiceRequest(BaseModel):
     period_months: int = 1
     company_address: str | None = None
     notes: str | None = None
+    # Override the tenant's default locale for this specific invoice.
+    # None / "" → fall back to tenant.locale.
+    locale: str | None = None
+
+
+_BILLING_COLUMNS = (
+    "legal_form", "bin", "talon_number", "postal_code", "legal_address",
+    "phone", "bank_iban", "bank_name", "bank_bik", "kbe", "signatory_name",
+)
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
@@ -716,14 +744,21 @@ async def create_tenant(
     if body.expiration_months:
         expires_at = datetime.now(timezone.utc) + timedelta(days=30 * body.expiration_months)
 
+    billing = [getattr(body, col) for col in _BILLING_COLUMNS]
     async with pool.acquire() as conn:
         tenant_id = await conn.fetchval(
-            """
-            INSERT INTO tenants(company_name, name, admin_email, plan, seats_limit, status, notes, expires_at)
-            VALUES($1,$2,$3,$4,$5,'draft',$6,$7) RETURNING id
+            f"""
+            INSERT INTO tenants(
+                company_name, name, admin_email, plan, seats_limit, status,
+                notes, expires_at, {", ".join(_BILLING_COLUMNS)}
+            )
+            VALUES($1,$2,$3,$4,$5,'draft',$6,$7,
+                   $8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            RETURNING id
             """,
             body.company_name, body.company_name, body.admin_email,
             body.plan, body.seats, body.notes, expires_at,
+            *billing,
         )
         await conn.execute(
             "INSERT INTO founder_admin_log(action, details) VALUES('create_tenant', $1)",
@@ -778,6 +813,11 @@ async def update_tenant(
         updates["notes"] = body.notes
     if body.expiration_months is not None:
         updates["expires_at"] = datetime.now(timezone.utc) + timedelta(days=30 * body.expiration_months)
+    # Billing fields — empty string = explicit clear, None = leave unchanged.
+    for col in _BILLING_COLUMNS:
+        v = getattr(body, col)
+        if v is not None:
+            updates[col] = v or None
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -824,6 +864,10 @@ async def generate_invoice(
             tenant["seats_limit"], tenant["plan"], body.period_months, body.notes,
         )
 
+    buyer = {col: tenant[col] for col in _BILLING_COLUMNS if col in tenant.keys()}
+    buyer["company_name"] = tenant["company_name"]
+    tenant_locale = tenant["locale"] if "locale" in tenant.keys() else "ru"
+    invoice_locale = body.locale or tenant_locale
     try:
         pdf_path = generate_pdf(
             invoice_number=invoice_number,
@@ -834,6 +878,8 @@ async def generate_invoice(
             period_months=body.period_months,
             amount_kzt=body.amount_kzt,
             seller=seller_from_env(),
+            buyer=buyer,
+            locale=invoice_locale,
         )
         async with pool.acquire() as conn:
             await conn.execute(
