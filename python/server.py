@@ -693,8 +693,14 @@ async def lifespan(app: FastAPI):
     # back into this very app instead of a network hop to localhost:8765.
     # Plugins (DialektSQL, retry_loop) read the context via get_context(),
     # so they pick up the in-process routing without any direct call.
+    #
+    # GPU Relay (2026-04-27): also pick up ~/.dialekt/relay.toml so that
+    # resolver / few_shot_memory route Ollama traffic through the relay
+    # when Cloud GPU mode is enabled. The /relay/config POST handler
+    # rebuilds the context after a save so the change applies without
+    # a restart.
     from dialekt.llm._plugin_context import PluginContext, set_context
-    set_context(PluginContext(app=app))
+    set_context(_build_plugin_context(app))
     log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
 
     yield
@@ -1692,6 +1698,189 @@ async def health():
         return {"status": "ok", "ollama": True, "models": models}
     except Exception as e:
         return {"status": "degraded", "ollama": False, "error": str(e)}
+
+
+# ── GPU Relay config endpoints (Cloud-Assisted tier) ──────────────────────────
+# Persists ~/.dialekt/relay.toml — the desktop-side config that tells
+# resolver / few_shot_memory where to send Ollama traffic. The toggle in
+# Settings → Models → Inference location flips `enabled`. PluginContext
+# wiring lives in Commit 5.
+
+import tempfile
+import tomllib
+
+RELAY_CONFIG_FILE = DIALEKT_DIR / "relay.toml"
+
+DEFAULT_RELAY_CONFIG = {
+    "url": "https://gpu-relay.dias.now",
+    "api_key": "",
+    "enabled": False,
+}
+
+
+def _toml_escape(s: str) -> str:
+    """Minimal TOML basic-string escape — enough for URLs and our key
+    format ``dlk_relay_<urlsafe-token>``."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _mask_relay_key(key: str) -> str:
+    if not key or len(key) <= 8:
+        return ""
+    return f"{key[:4]}…{key[-4:]}"
+
+
+def load_relay_config() -> dict:
+    """Read ~/.dialekt/relay.toml. Returns the defaults dict when the
+    file is missing or malformed."""
+    if not RELAY_CONFIG_FILE.exists():
+        return DEFAULT_RELAY_CONFIG.copy()
+    try:
+        with RELAY_CONFIG_FILE.open("rb") as fh:
+            raw = tomllib.load(fh)
+        section = raw.get("relay", {})
+        return {**DEFAULT_RELAY_CONFIG, **section}
+    except Exception:
+        log.warning("relay.toml malformed — falling back to defaults", exc_info=True)
+        return DEFAULT_RELAY_CONFIG.copy()
+
+
+def save_relay_config(data: dict) -> None:
+    """Atomic write to ~/.dialekt/relay.toml.
+
+    Only the three known keys are persisted; extras dropped. Empty
+    string for ``api_key`` means "no key configured" (TOML doesn't
+    have a clean None encoding for our shape).
+    """
+    DIALEKT_DIR.mkdir(parents=True, exist_ok=True)
+    body = {
+        "url": str(data.get("url") or DEFAULT_RELAY_CONFIG["url"]),
+        "api_key": str(data.get("api_key") or ""),
+        "enabled": bool(data.get("enabled")),
+    }
+    text = (
+        "[relay]\n"
+        f'url = "{_toml_escape(body["url"])}"\n'
+        f'api_key = "{_toml_escape(body["api_key"])}"\n'
+        f'enabled = {"true" if body["enabled"] else "false"}\n'
+    )
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=".relay.toml.", dir=str(DIALEKT_DIR), text=True,
+    )
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+        os.replace(tmp_path, RELAY_CONFIG_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+@app.get("/relay/config")
+async def get_relay_config():
+    """Return ~/.dialekt/relay.toml. ``api_key`` itself is never
+    surfaced — only a masked preview the UI can show next to a
+    "Rotate" affordance."""
+    cfg = load_relay_config()
+    return {
+        "url": cfg["url"],
+        "enabled": cfg["enabled"],
+        "api_key_set": bool(cfg["api_key"]),
+        "api_key_preview": _mask_relay_key(cfg["api_key"]),
+    }
+
+
+@app.post("/relay/config")
+async def set_relay_config(body: dict):
+    """Replace ~/.dialekt/relay.toml and rebuild the active
+    PluginContext so the change applies on the very next inference
+    (no restart needed).
+
+    Body fields:
+      url      str   relay base URL (no trailing slash)
+      enabled  bool  flip on/off — required
+      api_key  str   omitted or empty = preserve existing key
+    """
+    current = load_relay_config()
+    url = body.get("url", current["url"])
+    enabled = bool(body.get("enabled", current["enabled"]))
+    api_key = body.get("api_key")
+    if api_key is None or api_key == "":
+        api_key = current["api_key"]
+    save_relay_config({"url": url, "api_key": api_key, "enabled": enabled})
+
+    # Rebuild the plugin context so resolver / few_shot pick up the new
+    # toggle on the next call. Wrapped in try because tests may invoke
+    # this handler before a context exists.
+    try:
+        from dialekt.llm._plugin_context import set_context
+        set_context(_build_plugin_context(app))
+    except Exception:
+        log.exception("failed to rebuild plugin context after relay save")
+
+    return await get_relay_config()
+
+
+def _build_plugin_context(fastapi_app):
+    """Build a PluginContext that honours ~/.dialekt/relay.toml.
+
+    Lifted out of the lifespan so the /relay/config handler can call it
+    too — every save pushes a fresh context through ``set_context``.
+    """
+    from dialekt.llm._plugin_context import PluginContext
+    cfg = load_relay_config()
+    if cfg.get("enabled") and cfg.get("url") and cfg.get("api_key"):
+        return PluginContext(
+            app=fastapi_app,
+            relay_url=cfg["url"],
+            relay_api_key=cfg["api_key"],
+        )
+    return PluginContext(app=fastapi_app)
+
+
+@app.post("/relay/test")
+async def test_relay(body: dict):
+    """Probe a relay URL with the supplied (or saved) Bearer key.
+
+    Hits ``/relay/health`` first (always reachable when the relay is up)
+    and, if a key is present, also ``/relay/models`` (auth-required) to
+    verify the Bearer is valid. Returns a flat ``{ok, latency_ms,
+    ollama_reachable, auth_ok?, error?}`` shape the frontend can render
+    directly into the toast.
+    """
+    import time
+    import httpx
+    url = (body.get("url") or load_relay_config()["url"]).rstrip("/")
+    api_key = body.get("api_key") or load_relay_config()["api_key"]
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    out: dict = {"ok": False, "url": url}
+    start = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as c:
+            r = await c.get(f"{url}/relay/health")
+        out["latency_ms"] = int((time.monotonic() - start) * 1000)
+        if r.status_code != 200:
+            out["error"] = f"health returned HTTP {r.status_code}"
+            return out
+        out["ollama_reachable"] = bool(r.json().get("ollama_reachable", False))
+        if api_key:
+            async with httpx.AsyncClient(timeout=5.0) as c:
+                r2 = await c.get(f"{url}/relay/models", headers=headers)
+            if r2.status_code == 401:
+                out["error"] = "key invalid or revoked"
+                return out
+            if r2.status_code != 200:
+                out["error"] = f"models returned HTTP {r2.status_code}"
+                return out
+            out["auth_ok"] = True
+        out["ok"] = True
+        return out
+    except httpx.HTTPError as e:
+        out["error"] = f"network error: {e}"
+        return out
 
 
 # ── MCP Servers CRUD (Phase 1.2 commit B) ──────────────────────────────────

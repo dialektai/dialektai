@@ -1129,3 +1129,75 @@ async def remove_user(user_id: str, pool=Depends(get_pool), _=Depends(_require_a
     if not deleted:
         raise HTTPException(status_code=404)
     return {"deleted": str(deleted)}
+
+
+# ── GPU Relay key management ────────────────────────────────────────────────
+
+from ..services import relay_keys as _relay_keys_svc
+
+
+@router.post("/tenants/{tenant_id}/relay-keys", status_code=201)
+async def issue_relay_key(
+    tenant_id: str,
+    body: dict,
+    pool=Depends(get_pool),
+    _=Depends(_require_admin),
+):
+    """Mint a new GPU Relay key for a tenant.
+
+    The plaintext is returned in this response and ONLY in this
+    response — surface it to the operator with a "copy now, you won't
+    see it again" affordance. The DB stores SHA-256(plaintext).
+    """
+    name = (body.get("name") or "").strip() or "relay key"
+    rate = int(body.get("rate_limit_per_minute") or 120)
+    quota = body.get("monthly_token_quota")
+    quota = int(quota) if quota else None
+    return await _relay_keys_svc.create_key(
+        pool,
+        tenant_id=tenant_id,
+        name=name,
+        rate_limit_per_minute=rate,
+        monthly_token_quota=quota,
+    )
+
+
+@router.get("/tenants/{tenant_id}/relay-keys")
+async def list_relay_keys(
+    tenant_id: str,
+    include_revoked: bool = False,
+    pool=Depends(get_pool),
+    _=Depends(_require_admin),
+):
+    return await _relay_keys_svc.list_keys(
+        pool, tenant_id=tenant_id, include_revoked=include_revoked,
+    )
+
+
+@router.delete("/relay-keys/{key_id}")
+async def revoke_relay_key(
+    key_id: str,
+    pool=Depends(get_pool),
+    _=Depends(_require_admin),
+):
+    revoked = await _relay_keys_svc.revoke_key(pool, key_id=key_id)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="key not found or already revoked")
+    return {"revoked": key_id}
+
+
+@router.get("/tenants/{tenant_id}/relay-usage")
+async def get_relay_usage(
+    tenant_id: str,
+    days: int = 30,
+    pool=Depends(get_pool),
+    _=Depends(_require_admin),
+):
+    """Daily rollup of relay traffic over the last N days. Source for
+    the admin UI's consumption chart and the Cloud-Assisted billing
+    cycle close at month-end."""
+    if days < 1 or days > 365:
+        raise HTTPException(status_code=400, detail="days must be 1..365")
+    return await _relay_keys_svc.get_usage_rollup(
+        pool, tenant_id=tenant_id, days=days,
+    )

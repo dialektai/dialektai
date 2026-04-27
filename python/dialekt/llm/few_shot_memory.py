@@ -14,11 +14,13 @@ from typing import Optional
 
 import httpx
 
+from dialekt.llm._plugin_context import get_context
+
 log = logging.getLogger("dialekt.few_shot")
 
 FEW_SHOT_DB = Path.home() / ".dialekt" / "few_shots.db"
 EMBED_MODEL = "nomic-embed-text:v1.5"
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = "http://localhost:11434"  # used as fallback if context unset
 _MAX_QUESTION_CHARS = 1000
 _MAX_ANSWER_CHARS = 2000
 
@@ -45,10 +47,18 @@ def _open() -> sqlite3.Connection:
 
 
 async def _embed(text: str) -> Optional[list[float]]:
+    """Compute an embedding via Ollama's /api/embed.
+
+    Honours Cloud GPU mode: when the active PluginContext has a relay
+    configured, the call is routed through the relay (which exposes
+    /api/embed as a transparent alias) with the Bearer header.
+    """
+    target = get_context().inference_target()
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.post(
-                f"{OLLAMA_URL}/api/embed",
+                target.url("/api/embed"),
+                headers=target.headers,
                 json={"model": EMBED_MODEL, "input": text},
             )
             r.raise_for_status()
