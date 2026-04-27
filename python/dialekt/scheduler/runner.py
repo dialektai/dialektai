@@ -197,10 +197,14 @@ class DialektScheduler:
         for j in self._scheduler.get_jobs():
             agent_id = j.kwargs.get("agent_id") if isinstance(j.kwargs, dict) else None
             last = await self._last_run(agent_id) if agent_id else None
+            # next_run_time is only populated once the scheduler is running;
+            # callers (Settings UI) hit /scheduler/status during boot, so
+            # we have to tolerate the unset case rather than AttributeError.
+            next_at = getattr(j, "next_run_time", None)
             jobs.append({
                 "agent_id": agent_id,
                 "job_id": j.id,
-                "next_run": j.next_run_time.isoformat() if j.next_run_time else None,
+                "next_run": next_at.isoformat() if next_at else None,
                 "last_run_at": last["triggered_at"] if last else None,
                 "last_status": last["status"] if last else None,
             })
