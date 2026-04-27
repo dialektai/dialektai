@@ -78,8 +78,36 @@ DEFAULT_SETTINGS: dict = {
 }
 
 
-def load_settings() -> dict:
+# Process-level cache for keychain values pulled by load_settings(). The
+# unguarded path did 30 keyring lookups per call (~80ms each on Linux via
+# dbus), making GET /settings a 2.5 second blocker — long enough for the
+# frontend heartbeat to time out and bounce the user to OfflineScreen.
+# Cache is populated lazily on first read and kept in sync by
+# save_settings(); set _sensitive_cache=None to force a re-read.
+_sensitive_cache: dict | None = None
+
+
+def _read_sensitive_from_keychain() -> dict:
     from dialekt.secrets import get_secret, SENSITIVE_KEYS
+    out = {}
+    for name in SENSITIVE_KEYS:
+        try:
+            v = get_secret(name)
+            if v:
+                out[name] = v
+        except Exception:
+            pass
+    return out
+
+
+def _load_sensitive_cache() -> dict:
+    global _sensitive_cache
+    if _sensitive_cache is None:
+        _sensitive_cache = _read_sensitive_from_keychain()
+    return _sensitive_cache
+
+
+def load_settings() -> dict:
     try:
         if SETTINGS_FILE.exists():
             stored = json.loads(SETTINGS_FILE.read_text())
@@ -94,15 +122,9 @@ def load_settings() -> dict:
             merged = DEFAULT_SETTINGS.copy()
     except Exception:
         merged = DEFAULT_SETTINGS.copy()
-    # Pull sensitive fields out of the keychain (if present). Plaintext copies
-    # in config.json are removed by the boot-time migration — see `main()`.
-    for name in SENSITIVE_KEYS:
-        try:
-            v = get_secret(name)
-            if v:
-                merged[name] = v
-        except Exception:
-            pass
+    # Plaintext copies in config.json are removed by the boot-time migration —
+    # see `main()`.
+    merged.update(_load_sensitive_cache())
     return merged
 
 
@@ -112,17 +134,22 @@ def save_settings(data: dict) -> None:
     The on-disk JSON only ever contains non-sensitive preferences.
     """
     from dialekt.secrets import set_secret, delete_secret, SENSITIVE_KEYS
+    global _sensitive_cache
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if _sensitive_cache is None:
+        _sensitive_cache = {}
     to_write = dict(data)
     for name in SENSITIVE_KEYS:
         val = to_write.pop(name, None)
         try:
             if val:
                 set_secret(name, val)
+                _sensitive_cache[name] = val
             else:
                 # When the caller is explicitly clearing (e.g. revocation),
                 # mirror that into the keychain too.
                 delete_secret(name)
+                _sensitive_cache.pop(name, None)
         except Exception as e:
             log.warning("secret %s not persisted to keychain: %s", name, e)
     SETTINGS_FILE.write_text(json.dumps(to_write, indent=2, ensure_ascii=False))
