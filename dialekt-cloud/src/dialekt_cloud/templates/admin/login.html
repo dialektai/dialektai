@@ -2,47 +2,169 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>dias.now — Admin login</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dialekt.ai — Admin sign-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+:root {
+  --bg: #FAFAFA;
+  --bg-elev: #FFFFFF;
+  --bg-tint: #F3F4F6;
+  --ink: #0B1220;
+  --ink-2: #3F4657;
+  --ink-3: #6B7280;
+  --rule: #E4E6EB;
+  --rule-strong: #CDD1D9;
+  --primary: #1E3A8A;
+  --primary-ink: #0F2547;
+  --accent: #B45309;
+  --accent-ink: #7C3A06;
+  --focus: #1E3A8A33;
+  --ok: #166534;
+  --err: #991B1B;
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Courier New', monospace; background: #0a0e14; color: #cdd6f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.card { background: #13181f; border: 1px solid #2a3244; padding: 40px; width: 100%; max-width: 460px; }
-.logo { font-size: 16px; color: #89dceb; letter-spacing: .12em; margin-bottom: 28px; }
-h1 { font-size: 20px; color: #cdd6f4; margin-bottom: 6px; }
-p.sub { font-size: 12px; color: #6c7086; margin-bottom: 28px; line-height: 1.55; }
-label { display: block; font-size: 10px; color: #6c7086; letter-spacing: .12em; margin-bottom: 6px; text-transform: uppercase; }
-input { width: 100%; background: #0a0e14; border: 1px solid #2a3244; color: #cdd6f4; font-family: inherit; font-size: 13px; padding: 11px 13px; outline: none; margin-bottom: 14px; }
-input:focus { border-color: #89dceb; }
-button { width: 100%; background: #89dceb; color: #0a0e14; border: none; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .08em; padding: 12px; cursor: pointer; margin-top: 8px; }
-button:hover { background: #74c7ec; }
+body {
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+  background: var(--bg); color: var(--ink);
+  min-height: 100vh; display: flex; flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+.bar {
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.bar-inner {
+  max-width: 1160px; margin: 0 auto;
+  padding: 16px 24px;
+  display: flex; align-items: baseline; justify-content: space-between;
+}
+.brand {
+  font-family: var(--serif); font-size: 22px; letter-spacing: -0.02em; color: var(--ink);
+}
+.brand b { font-weight: 600; }
+.brand-tag {
+  margin-left: 10px; font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-3);
+  padding: 3px 8px; border: 1px solid var(--rule); border-radius: 999px;
+}
+main {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 48px 24px;
+}
+.card {
+  background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 40px;
+  width: 100%; max-width: 480px;
+}
+.kicker {
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--primary); font-weight: 500; margin-bottom: 14px;
+}
+h1 {
+  font-family: var(--serif); font-size: 28px; font-weight: 400;
+  letter-spacing: -0.018em; line-height: 1.15; margin: 0 0 10px;
+}
+p.sub { font-size: 14.5px; color: var(--ink-2); line-height: 1.6; margin: 0 0 28px; }
+label {
+  display: block; font-size: 12.5px; color: var(--ink-2);
+  margin-bottom: 8px; font-weight: 500;
+}
+input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: 4px;
+  padding: 12px 14px; font: inherit; font-size: 15px;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  margin-bottom: 16px;
+}
+input:focus {
+  border-color: var(--primary); background: var(--bg-elev);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+button {
+  width: 100%; box-sizing: border-box;
+  background: var(--accent); color: #FFFEF7; border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 14px 20px; font: inherit; font-size: 14.5px; font-weight: 600;
+  cursor: pointer; margin-top: 8px;
+  transition: background .15s ease, border-color .15s ease;
+  letter-spacing: -0.005em;
+}
+button:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
 button[disabled] { opacity: .4; cursor: not-allowed; }
-button.ghost { background: transparent; color: #94a3b8; border: 1px solid #2a3244; margin-top: 8px; font-weight: 400; letter-spacing: 0; }
-.alert { padding: 10px 12px; font-size: 12px; margin-bottom: 14px; border: 1px solid; line-height: 1.5; }
-.alert.err { color: #f38ba8; border-color: #f38ba8; background: rgba(243,139,168,0.05); }
-.alert.ok { color: #a6e3a1; border-color: #a6e3a1; background: rgba(166,227,161,0.05); }
-.qr { background: #fff; padding: 16px; margin: 16px 0; }
+button.ghost {
+  background: transparent; color: var(--ink); border: 1px solid var(--rule-strong);
+  font-weight: 500;
+}
+button.ghost:hover { background: var(--bg-tint); border-color: var(--ink-3); }
+.alert {
+  padding: 12px 14px; font-size: 13px;
+  margin: 4px 0 14px; border: 1px solid; border-radius: 4px;
+  line-height: 1.55;
+}
+.alert.err { color: var(--err); border-color: var(--err); background: #FEF2F2; }
+.alert.ok { color: var(--ok); border-color: var(--ok); background: #F0FDF4; }
+.qr {
+  background: #fff; padding: 18px; margin: 18px 0;
+  border: 1px solid var(--rule); border-radius: 6px;
+}
 .qr svg { width: 100%; height: auto; max-width: 240px; display: block; margin: 0 auto; }
-.codes { background: #0a0e14; border: 1px dashed #89dceb; padding: 14px; font-size: 12px; line-height: 1.7; margin: 12px 0; column-count: 2; column-gap: 16px; }
-.codes div { font-family: 'JetBrains Mono', monospace; color: #89dceb; }
-.muted { font-size: 11px; color: #6c7086; line-height: 1.55; margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a3244; }
-.muted code { color: #94a3b8; }
+.codes {
+  background: var(--bg-tint); border: 1px dashed var(--primary);
+  border-radius: 4px;
+  padding: 16px; font-size: 13.5px; line-height: 1.7;
+  margin: 14px 0; column-count: 2; column-gap: 18px;
+}
+.codes div {
+  font-family: var(--sans); color: var(--primary);
+  letter-spacing: 0.05em; font-weight: 500;
+}
+.muted {
+  font-size: 13px; color: var(--ink-3); line-height: 1.55;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule);
+}
+.muted code {
+  color: var(--ink); background: var(--bg-tint);
+  padding: 1px 6px; border-radius: 3px; font-size: 12.5px;
+}
+.muted strong { color: var(--err); font-weight: 600; }
+@media (max-width: 540px) {
+  .card { padding: 28px; }
+  h1 { font-size: 24px; }
+  .codes { column-count: 1; }
+}
 </style>
 </head>
 <body>
+<div class="bar">
+  <div class="bar-inner">
+    <a href="/" class="brand"><b>dialekt</b>.ai<span class="brand-tag">Admin</span></a>
+    <a href="https://dialekt.ai" style="font-size:13px;color:var(--ink-3);text-decoration:none">← Public site</a>
+  </div>
+</div>
+
+<main>
 <div class="card">
-  <div class="logo">dias.now / ADMIN</div>
+  <div class="kicker">Sign in</div>
 
   <!-- Stage 1: email + password -->
   <div id="stage-password">
-    <h1>Sign in</h1>
-    <p class="sub">Email + password, then a TOTP code from your authenticator app.</p>
+    <h1>Welcome back.</h1>
+    <p class="sub">Email, password, then a 6-digit code from your authenticator app.</p>
     <form id="form-password" autocomplete="on">
-      <label>EMAIL</label>
+      <label>Email</label>
       <input type="email" name="email" autocomplete="username" autofocus required>
-      <label>PASSWORD</label>
+      <label>Password</label>
       <input type="password" name="password" autocomplete="current-password" required>
       <div id="alert-password"></div>
-      <button type="submit" id="btn-password">CONTINUE →</button>
+      <button type="submit" id="btn-password">Continue →</button>
     </form>
   </div>
 
@@ -51,42 +173,43 @@ button.ghost { background: transparent; color: #94a3b8; border: 1px solid #2a324
     <h1>Two-factor code</h1>
     <p class="sub">Enter the 6-digit code from your authenticator app.</p>
     <form id="form-totp">
-      <label id="label-totp">6-DIGIT CODE</label>
+      <label id="label-totp">6-digit code</label>
       <input type="text" name="code" id="input-totp" inputmode="numeric" maxlength="9" autocomplete="one-time-code" autofocus required>
       <div id="alert-totp"></div>
-      <button type="submit" id="btn-totp">VERIFY →</button>
+      <button type="submit" id="btn-totp">Verify →</button>
       <button type="button" class="ghost" id="btn-use-backup">Use a backup code instead</button>
     </form>
   </div>
 
   <!-- Stage 3: enroll TOTP (first login) -->
   <div id="stage-enroll" style="display:none">
-    <h1>Enroll your authenticator</h1>
+    <h1>Set up your authenticator.</h1>
     <p class="sub">Scan this QR with Google Authenticator, 1Password, Authy, etc. Then enter the 6-digit code below.</p>
     <div id="qr-slot" class="qr"></div>
-    <p class="sub" style="margin-bottom:8px"><strong style="color:#cdd6f4">Or paste this secret manually:</strong></p>
+    <p class="sub" style="margin-bottom:8px"><strong style="color:var(--ink)">Or paste this secret manually:</strong></p>
     <div class="codes" style="column-count:1" id="enroll-secret-display"></div>
     <form id="form-enroll-confirm">
-      <label>VERIFY 6-DIGIT CODE</label>
+      <label>Verify 6-digit code</label>
       <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" autofocus required>
       <div id="alert-enroll"></div>
-      <button type="submit" id="btn-enroll-confirm">CONFIRM &amp; SHOW BACKUP CODES →</button>
+      <button type="submit" id="btn-enroll-confirm">Confirm &amp; show backup codes →</button>
     </form>
   </div>
 
   <!-- Stage 4: backup codes display (one-time) -->
   <div id="stage-backup" style="display:none">
-    <h1>Save your backup codes</h1>
-    <p class="sub">10 single-use codes. Use one if you lose your authenticator. <strong style="color:#f38ba8">Shown only this once.</strong></p>
+    <h1>Save your backup codes.</h1>
+    <p class="sub">10 single-use codes. Use one if you lose your authenticator. <strong style="color:var(--err);font-weight:600">Shown only this once.</strong></p>
     <div class="codes" id="backup-codes-list"></div>
-    <button type="button" id="btn-download-codes">DOWNLOAD AS .TXT</button>
-    <button type="button" class="ghost" id="btn-go-dashboard">I'VE SAVED THEM — CONTINUE →</button>
+    <button type="button" id="btn-download-codes">Download as .txt</button>
+    <button type="button" class="ghost" id="btn-go-dashboard">I've saved them — continue →</button>
   </div>
 
   <p class="muted">
     Lost everything? See the recovery runbook · SSH + <code>dialekt-admin admin reset-2fa --email=…</code>
   </p>
 </div>
+</main>
 
 <script>
 const showStage = (id) => {
@@ -106,7 +229,7 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
   e.preventDefault();
   setAlert('alert-password', '', '');
   const btn = document.getElementById('btn-password');
-  btn.disabled = true; btn.textContent = 'CHECKING…';
+  btn.disabled = true; btn.textContent = 'Checking…';
   const fd = new FormData(e.target);
   try {
     const r = await fetch('/admin/login', {
@@ -117,7 +240,7 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
     const body = await r.json();
     if (!r.ok) {
       setAlert('alert-password', 'err', body.detail || ('Error ' + r.status));
-      btn.disabled = false; btn.textContent = 'CONTINUE →';
+      btn.disabled = false; btn.textContent = 'Continue →';
       return;
     }
     challengeToken = body.challenge_token;
@@ -131,8 +254,8 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
       });
       const eb = await er.json();
       if (!er.ok) {
-        setAlert('alert-password', 'err', eb.detail || 'enroll error');
-        btn.disabled = false; btn.textContent = 'CONTINUE →';
+        setAlert('alert-password', 'err', eb.detail || 'Enroll error');
+        btn.disabled = false; btn.textContent = 'Continue →';
         return;
       }
       enrollSecret = eb.secret;
@@ -142,13 +265,13 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
     }
   } catch (err) {
     setAlert('alert-password', 'err', 'Network error: ' + err.message);
-    btn.disabled = false; btn.textContent = 'CONTINUE →';
+    btn.disabled = false; btn.textContent = 'Continue →';
   }
 });
 
 document.getElementById('btn-use-backup').addEventListener('click', () => {
   useBackup = !useBackup;
-  document.getElementById('label-totp').textContent = useBackup ? 'BACKUP CODE (8 CHARS)' : '6-DIGIT CODE';
+  document.getElementById('label-totp').textContent = useBackup ? 'Backup code (8 chars)' : '6-digit code';
   const inp = document.getElementById('input-totp');
   inp.value = '';
   inp.placeholder = useBackup ? 'ABCDEFGH' : '123 456';
@@ -159,7 +282,7 @@ document.getElementById('form-totp').addEventListener('submit', async (e) => {
   e.preventDefault();
   setAlert('alert-totp', '', '');
   const btn = document.getElementById('btn-totp');
-  btn.disabled = true; btn.textContent = 'VERIFYING…';
+  btn.disabled = true; btn.textContent = 'Verifying…';
   const fd = new FormData(e.target);
   try {
     const r = await fetch('/admin/login/totp', {
@@ -173,7 +296,7 @@ document.getElementById('form-totp').addEventListener('submit', async (e) => {
     const body = await r.json();
     if (!r.ok) {
       setAlert('alert-totp', 'err', body.detail || ('Error ' + r.status));
-      btn.disabled = false; btn.textContent = 'VERIFY →';
+      btn.disabled = false; btn.textContent = 'Verify →';
       return;
     }
     if (useBackup && body.backup_codes_remaining != null) {
@@ -182,7 +305,7 @@ document.getElementById('form-totp').addEventListener('submit', async (e) => {
     setTimeout(() => location.href = '/admin/ui/', 600);
   } catch (err) {
     setAlert('alert-totp', 'err', 'Network error: ' + err.message);
-    btn.disabled = false; btn.textContent = 'VERIFY →';
+    btn.disabled = false; btn.textContent = 'Verify →';
   }
 });
 
@@ -190,7 +313,7 @@ document.getElementById('form-enroll-confirm').addEventListener('submit', async 
   e.preventDefault();
   setAlert('alert-enroll', '', '');
   const btn = document.getElementById('btn-enroll-confirm');
-  btn.disabled = true; btn.textContent = 'CONFIRMING…';
+  btn.disabled = true; btn.textContent = 'Confirming…';
   const fd = new FormData(e.target);
   try {
     const r = await fetch('/admin/login/enroll-totp/confirm', {
@@ -204,7 +327,7 @@ document.getElementById('form-enroll-confirm').addEventListener('submit', async 
     const body = await r.json();
     if (!r.ok) {
       setAlert('alert-enroll', 'err', body.detail || 'Code rejected');
-      btn.disabled = false; btn.textContent = 'CONFIRM & SHOW BACKUP CODES →';
+      btn.disabled = false; btn.textContent = 'Confirm & show backup codes →';
       return;
     }
     backupCodes = body.backup_codes || [];
@@ -213,14 +336,13 @@ document.getElementById('form-enroll-confirm').addEventListener('submit', async 
     showStage('backup');
   } catch (err) {
     setAlert('alert-enroll', 'err', 'Network error: ' + err.message);
-    btn.disabled = false; btn.textContent = 'CONFIRM & SHOW BACKUP CODES →';
+    btn.disabled = false; btn.textContent = 'Confirm & show backup codes →';
   }
 });
 
-// Backup codes download — CLIENT-SIDE blob (mentor add-on: no server roundtrip).
 document.getElementById('btn-download-codes').addEventListener('click', () => {
   const date = new Date().toISOString().slice(0, 10);
-  const text = `dias.now admin backup codes — ${date}\n\n` +
+  const text = `dialekt.ai admin backup codes — ${date}\n\n` +
     backupCodes.map((c, i) => `${(i + 1).toString().padStart(2, '0')}. ${c}`).join('\n') +
     `\n\nKeep these safe. Each code works once. Generated ${new Date().toString()}.\n`;
   const blob = new Blob([text], { type: 'text/plain' });
