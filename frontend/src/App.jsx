@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { T } from './tokens.js';
 import MainScreen from './screens/MainScreen.jsx';
 import SettingsScreen from './screens/SettingsScreen.jsx';
 import OnboardingScreen from './screens/OnboardingScreen.jsx';
@@ -249,8 +250,8 @@ function OllamaGateway({ onNav }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#0a0d12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#64748b', letterSpacing: '.1em' }}>CHECKING OLLAMA…</div>
+    <div style={{ width: '100%', height: '100%', background: T.bg0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ fontFamily: T.mono, fontSize: 12, color: T.dim, letterSpacing: '.1em' }}>CHECKING OLLAMA…</div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ function DiagRow({ label, state, detail, last }) {
     <div style={{
       display: 'grid', gridTemplateColumns: '90px 1fr auto', gap: 14, alignItems: 'center',
       padding: '10px 14px', borderBottom: last ? 'none' : `1px solid ${T.border}`,
-      background: state === 'fail' ? '#1f0d10' : 'transparent',
+      background: state === 'fail' ? T.errorBg : 'transparent',
     }}>
       <span className="mono" style={{ fontSize: 10, color: map.c, letterSpacing: '.08em' }}>{map.m}</span>
       <div>
@@ -131,7 +131,7 @@ export default function OfflineScreen({ onNav }) {
     <AppFrame title="dias.now — connection error">
       <LeftPanel active={-1} running={false} model="— no model —" onNav={onNav} />
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: T.bg0, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: '#2a0f12', borderBottom: `1px solid ${T.amber}55` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: T.errorBg, borderBottom: `1px solid ${T.amber}55` }}>
           <span className="dlk-dot amber live" />
           <span className="mono" style={{ fontSize: 11, color: T.amber, letterSpacing: '.1em' }}>OLLAMA OFFLINE</span>
           <span className="mono" style={{ fontSize: 11, color: T.muted }}>· can't reach localhost:11434</span>
@@ -191,7 +191,7 @@ export default function OfflineScreen({ onNav }) {
               <DiagRow label="Network (outbound)"             state="warn" detail="not required — local only" last />
             </div>
 
-            <div style={{ border: `1px solid ${T.border}`, background: '#05080c', marginBottom: 20 }}>
+            <div style={{ border: `1px solid ${T.border}`, background: T.surfaceDeep, marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderBottom: `1px solid ${T.border}`, background: T.bg2 }}>
                 <Icon name="terminal" size={12} color={T.green} />
                 <span className="mono" style={{ fontSize: 10, color: T.text }}>dialekt backend log · latest</span>
@@ -200,7 +200,7 @@ export default function OfflineScreen({ onNav }) {
               </div>
               <div className="mono" style={{ padding: '10px 12px', fontSize: 11, lineHeight: 1.65 }}>
                 <div style={{ color: T.dim }}>[–] <span style={{ color: T.muted }}>dialekt-api</span> probe :11434 …</div>
-                <div style={{ color: '#ff8a8a' }}>[–] fetch error: ECONNREFUSED 127.0.0.1:11434</div>
+                <div style={{ color: T.textError }}>[–] fetch error: ECONNREFUSED 127.0.0.1:11434</div>
                 <div style={{ color: T.amber }}>[–] ollama offline · attempt {attempt}</div>
                 <div style={{ color: T.muted }}>[–] hint: run <span style={{ color: T.cyan }}>ollama serve</span> to start the daemon</div>
               </div>

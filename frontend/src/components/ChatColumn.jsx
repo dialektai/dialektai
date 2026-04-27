@@ -179,7 +179,7 @@ function CodeBubble({ format, content, ts }) {
           return (
             <div key={i} style={{
               display: 'flex', gap: 10, padding: '0 10px',
-              background: isAdd ? '#0c2a1f' : isDel ? '#2a0f12' : 'transparent',
+              background: isAdd ? T.successBg : isDel ? T.errorBg : 'transparent',
               borderLeft: `2px solid ${isAdd ? T.green : isDel ? T.red : 'transparent'}`,
             }}>
               <span style={{ color: T.dim, width: 28, textAlign: 'right', userSelect: 'none', flexShrink: 0 }}>{i + 1}</span>
@@ -231,7 +231,7 @@ function ConsoleBubble({ content }) {
   const media = extractMedia(content);
   return (
     <div>
-      <div style={{ border: `1px solid ${T.border}`, background: '#05080c' }}>
+      <div style={{ border: `1px solid ${T.border}`, background: T.surfaceDeep }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
           borderBottom: `1px solid ${T.border}`, background: T.bg2,
@@ -246,7 +246,7 @@ function ConsoleBubble({ content }) {
         </div>
         <pre style={{
           margin: 0, padding: '10px 12px', fontFamily: T.mono, fontSize: 11, lineHeight: 1.65,
-          color: isErr ? '#ff8a8a' : '#9fefb4', overflowX: 'auto', maxHeight: 280,
+          color: isErr ? T.textError : T.textSuccess, overflowX: 'auto', maxHeight: 280,
           overflowY: lines.length > 20 ? 'auto' : 'visible',
         }}>{content}</pre>
       </div>
@@ -257,7 +257,7 @@ function ConsoleBubble({ content }) {
 
 function ErrorBubble({ content }) {
   return (
-    <div style={{ marginBottom: 12, padding: '10px 14px', border: `1px solid ${T.amber}44`, background: '#2a1f0a', display: 'flex', gap: 10 }}>
+    <div style={{ marginBottom: 12, padding: '10px 14px', border: `1px solid ${T.amber}44`, background: T.warningBg, display: 'flex', gap: 10 }}>
       <Icon name="stop" size={14} color={T.amber} />
       <span className="mono" style={{ fontSize: 12, color: T.amber, lineHeight: 1.55 }}>{content}</span>
     </div>
@@ -375,7 +375,7 @@ function ConfirmationModal({ content, code, onApprove, onDeny }) {
           {/* Header */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
-            borderBottom: `1px solid ${T.border}`, background: '#2a1f0a',
+            borderBottom: `1px solid ${T.border}`, background: T.warningBg,
           }}>
             <span className="mono" style={{ fontSize: 10, color: T.amber, letterSpacing: '.14em' }}>△ PERMISSION REQUEST</span>
             <div style={{ flex: 1 }} />
@@ -394,7 +394,7 @@ function ConfirmationModal({ content, code, onApprove, onDeny }) {
 
           {/* Code preview */}
           {code && (
-            <div style={{ margin: '0 20px 16px', padding: 12, background: '#05080c', border: `1px solid ${T.border}`, fontFamily: T.mono, fontSize: 12 }}>
+            <div style={{ margin: '0 20px 16px', padding: 12, background: T.surfaceDeep, border: `1px solid ${T.border}`, fontFamily: T.mono, fontSize: 12 }}>
               <pre style={{ margin: 0, color: T.text, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 180, overflowY: 'auto' }}>{code}</pre>
             </div>
           )}
