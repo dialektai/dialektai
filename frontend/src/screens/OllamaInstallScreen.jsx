@@ -216,7 +216,7 @@ export default function OllamaInstallScreen({ onNav, checkInfo }) {
 
   const installed = status?.installed;
   const running = status?.running;
-  const platform = status?.platform || preview?.supported ? 'linux' : (status?.platform || 'darwin');
+  const platform = status?.platform || (preview?.supported ? 'linux' : 'darwin');
   const installUrl = status?.install_url || 'https://ollama.com/download';
   const platformLabel = { darwin: 'Mac', linux: 'Linux', windows: 'Windows' }[platform] || 'Mac';
   const isLinux = (status?.platform === 'linux') || (preview?.supported === true);
