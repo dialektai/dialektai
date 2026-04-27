@@ -52,8 +52,15 @@ function PermsBody() {
 }
 
 export default function OnboardingPermsScreen({ onNav, onComplete }) {
+  const [completing, setCompleting] = useState(false);
+  const handleClick = async () => {
+    if (completing) return;
+    setCompleting(true);
+    try { await onComplete?.(); }
+    catch { setCompleting(false); }
+  };
   return (
-    <OnboardingShell step={4} onNav={onNav} onCtaClick={onComplete}
+    <OnboardingShell step={4} onNav={onNav} onCtaClick={handleClick} loading={completing}
       title={<>Grant the agent<br /><span style={{ color: T.cyan }}>the keys it needs.</span></>}
       blurb="Off by default. Pick what dialekt can touch — you can change any of this later.">
       <PermsBody />

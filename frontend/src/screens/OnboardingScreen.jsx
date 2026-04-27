@@ -427,6 +427,7 @@ export default function OnboardingScreen({ onNav }) {
   const [selectedProvider, setSelectedProvider] = useState(null); // provider id
   const [selectedProviderModel, setSelectedProviderModel] = useState(null);
   const [credModalProvider, setCredModalProvider] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // ── Fetch catalog + system state on mount ────────────────────────────────
   // BackendBootGate already waited for /health, but the catalog endpoint can
@@ -519,11 +520,13 @@ export default function OnboardingScreen({ onNav }) {
 
   // ── Continue handler ────────────────────────────────────────────────────
   const handleContinue = async () => {
+    if (saving) return;
     if (tab === 'local') {
       if (!selectedOllama) return;
       const [name, ...rest] = selectedOllama.split(':');
       const tag = rest.join(':');
       const entry = ollamaAnnotated.find(e => `${e.model.name}:${e.model.tag}` === selectedOllama);
+      setSaving(true);
       // Save provider+model to settings
       await fetch(`${API}/settings`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -539,6 +542,7 @@ export default function OnboardingScreen({ onNav }) {
       }
     } else {
       if (!selectedProvider || !selectedProviderModel) return;
+      setSaving(true);
       await fetch(`${API}/settings`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_provider: selectedProvider, model: selectedProviderModel }),
@@ -652,6 +656,7 @@ export default function OnboardingScreen({ onNav }) {
             selectedProvider={activeProvider}
             selectedProviderModel={selectedProviderModel}
             providerConfigured={activeProviderConfigured}
+            saving={saving}
             onContinue={handleContinue}
             onConfigure={() => setCredModalProvider(activeProvider)}
             onBack={() => onNav('mode-setup')}
@@ -819,13 +824,16 @@ function CloudTab({ providers, providersStatus, selectedProvider, onSelectProvid
   );
 }
 
-function Footer({ tab, selectedOllama, ollamaAnnotated, selectedProvider, selectedProviderModel, providerConfigured, onContinue, onConfigure, onBack, onSkip }) {
+function Footer({ tab, selectedOllama, ollamaAnnotated, selectedProvider, selectedProviderModel, providerConfigured, saving, onContinue, onConfigure, onBack, onSkip }) {
   const ollamaEntry = selectedOllama ? ollamaAnnotated.find(e => `${e.model.name}:${e.model.tag}` === selectedOllama) : null;
   const ollamaInstalled = ollamaEntry?.installed;
 
   let label, disabled = false, action = onContinue;
 
-  if (tab === 'local') {
+  if (saving) {
+    label = 'Saving…';
+    disabled = true;
+  } else if (tab === 'local') {
     if (ollamaAnnotated.length === 0) {
       // Catalog still warming up — make it obvious why Continue is grey.
       label = 'Loading models…';
