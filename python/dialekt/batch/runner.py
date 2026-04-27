@@ -200,6 +200,8 @@ async def run_batch_job(
             final_status = "completed"
 
         await job_mod.set_job_status(db, job_id, final_status)
+        # Re-fetch so the manifest reflects the terminal status / done count.
+        final_job = await job_mod.get_job(db, job_id)
         _write_manifest(out_dir, final_job, completed_outputs, any_error)
         _emit(on_event, {
             "type": final_status,
