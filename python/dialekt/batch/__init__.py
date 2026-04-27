@@ -31,6 +31,7 @@ from .job import (
     record_file_error,
     record_file_cancelled,
 )
+from .runner import run_batch_job, DEFAULT_OUTPUT_ROOT
 
 __all__ = [
     "BATCH_SCHEMA",
@@ -48,4 +49,6 @@ __all__ = [
     "record_file_done",
     "record_file_error",
     "record_file_cancelled",
+    "run_batch_job",
+    "DEFAULT_OUTPUT_ROOT",
 ]
