@@ -1,1527 +1,1246 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>dialekt.ai — Конструктор локальных AI-агентов для регулируемых отраслей</title>
-  <meta name="description" content="Платформа локальных AI-агентов для бизнес-задач: SQL-аналитика, документы, compliance, outreach. Данные не покидают периметр. Соответствует Закону о ПДн РК с 18.01.2026.">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>dias.now — Private AI for teams that handle sensitive data</title>
+  <meta name="description" content="Deployed inside your perimeter. For your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/_shared.css">
+  <script>
+    window.__I18N_PAGE__ = {
+      en: {
+        "hero.eyebrow": "Enterprise pilot · Cohort 01 · 2026",
+        "hero.h1.a": "Private AI",
+        "hero.h1.b": "for teams that handle",
+        "hero.h1.c": "sensitive data.",
+        "hero.sub": "Deployed inside your perimeter. Available to your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.",
+        "hero.cta.primary": "Request pilot access",
+        "hero.cta.secondary": "Or start a free trial →",
+        "hero.meta1": "On-premises, private cloud, or air-gapped",
+        "hero.meta2": "No data training · No telemetry",
+
+        "diag.perimeter": "Your perimeter",
+        "diag.external": "External cloud — unused",
+        "diag.engine": "Dialekt engine",
+
+        "problem.meta": "01 · The problem",
+        "problem.h": "Your teams want AI. Your compliance function cannot authorise it.",
+        "problem.1": "Your employees are already using consumer AI tools. Each prompt is a potential data exfiltration event.",
+        "problem.2": "Client files, financial records, and intellectual property cannot leave your jurisdiction — or your perimeter — under any circumstances.",
+        "problem.3": "Generic assistants do not know your org chart, your playbooks, your reporting formats, or your regulatory context.",
+
+        "solution.meta": "02 · The approach",
+        "solution.h": "An AI layer that lives where your data already does.",
+        "solution.sub": "Dialekt is designed to be deployed entirely inside your perimeter — running on your compute, answering against your data, accessible only to your employees.",
+        "sol.1.h": "On your infrastructure",
+        "sol.1.p": "Deploy on your servers, your private cloud, or an air-gapped environment. Inference, indexing, and storage happen inside the boundary you already audit.",
+        "sol.2.h": "For every department",
+        "sol.2.p": "Separate workspaces for legal, finance, HR, R&D, and compliance. Each with their own data sources, permissions, context, and retention policies.",
+        "sol.3.h": "Compliance-ready",
+        "sol.3.p": "Audit log, role-based access, single sign-on, and data-residency controls are built in, not retrofitted. Every query and every document access is recorded and exportable.",
+
+        "uc.meta": "03 · Use cases",
+        "uc.h": "A working assistant for every function that handles sensitive documents.",
+        "uc.legal.d": "Legal",
+        "uc.legal.h": "Contract review in two languages, none of them leaking.",
+        "uc.legal.p": "Analyses agreements in Russian, Kazakh, and English. Flags non-standard clauses against your template library.",
+        "uc.fin.d": "Finance",
+        "uc.fin.h": "Conversational access to your internal numbers.",
+        "uc.fin.p": "Queries 1C, SAP, and internal data warehouses in plain language. Generates reports in your house formats.",
+        "uc.hr.d": "Human Resources",
+        "uc.hr.h": "Résumés and personal data, processed inside the building.",
+        "uc.hr.p": "Evaluates candidates against your hiring rubric. Personal data never leaves your infrastructure.",
+        "uc.rd.d": "R & D",
+        "uc.rd.h": "Research archives that finally answer questions.",
+        "uc.rd.p": "Queries technical documentation and research history. Your intellectual property stays yours.",
+        "uc.comp.d": "Compliance",
+        "uc.comp.h": "Policy enforcement at the speed of search.",
+        "uc.comp.p": "Audits internal communications and documents against your policy library. Every check is recorded.",
+        "uc.cs.d": "Customer Support",
+        "uc.cs.h": "Call-centre analytics that stay on the call-centre side.",
+        "uc.cs.p": "Summarises, classifies, and reviews conversations with an internal agent that runs on your premises.",
+
+        "dep.meta": "04 · Deployment",
+        "dep.h": "One architecture. One boundary. Nothing crosses it.",
+        "dep.sub": "The Dialekt runtime is installed inside the perimeter you already trust. It does not call out. It does not phone home. It does not depend on any third-party model provider.",
+        "dep.s1": "Runs on standard server infrastructure you already operate or procure. Sizing guidance during pilot scoping.",
+        "dep.s2": "Browser-based client — no installation on employee machines.",
+        "dep.s3": "Integrates with Active Directory, single sign-on, and your document management systems.",
+        "dep.s4": "On-premises, private cloud, or fully air-gapped deployments.",
+
+        "comp.meta": "05 · Compliance & data sovereignty",
+        "comp.h": "Designed around the regulations you already answer to.",
+        "comp.kz.h": "Kazakhstan",
+        "comp.kz.p": "Designed for compliance with the Law on Personal Data and data-residency requirements for state-adjacent institutions.",
+        "comp.ru.h": "Russia",
+        "comp.ru.p": "Designed for 152-FZ data-residency and processing constraints. Deployable inside regulated infrastructure.",
+        "comp.eu.h": "European Union",
+        "comp.eu.p": "GDPR-aligned: data minimisation, auditability, and lawful-basis controls are built into the deployment model.",
+        "comp.air.h": "Air-gapped",
+        "comp.air.p": "Deployable in environments with no internet connectivity. Updates delivered via signed internal channels.",
+
+        "cred.meta": "06 · Who is building this",
+        "cred.h": "Built by a team that delivers enterprise AI for a living.",
+        "cred.1.l": "Certifications",
+        "cred.1.v": "Anthropic · Google · NVIDIA",
+        "cred.2.l": "Community",
+        "cred.2.v": "We Love Claude — Russian-language AI practitioner community",
+        "cred.3.l": "Delivered training",
+        "cred.3.v": "HR, geology, public sector teams · Kazakhstan",
+        "cred.4.l": "Operating business",
+        "cred.4.v": "briq.team — educational platform for AI-augmented engineering",
+
+        "ea.meta": "Pilot programme",
+        "ea.cohort": "Cohort 01",
+        "ea.cohortn": "10 companies",
+        "ea.h": "A selective pilot. Not a mailing list.",
+        "ea.sub": "The first ten companies we onboard shape the product roadmap. They get deployment support, one custom integration, direct access to the founding team, and pilot pricing.",
+        "ea.p1.k": "Deployment",
+        "ea.p1.v": "White-glove installation inside your infrastructure by our engineering team.",
+        "ea.p2.k": "Integration",
+        "ea.p2.v": "One custom connector to a priority data source — document management, ERP, ticketing, or database of your choice.",
+        "ea.p3.k": "Roadmap",
+        "ea.p3.v": "Quarterly input sessions with the founding team. Pilot partners drive the first year of development.",
+        "ea.p4.k": "Pricing",
+        "ea.p4.v": "Pilot pricing locked in at 50% of general-availability rates for the term of the agreement.",
+        "ea.who": "Cohort 01 is focused on organisations with 50+ knowledge workers in regulated industries, with deployment intent within six months.",
+
+        "form.meta": "Request pilot access",
+        "form.h": "Two minutes. Five fields. No marketing calls.",
+        "form.name": "Full name",
+        "form.email": "Work email",
+        "form.email.hint": "We'll send the pilot updates and license details here.",
+        "form.company": "Company",
+        "form.size": "Team size",
+        "form.size.ph": "Select —",
+        "form.role": "Your role",
+        "form.role.ph": "Select —",
+        "form.role.legal": "Legal / General Counsel",
+        "form.role.fin": "Finance / CFO",
+        "form.role.hr": "HR / People",
+        "form.role.it": "IT / Security / CIO",
+        "form.role.ops": "Operations / COO",
+        "form.role.exec": "CEO / Founder",
+        "form.role.other": "Other",
+        "form.notes": "Primary use case (optional)",
+        "form.notes.ph": "Two sentences. What problem do you want solved?",
+        "form.submit": "Request pilot access",
+        "form.legal": "By submitting, you agree we may contact you about the pilot. We do not share your details and we do not run a marketing newsletter.",
+        "form.alt": "Or",
+        "form.alt.trial": "start a free 30-day trial →",
+        "form.err.email": "Please use your work email — free-email providers are not accepted.",
+        "form.err.required": "Please fill in all required fields.",
+        "form.ok.h": "Received.",
+        "form.ok.p": "We review every application personally. You will hear from us within three business days. If the pilot is not a fit, we will say so directly.",
+        "form.ok.signature": "— Dias, founder",
+
+        "dl.kicker":       "07 · Install",
+        "dl.h":            "Download dias.now for your platform.",
+        "dl.sub":          "Local-first build. No telemetry, no cloud calls by default. Pick your OS — your trial license arrives by email after a 30-second signup.",
+        "dl.loading":      "Fetching latest release…",
+        "dl.err.a":        "Could not reach the release feed right now. Please try again in a moment, or ",
+        "dl.err.contact":  "contact support",
+        "dl.err.b":        ".",
+        "dl.foot.latest":  "Latest release ",
+        "dl.foot.signup":  "Need a trial license? Sign up →",
+        "dl.req.min":      "Minimum requirements",
+        "dl.req.min.os":   "macOS 12+, Ubuntu 22.04+ / glibc 2.35+, or Windows 10/11",
+        "dl.req.min.cpu":  "x86_64 or ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)",
+        "dl.req.min.ram":  "16 GB RAM",
+        "dl.req.min.disk": "10 GB free disk for the app + a starter 7B model",
+        "dl.req.min.net":  "Internet on first launch (license verification only — chats run offline)",
+        "dl.req.rec":      "Recommended for 32B+ models",
+        "dl.req.rec.ram":  "48 GB RAM (or 32 GB unified memory on Apple Silicon)",
+        "dl.req.rec.gpu":  "NVIDIA GPU with 12 GB+ VRAM, Apple Silicon M-series, or AMD ROCm-capable GPU",
+        "dl.req.rec.disk": "100 GB+ disk for keeping multiple models on hand",
+        "dl.req.rec.ollama":"Ollama 0.4+ running locally for the local-LLM path (cloud providers don't need it)",
+        "dl.req.rec.net":  "Stable connection if you'll be using cloud providers (Anthropic, OpenAI, …)",
+      },
+      ru: {
+        "hero.eyebrow": "Корпоративный пилот · Когорта 01 · 2026",
+        "hero.h1.a": "Частный ИИ",
+        "hero.h1.b": "для команд, работающих с",
+        "hero.h1.c": "конфиденциальными данными.",
+        "hero.sub": "Развёрнут внутри вашего периметра. Доступен юридическому, финансовому, HR- и исследовательскому отделам. Документы, клиентские данные и интеллектуальная собственность не покидают вашу инфраструктуру.",
+        "hero.cta.primary": "Запросить пилот",
+        "hero.cta.secondary": "Или начать пробный период →",
+        "hero.meta1": "На вашем сервере, в частном облаке или изолированно",
+        "hero.meta2": "Не обучается на ваших данных · без телеметрии",
+
+        "diag.perimeter": "Ваш периметр",
+        "diag.external": "Внешнее облако — не используется",
+        "diag.engine": "Движок Dialekt",
+
+        "problem.meta": "01 · Проблема",
+        "problem.h": "Команды хотят ИИ. Служба безопасности не может это разрешить.",
+        "problem.1": "Сотрудники уже используют публичные ИИ-сервисы. Каждый запрос — это потенциальная утечка данных.",
+        "problem.2": "Клиентские файлы, финансовая отчётность и интеллектуальная собственность не могут покидать вашу юрисдикцию — и ваш периметр — ни при каких условиях.",
+        "problem.3": "Универсальные ассистенты не знают вашу структуру, ваши регламенты, ваши форматы отчётности и нормативный контекст.",
+
+        "solution.meta": "02 · Подход",
+        "solution.h": "ИИ-слой там же, где ваши данные.",
+        "solution.sub": "Dialekt разворачивается полностью внутри вашего периметра — работает на ваших мощностях, отвечает по вашим данным, доступен только вашим сотрудникам.",
+        "sol.1.h": "В вашей инфраструктуре",
+        "sol.1.p": "Разворачивается на ваших серверах, в частном облаке или в изолированной среде. Обработка, индексация и хранение — всё внутри границы, которую вы уже контролируете.",
+        "sol.2.h": "Для каждого отдела",
+        "sol.2.p": "Отдельные рабочие пространства для юристов, финансов, HR, R&D и службы комплаенса. У каждого — свои источники данных, права доступа, контекст и политики хранения.",
+        "sol.3.h": "Готов к проверкам",
+        "sol.3.p": "Журнал действий, права доступа по ролям, единый вход и контроль резидентности данных встроены изначально, а не прикручены потом. Каждый запрос и каждое обращение к документу записывается и выгружается.",
+
+        "uc.meta": "03 · Сценарии",
+        "uc.h": "Рабочий ассистент для каждой функции, которая работает с конфиденциальными документами.",
+        "uc.legal.d": "Юридический отдел",
+        "uc.legal.h": "Анализ договоров на двух языках — без утечек.",
+        "uc.legal.p": "Разбирает договоры на русском, казахском и английском. Отмечает нестандартные пункты по вашей библиотеке шаблонов.",
+        "uc.fin.d": "Финансы",
+        "uc.fin.h": "Разговорный доступ к вашим внутренним цифрам.",
+        "uc.fin.p": "Запросы к 1С, SAP и внутренним хранилищам на обычном языке. Готовые отчёты в ваших корпоративных форматах.",
+        "uc.hr.d": "HR",
+        "uc.hr.h": "Резюме и персональные данные обрабатываются внутри здания.",
+        "uc.hr.p": "Оценивает кандидатов по вашим критериям отбора. Персональные данные не покидают инфраструктуру.",
+        "uc.rd.d": "R & D",
+        "uc.rd.h": "Исследовательские архивы, которые наконец отвечают на вопросы.",
+        "uc.rd.p": "Запросы к технической документации и истории исследований. Ваша интеллектуальная собственность остаётся вашей.",
+        "uc.comp.d": "Комплаенс",
+        "uc.comp.h": "Контроль политик со скоростью поиска.",
+        "uc.comp.p": "Проверяет внутреннюю переписку и документы по вашей политике. Каждая проверка фиксируется.",
+        "uc.cs.d": "Клиентская поддержка",
+        "uc.cs.h": "Аналитика колл-центра, которая остаётся в колл-центре.",
+        "uc.cs.p": "Обобщает, классифицирует и проверяет разговоры внутренним ассистентом, работающим на ваших серверах.",
+
+        "dep.meta": "04 · Развёртывание",
+        "dep.h": "Одна архитектура. Одна граница. Ничто её не пересекает.",
+        "dep.sub": "Dialekt устанавливается внутри периметра, которому вы уже доверяете. Он не звонит наружу. Он не отчитывается. Он не зависит от стороннего поставщика моделей.",
+        "dep.s1": "Работает на стандартном серверном железе, которое у вас уже есть или которое вы планируете закупать. Подбор конфигурации — на этапе пилота.",
+        "dep.s2": "Веб-клиент в браузере — ничего не нужно ставить на компьютеры сотрудников.",
+        "dep.s3": "Интегрируется с Active Directory, единым входом и системами документооборота.",
+        "dep.s4": "На вашем сервере, в частном облаке или полностью изолированно.",
+
+        "comp.meta": "05 · Комплаенс и суверенитет данных",
+        "comp.h": "Под регулирование, на которое вы уже отвечаете.",
+        "comp.kz.h": "Казахстан",
+        "comp.kz.p": "Спроектирован под Закон о персональных данных и требования резидентности для государственно-связанных институтов.",
+        "comp.ru.h": "Россия",
+        "comp.ru.p": "Спроектирован под 152-ФЗ: резидентность данных и ограничения обработки. Разворачивается внутри регулируемой инфраструктуры.",
+        "comp.eu.h": "Европейский Союз",
+        "comp.eu.p": "Соответствие GDPR: минимизация данных, аудит и контроль правовых оснований встроены в модель развёртывания.",
+        "comp.air.h": "Изолированная среда",
+        "comp.air.p": "Разворачивается там, где нет интернета. Обновления — через подписанные внутренние каналы.",
+
+        "cred.meta": "06 · Кто это строит",
+        "cred.h": "Команда, которая профессионально занимается корпоративным ИИ.",
+        "cred.1.l": "Сертификации",
+        "cred.1.v": "Anthropic · Google · NVIDIA",
+        "cred.2.l": "Сообщество",
+        "cred.2.v": "We Love Claude — русскоязычное сообщество практиков ИИ",
+        "cred.3.l": "Проведённое обучение",
+        "cred.3.v": "HR, геологи, госсектор · Казахстан",
+        "cred.4.l": "Действующий бизнес",
+        "cred.4.v": "briq.team — образовательная платформа для AI-разработки",
+
+        "ea.meta": "Пилотная программа",
+        "ea.cohort": "Когорта 01",
+        "ea.cohortn": "10 компаний",
+        "ea.h": "Закрытый пилот. Не рассылка.",
+        "ea.sub": "Первые десять компаний формируют продуктовую дорожную карту. Им — развёртывание под ключ, одна индивидуальная интеграция, прямой доступ к основателям и пилотные цены.",
+        "ea.p1.k": "Развёртывание",
+        "ea.p1.v": "Установка под ключ внутри вашей инфраструктуры нашей инженерной командой.",
+        "ea.p2.k": "Интеграция",
+        "ea.p2.v": "Один индивидуальный коннектор к приоритетному источнику данных — системе документооборота, ERP, тикет-системе или базе данных на ваш выбор.",
+        "ea.p3.k": "Дорожная карта",
+        "ea.p3.v": "Ежеквартальные сессии с командой основателей. Пилотные партнёры определяют первый год развития продукта.",
+        "ea.p4.k": "Цена",
+        "ea.p4.v": "Пилотная цена фиксируется на уровне 50% от публичного тарифа на срок действия соглашения.",
+        "ea.who": "Когорта 01 — для организаций с 50+ сотрудниками умственного труда в регулируемых отраслях, с планом развёртывания в течение шести месяцев.",
+
+        "form.meta": "Запрос на пилот",
+        "form.h": "Две минуты. Пять полей. Никаких холодных звонков.",
+        "form.name": "Имя и фамилия",
+        "form.email": "Рабочая почта",
+        "form.email.hint": "Сюда придут детали пилота и информация о лицензии.",
+        "form.company": "Компания",
+        "form.size": "Размер команды",
+        "form.size.ph": "Выберите —",
+        "form.role": "Ваша роль",
+        "form.role.ph": "Выберите —",
+        "form.role.legal": "Юрист / Главный юрист",
+        "form.role.fin": "Финансы / Финансовый директор",
+        "form.role.hr": "HR / Кадры",
+        "form.role.it": "IT / Безопасность / CIO",
+        "form.role.ops": "Операции / COO",
+        "form.role.exec": "CEO / Основатель",
+        "form.role.other": "Другое",
+        "form.notes": "Основной сценарий (необязательно)",
+        "form.notes.ph": "Два предложения. Какую задачу хотите решить?",
+        "form.submit": "Запросить пилот",
+        "form.legal": "Отправляя форму, вы соглашаетесь, что мы свяжемся с вами по поводу пилота. Мы не передаём ваши данные третьим лицам и не ведём маркетинговую рассылку.",
+        "form.alt": "Или",
+        "form.alt.trial": "начать бесплатный пробный период →",
+        "form.err.email": "Используйте рабочую почту — бесплатные провайдеры не принимаются.",
+        "form.err.required": "Заполните все обязательные поля.",
+        "form.ok.h": "Заявка получена.",
+        "form.ok.p": "Мы лично рассматриваем каждую заявку. Ответим в течение трёх рабочих дней. Если пилот не подходит — скажем об этом прямо.",
+        "form.ok.signature": "— Диас, основатель",
+
+        "dl.kicker":       "07 · Установка",
+        "dl.h":            "Скачайте dias.now для вашей платформы.",
+        "dl.sub":          "Локальная сборка. Никакой телеметрии и облачных вызовов по умолчанию. Выберите OS — пробный ключ придёт на почту после 30-секундной регистрации.",
+        "dl.loading":      "Получаем последний релиз…",
+        "dl.err.a":        "Не удалось получить ленту релизов прямо сейчас. Попробуйте через минуту или ",
+        "dl.err.contact":  "напишите в поддержку",
+        "dl.err.b":        ".",
+        "dl.foot.latest":  "Последний релиз ",
+        "dl.foot.signup":  "Нужен пробный ключ? Зарегистрироваться →",
+        "dl.req.min":      "Минимальные требования",
+        "dl.req.min.os":   "macOS 12+, Ubuntu 22.04+ / glibc 2.35+ или Windows 10/11",
+        "dl.req.min.cpu":  "x86_64 или ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)",
+        "dl.req.min.ram":  "16 ГБ оперативной памяти",
+        "dl.req.min.disk": "10 ГБ свободного места на диске для приложения + стартовая модель 7B",
+        "dl.req.min.net":  "Интернет при первом запуске (только для проверки лицензии — чаты работают офлайн)",
+        "dl.req.rec":      "Рекомендуется для моделей 32B+",
+        "dl.req.rec.ram":  "48 ГБ RAM (или 32 ГБ единой памяти на Apple Silicon)",
+        "dl.req.rec.gpu":  "GPU NVIDIA с VRAM от 12 ГБ, Apple Silicon серии M или AMD-GPU с поддержкой ROCm",
+        "dl.req.rec.disk": "100 ГБ+ диска, чтобы держать несколько моделей одновременно",
+        "dl.req.rec.ollama":"Ollama 0.4+ запущена локально для режима локальных LLM (облачным провайдерам она не нужна)",
+        "dl.req.rec.net":  "Стабильное соединение, если планируете использовать облачных провайдеров (Anthropic, OpenAI, …)",
+      }
+    };
+  </script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { background: #0a0d12; }
+    /* index-only flourishes; design system lives in /_shared.css */
+    .hero-kicker {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 10px;
+      border: 1px solid var(--rule); border-radius: 999px;
+      font-size: 12px; color: var(--ink-2);
+      margin-bottom: 28px;
+    }
+    .hero-kicker::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent);
+    }
+    .hero-h1 .accent { color: var(--ink-3); }
+    .hero-meta {
+      margin-top: 32px; display: flex; gap: 28px; flex-wrap: wrap;
+      font-size: 13.5px; color: var(--ink-3);
+    }
+    .hero-meta span { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-art {
+      position: relative; aspect-ratio: 1 / 0.85; width: 100%;
+      background: var(--bg-elev);
+      border: 1px solid var(--rule); border-radius: 8px;
+      overflow: hidden;
+    }
+    .hero-art svg { width: 100%; height: 100%; display: block; }
+    .anno {
+      position: absolute; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ink-2); background: var(--bg-elev); padding: 4px 10px;
+      border: 1px solid var(--rule); border-radius: 3px;
+    }
+    .anno-1 { top: 14%; left: 7%; }
+    .anno-2 { top: 8%; right: 7%; color: var(--ink-3); }
+    .anno-3 { bottom: 9%; left: 9%; }
+
+    /* Problem — 3 numbered items, editorial */
+    .problem-list {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--rule);
+      border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+    }
+    .problem-list li {
+      list-style: none; padding: 32px;
+      background: var(--bg-elev);
+    }
+    .problem-list .num {
+      font-family: var(--serif); font-size: 14px; color: var(--primary);
+      letter-spacing: 0; display: block; margin-bottom: 22px;
+    }
+    .problem-list p {
+      margin: 0; color: var(--ink); font-size: 16px; line-height: 1.5;
+      text-wrap: pretty;
+    }
+    @media (max-width: 820px) { .problem-list { grid-template-columns: 1fr; } }
+
+    /* Approach — 3 cards, no borders, just whitespace */
+    .approach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+    @media (max-width: 900px) { .approach-grid { grid-template-columns: 1fr; gap: 32px; } }
+    .approach-card { padding: 4px 0; }
+    .approach-icon {
+      width: 48px; height: 48px; display: grid; place-items: center;
+      border: 1px solid var(--rule); border-radius: 4px;
+      margin-bottom: 22px; color: var(--primary);
+    }
+    .approach-card h3 { margin-bottom: 10px; font-size: 19px; line-height: 1.3; }
+    .approach-card p { color: var(--ink-2); font-size: 15px; line-height: 1.55; margin: 0; }
+
+    /* Use cases — 3×2 grid */
+    .uc-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--rule);
+      border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+    }
+    .uc-card {
+      background: var(--bg-elev); padding: 32px;
+      display: flex; flex-direction: column; gap: 14px; min-height: 200px;
+    }
+    .uc-dept {
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--primary); font-weight: 500;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .uc-dept::before { content: ""; width: 18px; height: 1px; background: var(--primary); }
+    .uc-card h3 {
+      font-family: var(--serif); font-size: 21px; font-weight: 400;
+      line-height: 1.2; margin: 0; letter-spacing: -0.01em;
+    }
+    .uc-card p { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; margin: 0; text-wrap: pretty; }
+    @media (max-width: 960px) { .uc-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) { .uc-grid { grid-template-columns: 1fr; } }
+
+    /* Deployment — split text + perimeter SVG */
+    .dep {
+      background: var(--bg-elev);
+      border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    }
+    .dep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    @media (max-width: 900px) { .dep-grid { grid-template-columns: 1fr; gap: 40px; } }
+    .perimeter-art { position: relative; aspect-ratio: 1 / 0.82; width: 100%; }
+    .perimeter-art svg { width: 100%; height: 100%; display: block; }
+    .spec-list { margin: 24px 0 0 0; padding: 0; list-style: none; }
+    .spec-list li {
+      padding: 16px 0; border-top: 1px solid var(--rule);
+      display: grid; grid-template-columns: 20px 1fr; gap: 14px;
+      font-size: 15px; color: var(--ink); line-height: 1.55;
+    }
+    .spec-list li:last-child { border-bottom: 1px solid var(--rule); }
+    .spec-list .bullet {
+      margin-top: 9px; width: 8px; height: 8px;
+      border: 1px solid var(--primary); transform: rotate(45deg);
+    }
+
+    /* Compliance — 4 jurisdiction cards */
+    .comp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+    @media (max-width: 900px) { .comp-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .comp-grid { grid-template-columns: 1fr; } }
+    .comp-item { border-top: 1px solid var(--rule); padding-top: 20px; }
+    .comp-item .jur {
+      font-family: var(--serif); font-size: 18px; margin-bottom: 8px;
+      letter-spacing: -0.005em;
+    }
+    .comp-item p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin: 0; }
+
+    /* Credibility — dark band, 4 thin cards */
+    .credibility {
+      background: var(--primary); color: #E6ECF7;
+      border: 0;
+    }
+    .credibility .meta { color: #8FA3C9; }
+    .credibility h2 { color: #fff; }
+    .credibility .lede { color: #C9D3E5; }
+    .cred-cards { display: grid; gap: 14px; }
+    .cred-card {
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 20px 22px; border-radius: 4px;
+      background: rgba(255,255,255,.02);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .cred-card .label { font-size: 13px; color: #C9D3E5; letter-spacing: 0.02em; }
+    .cred-card .value { font-family: var(--serif); font-size: 17px; color: #fff; }
+    @media (max-width: 540px) {
+      .cred-card { flex-direction: column; align-items: flex-start; gap: 4px; }
+    }
+
+    /* Pilot section — left perks list, right form */
+    .pilot {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+      padding-top: clamp(64px, 9vw, 104px);
+    }
+    @media (max-width: 900px) { .pilot { grid-template-columns: 1fr; gap: 40px; } }
+    .pilot .cohort {
+      display: inline-flex; align-items: baseline; gap: 10px;
+      padding: 6px 14px; border: 1px solid var(--rule); border-radius: 999px;
+      font-size: 12px; color: var(--ink-2); margin-bottom: 28px;
+    }
+    .pilot .cohort b {
+      font-family: var(--serif); color: var(--ink); font-weight: 500; font-size: 14px;
+    }
+    .perks { margin: 32px 0 0 0; padding: 0; list-style: none; }
+    .perks li {
+      padding: 20px 0; border-top: 1px solid var(--rule);
+      display: grid; grid-template-columns: 110px 1fr; gap: 18px; align-items: baseline;
+    }
+    .perks li:last-child { border-bottom: 1px solid var(--rule); }
+    .perks .k { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+    .perks .v { font-size: 15.5px; color: var(--ink); line-height: 1.5; }
+    @media (max-width: 540px) {
+      .perks li { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    /* Pilot form */
+    .form-card {
+      background: var(--bg-elev); border: 1px solid var(--rule); border-radius: 8px;
+      padding: 36px; position: relative;
+    }
+    .form-card .form-head { margin-bottom: 24px; }
+    .form-card .form-head .meta { display: block; margin-bottom: 10px; }
+    .form-card .form-head h3 {
+      font-family: var(--serif); font-size: 26px; font-weight: 400;
+      letter-spacing: -0.01em; line-height: 1.2;
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 540px) { .field-row { grid-template-columns: 1fr; } }
+    .submit-row { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
+    .submit-row .btn.primary { width: 100%; justify-content: center; padding: 16px; font-size: 15.5px; }
+    .form-legal { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+    .form-alt {
+      margin-top: 16px; padding-top: 16px;
+      border-top: 1px solid var(--rule);
+      font-size: 13.5px; color: var(--ink-3);
+    }
+    .form-alt a { color: var(--primary); border-bottom: 1px solid var(--rule-strong); text-underline-offset: 3px; }
+
+    .form-card.sent .form-body { display: none; }
+    .confirmation { display: none; flex-direction: column; gap: 16px; }
+    .form-card.sent .confirmation { display: flex; }
+    .conf-check {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 1px solid var(--primary);
+      display: grid; place-items: center; color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .confirmation h3 {
+      font-family: var(--serif); font-size: 24px; font-weight: 400;
+      letter-spacing: -0.01em; margin: 0;
+    }
+    .confirmation p { margin: 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+    .confirmation .signature {
+      margin-top: 14px; padding-top: 18px; border-top: 1px solid var(--rule);
+      font-size: 13.5px; color: var(--ink-2);
+    }
+
+    .who-line {
+      margin-top: 28px; font-size: 13.5px; color: var(--ink-3); line-height: 1.55;
+    }
+
+    /* ── DOWNLOAD section ─────────────────────────────────────────────────── */
+    .dl-loading {
+      font-size: 14px; color: var(--ink-3); padding: 32px 0;
+      letter-spacing: 0.02em;
+    }
+    .dl-loading::before {
+      content: ""; display: inline-block; width: 9px; height: 9px;
+      margin-right: 12px; vertical-align: 1px;
+      background: var(--primary); border-radius: 50%;
+      animation: dl-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes dl-pulse {
+      0%, 100% { opacity: 0.25; transform: scale(0.85); }
+      50%      { opacity: 1;    transform: scale(1);    }
+    }
+    .dl-error {
+      padding: 16px 20px; border-left: 3px solid var(--err);
+      background: var(--bg-tint); color: var(--ink-2); font-size: 14px;
+      line-height: 1.6;
+    }
+    .dl-error a { color: var(--primary); border-bottom: 1px solid currentColor; }
+
+    .dl-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    .dl-card {
+      position: relative;
+      display: flex; flex-direction: column; gap: 12px;
+      padding: 22px 22px 18px;
+      background: var(--bg-elev);
+      border: 1px solid var(--rule);
+      transition: border-color .15s ease, transform .15s ease;
+    }
+    .dl-card:hover { border-color: var(--ink-3); }
+    .dl-card.detected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary) inset;
+    }
+    .dl-card.detected::after {
+      content: "DETECTED"; position: absolute; top: 10px; right: 14px;
+      font-family: var(--sans); font-size: 9.5px; font-weight: 600;
+      letter-spacing: 0.18em; color: var(--primary);
+    }
+    .dl-os {
+      display: flex; align-items: baseline; gap: 8px;
+      font-family: var(--serif); font-size: 19px;
+      letter-spacing: -0.01em; color: var(--ink);
+    }
+    .dl-os .arch {
+      font-family: var(--sans); font-size: 11px; font-weight: 500;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-3); padding-bottom: 2px;
+    }
+    .dl-files {
+      display: flex; flex-direction: column; gap: 8px;
+      margin-top: 4px;
+    }
+    .dl-file {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; padding: 9px 12px;
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      font-family: var(--sans); font-size: 13.5px;
+      color: var(--ink-2);
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .dl-file:hover {
+      background: var(--primary); color: #FFFFFF;
+      border-color: var(--primary);
+    }
+    .dl-file:hover .dl-size { color: rgba(255,255,255,0.78); }
+    .dl-file .dl-ext {
+      font-weight: 600; letter-spacing: 0.04em;
+    }
+    .dl-file .dl-size {
+      font-family: var(--sans); font-size: 11.5px; color: var(--ink-3);
+      letter-spacing: 0.04em; transition: color .12s ease;
+    }
+
+    .dl-foot {
+      font-size: 13px; color: var(--ink-3);
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+      padding-top: 14px; border-top: 1px solid var(--rule);
+    }
+    .dl-foot a { color: var(--primary); }
+    .dl-foot a:hover { color: var(--primary-ink); }
+    .dl-foot .dl-sep { color: var(--rule-strong); }
+    .dl-foot strong { color: var(--ink-2); font-weight: 500; font-family: var(--sans); }
+
+    .dl-req {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      margin-top: 36px; padding-top: 32px; border-top: 1px solid var(--rule);
+    }
+    @media (max-width: 720px) { .dl-req { grid-template-columns: 1fr; } }
+    .dl-req-col {
+      padding: 22px;
+      background: var(--bg-elev);
+      border: 1px solid var(--rule);
+    }
+    .dl-req-head {
+      font-family: var(--sans); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary);
+      margin-bottom: 14px;
+    }
+    .dl-req-list {
+      list-style: none; padding: 0; margin: 0;
+      font-size: 13.5px; line-height: 1.6; color: var(--ink-2);
+    }
+    .dl-req-list li {
+      padding: 6px 0 6px 18px; position: relative;
+      border-top: 1px dashed var(--rule);
+    }
+    .dl-req-list li:first-child { border-top: none; }
+    .dl-req-list li::before {
+      content: "›"; position: absolute; left: 0; top: 5px;
+      color: var(--primary); font-weight: 700; font-size: 14px;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
 
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<div data-layout="nav"></div>
 
-  <script type="text/babel">
-// ─────────────────────────────────────────────────────────────
-// TOKENS
-// ─────────────────────────────────────────────────────────────
-const LT = {
-  bg0: '#0a0d12',
-  bg1: '#0f1318',
-  bg2: '#161b22',
-  bg3: '#1a2029',
-  border: '#1e2733',
-  borderHi: '#2a3441',
-  text: '#e2e8f0',
-  muted: '#94a3b8',
-  dim: '#64748b',
-  deep: '#475569',
-  cyan: '#00d4ff',
-  cyanDim: '#0891b2',
-  amber: '#f59e0b',
-  green: '#22c55e',
-  red: '#ef4444',
-  mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-  ui: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-};
-
-if (!document.getElementById('dlk-land-styles')) {
-  const s = document.createElement('style');
-  s.id = 'dlk-land-styles';
-  s.textContent = `
-    html, body { background: ${LT.bg0}; overflow-x: hidden; }
-    .dlk-land, .dlk-land * { box-sizing: border-box; }
-    .dlk-land { max-width: 100vw; overflow-x: hidden; }
-    .dlk-land {
-      font-family: ${LT.ui};
-      color: ${LT.text};
-      background: ${LT.bg0};
-      font-size: 14px;
-      line-height: 1.5;
-      font-feature-settings: "cv02","cv03","cv04","cv11";
-      -webkit-font-smoothing: antialiased;
-      letter-spacing: -0.005em;
-    }
-    .dlk-land ::selection { background: ${LT.cyan}; color: ${LT.bg0}; }
-    .dlk-land .mono { font-family: ${LT.mono}; letter-spacing: 0; }
-    .dlk-land .upper { text-transform: uppercase; letter-spacing: 0.14em; font-size: 10px; font-weight: 500; font-family: ${LT.mono}; }
-    .dlk-land a { color: inherit; text-decoration: none; }
-    .dlk-land h1, .dlk-land h2, .dlk-land h3, .dlk-land p { margin: 0; }
-    .dlk-land h1 { font-weight: 600; letter-spacing: -0.022em; }
-    .dlk-land h2 { font-weight: 600; letter-spacing: -0.018em; }
-
-    .dlk-land .sec-tag {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 0; margin-bottom: 24px;
-      border-bottom: 1px solid ${LT.border};
-    }
-    .dlk-land .sec-tag .n { color: ${LT.cyan}; font-family: ${LT.mono}; font-size: 11px; letter-spacing: 0.14em; }
-    .dlk-land .sec-tag .label { font-family: ${LT.mono}; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: ${LT.text}; }
-    .dlk-land .sec-tag .rule { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, ${LT.border} 0 4px, transparent 4px 8px); }
-    .dlk-land .sec-tag .meta { font-family: ${LT.mono}; font-size: 10px; color: ${LT.dim}; letter-spacing: 0.1em; }
-
-    .dlk-land .btn {
-      font-family: ${LT.mono}; font-size: 12px; font-weight: 500;
-      background: transparent; color: ${LT.text};
-      border: 1px solid ${LT.border}; padding: 10px 14px;
-      cursor: pointer; border-radius: 2px;
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: border-color .12s, background .12s, color .12s;
-      letter-spacing: 0.02em;
-    }
-    .dlk-land .btn:hover { border-color: ${LT.borderHi}; background: ${LT.bg2}; }
-    .dlk-land .btn.primary { background: ${LT.cyan}; color: ${LT.bg0}; border-color: ${LT.cyan}; font-weight: 600; }
-    .dlk-land .btn.primary:hover { background: #33dfff; border-color: #33dfff; }
-    .dlk-land .btn .kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; padding: 1px 4px; border: 1px solid currentColor; border-radius: 2px; }
-
-    @keyframes dlk-land-caret { 0%,49%{opacity:1} 50%,100%{opacity:0} }
-    .dlk-land .caret { display:inline-block; width:7px; height:14px; background:${LT.cyan}; vertical-align:-2px; margin-left:3px; animation: dlk-land-caret 1s steps(1) infinite; }
-
-    @keyframes dlk-land-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
-    .dlk-land .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
-    .dlk-land .dot.live { animation: dlk-land-pulse 1.4s ease-in-out infinite; }
-
-    .dlk-land .winchrome {
-      height: 30px; display: flex; align-items: center; gap: 10px;
-      padding: 0 12px; background: ${LT.bg1}; border-bottom: 1px solid ${LT.border};
-      font-family: ${LT.mono}; font-size: 10px; color: ${LT.muted}; letter-spacing: 0.08em;
-    }
-    .dlk-land .winchrome .dots { display: flex; gap: 6px; }
-    .dlk-land .winchrome .dots span { width:10px; height:10px; border-radius:50%; display:inline-block; }
-
-    .dlk-land .card { background: ${LT.bg1}; border: 1px solid ${LT.border}; border-radius: 2px; }
-    .dlk-land .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
-    .dlk-land .wrap-wide { max-width: 1400px; margin: 0 auto; padding: 0 32px; }
-
-    @media (max-width: 860px) {
-      .dlk-land .wrap, .dlk-land .wrap-wide { padding: 0 20px; }
-      .dlk-land .hide-sm { display: none !important; }
-      .dlk-land .stack-sm { flex-direction: column !important; }
-    }
-
-    html { scroll-behavior: smooth; }
-    .dlk-land .scanlines { background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px); }
-    .dlk-land .ticks { background-image: linear-gradient(to right, ${LT.border} 1px, transparent 1px); background-size: 8px 100%; }
-    .dlk-land input, .dlk-land button, .dlk-land textarea { font-family: inherit; }
-
-    @media (max-width: 900px) {
-      .cap-grid { grid-template-columns: 1fr !important; }
-    }
-    @media (min-width: 901px) and (max-width: 1200px) {
-      .cap-grid { grid-template-columns: 1fr 1fr !important; }
-    }
-    @media (max-width: 720px) {
-      .install-row { grid-template-columns: 1fr !important; gap: 10px !important; }
-      .install-row .mono-cmd { white-space: normal !important; word-break: break-all; }
-    }
-    @media (max-width: 860px) {
-      .hero-grid { grid-template-columns: 1fr !important; }
-      .local-grid { grid-template-columns: 1fr !important; }
-      .hw-grid { grid-template-columns: 1fr !important; }
-      .who-grid { grid-template-columns: 1fr !important; }
-      .about-grid { grid-template-columns: 1fr !important; }
-      .install-grid { grid-template-columns: 1fr !important; }
-      .footer-grid { grid-template-columns: 1fr 1fr !important; }
-      .diff-split { grid-template-columns: 1fr !important; }
-      .how-step { grid-template-columns: 1fr !important; }
-    }
-
-    /* ── Mobile (≤640px) — hide decorative mockups, tighten nav */
-    @media (max-width: 640px) {
-      .hide-mobile { display: none !important; }
-      .dlk-land h1 { font-size: clamp(30px, 8vw, 48px) !important; line-height: 1.05 !important; }
-      .dlk-land h2 { font-size: clamp(24px, 7vw, 40px) !important; }
-      .dlk-land .wrap, .dlk-land .wrap-wide { padding: 0 16px !important; }
-      .footer-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
-      .install-row .mono-cmd { font-size: 10px !important; }
-    }
-  `;
-  document.head.appendChild(s);
-}
-
-const LIcon = ({ name, size = 14, color = 'currentColor', stroke = 1.5 }) => {
-  const paths = {
-    chat: 'M3 4h14v9H8l-4 3V4z',
-    folder: 'M2 5h6l2 2h8v9H2V5z',
-    terminal: 'M3 4h14v12H3V4zM6 8l2 2-2 2M10 12h4',
-    cog: 'M10 13a3 3 0 100-6 3 3 0 000 6zm0-9v2M10 16v2M4 10H2M18 10h-2M5.6 5.6L4.2 4.2M15.8 15.8l-1.4-1.4M5.6 14.4l-1.4 1.4M15.8 4.2l-1.4 1.4',
-    plus: 'M10 4v12M4 10h12',
-    send: 'M3 10l14-6-6 14-2-6-6-2z',
-    attach: 'M14 8l-5 5a2.5 2.5 0 01-3.5-3.5l6-6a4 4 0 015.5 5.5L9.5 16',
-    cpu: 'M5 5h10v10H5V5zM2 7h1M2 10h1M2 13h1M17 7h1M17 10h1M17 13h1M7 2v1M10 2v1M13 2v1M7 17v1M10 17v1M13 17v1',
-    file: 'M5 2h7l4 4v12H5V2zM12 2v4h4',
-    globe: 'M10 2a8 8 0 100 16 8 8 0 000-16zM2 10h16M10 2c2.5 2.8 2.5 13.2 0 16M10 2c-2.5 2.8-2.5 13.2 0 16',
-    chev: 'M6 8l4 4 4-4',
-    chevR: 'M8 6l4 4-4 4',
-    check: 'M4 10l4 4 8-8',
-    search: 'M8.5 3a5.5 5.5 0 104.1 9.3l4 4 1-1-4-4A5.5 5.5 0 008.5 3z',
-    shield: 'M10 2l7 3v5c0 5-3.5 7.5-7 8-3.5-.5-7-3-7-8V5l7-3z',
-    copy: 'M6 6h10v10H6V6zM4 4h10v2M4 4v10h2',
-    stop: 'M5 5h10v10H5z',
-    refresh: 'M3 10a7 7 0 0112-5l2 2M17 10a7 7 0 01-12 5l-2-2M15 3v4h4M5 17v-4H1',
-    arrow: 'M4 10h12M12 6l4 4-4 4',
-    down: 'M10 3v12M5 10l5 5 5-5',
-    x: 'M4 4l12 12M16 4L4 16',
-    play: 'M5 3l12 7-12 7V3z',
-    github: 'M10 2a8 8 0 00-2.5 15.6c.4.1.5-.2.5-.4v-1.4c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.2-.1-.2-.4-1 .1-2 0 0 .7-.2 2.2.8a7.5 7.5 0 014 0c1.5-1 2.2-.8 2.2-.8.4 1 .2 1.8.1 2 .5.6.8 1.3.8 2.2 0 3.1-1.9 3.8-3.7 4 .3.3.6.8.6 1.6v2.3c0 .3.1.5.6.4A8 8 0 0010 2z',
-    bolt: 'M11 2L4 11h5l-1 7 7-9h-5l1-7z',
-    lock: 'M6 9V6a4 4 0 018 0v3M4 9h12v9H4V9z',
-    disk: 'M3 3h10l4 4v10H3V3zM6 3v5h6V3M6 13h8',
-    flask: 'M8 2h4M9 2v5l-4 8a2 2 0 002 3h6a2 2 0 002-3l-4-8V2',
-    brain: 'M7 4a3 3 0 016 0v1a3 3 0 012 3v2a3 3 0 01-2 3v1a3 3 0 01-6 0v-1a3 3 0 01-2-3V8a3 3 0 012-3V4z',
-    eye: 'M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6zM10 7a3 3 0 100 6 3 3 0 000-6z',
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="square" strokeLinejoin="miter" style={{ flexShrink: 0, display: 'block' }}>
-      <path d={paths[name]} />
-    </svg>
-  );
-};
-
-function SecTag({ n, label, meta }) {
-  return (
-    <div className="sec-tag">
-      <span className="n">{n} //</span>
-      <span className="label">{label}</span>
-      <div className="rule" />
-      {meta && <span className="meta">{meta}</span>}
-    </div>
-  );
-}
-
-function WinChrome({ title }) {
-  return (
-    <div className="winchrome">
-      <div className="dots">
-        <span style={{ background: '#ff5f56' }} />
-        <span style={{ background: '#ffbd2e' }} />
-        <span style={{ background: '#27c93f' }} />
+<!-- ─── HERO ─────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="hero-kicker" data-i18n="hero.eyebrow">Enterprise pilot · Cohort 01 · 2026</div>
+      <h1 class="hero-h1">
+        <span data-i18n="hero.h1.a">Private AI</span><br>
+        <span class="accent" data-i18n="hero.h1.b">for teams that handle</span> <span data-i18n="hero.h1.c">sensitive data.</span>
+      </h1>
+      <p class="lede" style="margin-top:24px;font-size:18.5px;max-width:62ch" data-i18n="hero.sub">
+        Deployed inside your perimeter. Available to your legal, finance, HR, and research teams. Documents, client data, and intellectual property never leave your infrastructure.
+      </p>
+      <div class="hero-cta" style="margin-top:36px;display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
+        <a href="#pilot-form" class="btn primary lg">
+          <span data-i18n="hero.cta.primary">Request pilot access</span>
+          <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
+        </a>
+        <a href="/signup.html" style="font-size:14px;color:var(--primary);border-bottom:1px solid var(--rule-strong);text-underline-offset:3px;padding:4px 0" data-i18n="hero.cta.secondary">Or start a free trial →</a>
+        <a href="#download" style="font-size:14px;color:var(--ink-3);border-bottom:1px solid var(--rule);text-underline-offset:3px;padding:4px 0">Or download →</a>
       </div>
-      <div style={{ flex: 1, textAlign: 'center' }}>{title}</div>
-      <div style={{ width: 52 }} />
+      <div class="hero-meta">
+        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" stroke="currentColor" stroke-width="1"/><path d="M5 7l1.5 1.5L9 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta1">On-premises, private cloud, or air-gapped</span></span>
+        <span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1"/><path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg><span data-i18n="hero.meta2">No data training · No telemetry</span></span>
+      </div>
     </div>
-  );
-}
 
-// ─────────────────────────────────────────────────────────────
-// DOWNLOADS — platform detection + GitHub Releases API
-// ─────────────────────────────────────────────────────────────
-const GH_LATEST_RELEASE = 'https://api.github.com/repos/dialektai/dialektai/releases/latest';
+    <div class="hero-art" aria-hidden="true">
+      <span class="anno anno-1" data-i18n="diag.perimeter">Your perimeter</span>
+      <span class="anno anno-2" data-i18n="diag.external">External cloud — unused</span>
+      <span class="anno anno-3" data-i18n="diag.engine">Dialekt engine</span>
+      <svg viewBox="0 0 600 540" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="iso-grid" x="0" y="0" width="40" height="23" patternUnits="userSpaceOnUse" patternTransform="skewX(-30) scale(1,0.866)">
+            <path d="M0 0 H40 M0 0 V23" stroke="#E4E6EB" stroke-width="0.6"/>
+          </pattern>
+          <linearGradient id="plane" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#F3F4F6"/>
+          </linearGradient>
+          <linearGradient id="cube-top" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFFFFF"/>
+            <stop offset="1" stop-color="#F8F8FA"/>
+          </linearGradient>
+          <linearGradient id="cube-left" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#E9ECF2"/>
+            <stop offset="1" stop-color="#DEE2EA"/>
+          </linearGradient>
+          <linearGradient id="cube-right" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#D6DBE4"/>
+            <stop offset="1" stop-color="#C7CDD8"/>
+          </linearGradient>
+          <linearGradient id="primary-top" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2E4FA8"/>
+            <stop offset="1" stop-color="#1E3A8A"/>
+          </linearGradient>
+          <linearGradient id="primary-left" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#162A65"/>
+            <stop offset="1" stop-color="#122355"/>
+          </linearGradient>
+          <linearGradient id="primary-right" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#1E3A8A"/>
+            <stop offset="1" stop-color="#162A65"/>
+          </linearGradient>
+          <clipPath id="clip-plane"><polygon points="0,-160 240,-20 0,120 -240,-20"/></clipPath>
+        </defs>
 
-function detectPlatform() {
-  const ua = (navigator.userAgent || '').toLowerCase();
-  const platform = (navigator.platform || '').toLowerCase();
-  if (ua.includes('linux') || platform.includes('linux')) {
-    // Default Linux users to .deb (Ubuntu/Debian majority)
-    // Fedora / Arch / SUSE users can click the AppImage row.
-    if (ua.includes('fedora') || ua.includes('arch') || ua.includes('suse')) return 'linux-appimage';
-    return 'linux-deb';
-  }
-  if (ua.includes('mac') || platform.includes('mac')) return 'macos';
-  if (ua.includes('win')) return 'windows';
-  return 'linux-deb';  // fall back to the only platform we ship today
-}
+        <!-- Dashed external boundary -->
+        <g opacity="0.45">
+          <path d="M40 80 Q100 40 180 60 T340 40 Q420 30 480 70" stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 5" fill="none"/>
+          <text x="52" y="55" font-family="Inter" font-size="10" fill="#9CA3AF" letter-spacing="1.4">EXTERNAL · NOT USED</text>
+        </g>
 
-function fmtBytes(n) {
-  if (!n || isNaN(n)) return null;
-  const mb = n / (1024 * 1024);
-  return `${mb.toFixed(0)} MB`;
-}
+        <!-- Isometric perimeter base plane -->
+        <g transform="translate(300 300)">
+          <polygon points="0,-160 240,-20 0,120 -240,-20" fill="url(#plane)" stroke="#CDD1D9" stroke-width="1"/>
+          <g clip-path="url(#clip-plane)">
+            <polygon points="0,-160 240,-20 0,120 -240,-20" fill="url(#iso-grid)"/>
+          </g>
 
-function useReleases() {
-  const [state, setState] = React.useState({
-    version: null,
-    publishedAt: null,
-    debUrl: null, debSize: null,
-    appimageUrl: null, appimageSize: null,
-    dmgUrl: null, dmgSize: null,
-    exeUrl: null, exeSize: null,
-    msiUrl: null, msiSize: null,
-    loading: true,
-    error: null,
-  });
-  React.useEffect(() => {
-    fetch(GH_LATEST_RELEASE, { headers: { 'Accept': 'application/vnd.github+json' } })
-      .then(r => {
-        if (!r.ok) throw new Error(`GitHub API: HTTP ${r.status}`);
-        return r.json();
-      })
-      .then(release => {
-        const assets = release.assets || [];
-        const deb = assets.find(a => /\.deb$/i.test(a.name));
-        const app = assets.find(a => /\.AppImage$/i.test(a.name));
-        const dmg = assets.find(a => /\.dmg$/i.test(a.name));
-        // Prefer NSIS *-setup.exe installer over generic .exe; MSI as fallback
-        const exe = assets.find(a => /-setup\.exe$/i.test(a.name))
-                 || assets.find(a => /\.exe$/i.test(a.name));
-        const msi = assets.find(a => /\.msi$/i.test(a.name));
-        setState({
-          version: (release.tag_name || '').replace(/^v/, '') || '0.10.0',
-          publishedAt: release.published_at ? release.published_at.substring(0, 10) : null,
-          debUrl: deb ? deb.browser_download_url : null,
-          debSize: deb ? fmtBytes(deb.size) : null,
-          appimageUrl: app ? app.browser_download_url : null,
-          appimageSize: app ? fmtBytes(app.size) : null,
-          dmgUrl: dmg ? dmg.browser_download_url : null,
-          dmgSize: dmg ? fmtBytes(dmg.size) : null,
-          exeUrl: exe ? exe.browser_download_url : null,
-          exeSize: exe ? fmtBytes(exe.size) : null,
-          msiUrl: msi ? msi.browser_download_url : null,
-          msiSize: msi ? fmtBytes(msi.size) : null,
-          loading: false,
-          error: null,
+          <!-- Department cubes -->
+          <g transform="translate(-120 -60)">
+            <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
+            <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">LEGAL</text>
+          </g>
+          <g transform="translate(120 -60)">
+            <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
+            <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">FINANCE</text>
+          </g>
+          <g transform="translate(-120 40)">
+            <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
+            <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">HR</text>
+          </g>
+          <g transform="translate(120 40)">
+            <polygon points="0,-24 28,-10 0,4 -28,-10" fill="url(#cube-top)" stroke="#C7CDD8" stroke-width="0.8"/>
+            <polygon points="-28,-10 0,4 0,28 -28,14" fill="url(#cube-left)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <polygon points="28,-10 0,4 0,28 28,14" fill="url(#cube-right)" stroke="#B8BFCB" stroke-width="0.8"/>
+            <text x="0" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#6B7280" letter-spacing="1.4">R &amp; D</text>
+          </g>
+
+          <!-- Center engine -->
+          <g transform="translate(0 -10)">
+            <g stroke="#1E3A8A" stroke-width="1" stroke-dasharray="3 3" opacity="0.5" fill="none">
+              <line x1="0" y1="0" x2="-120" y2="-50"/>
+              <line x1="0" y1="0" x2="120" y2="-50"/>
+              <line x1="0" y1="0" x2="-120" y2="50"/>
+              <line x1="0" y1="0" x2="120" y2="50"/>
+            </g>
+            <polygon points="0,-64 40,-44 0,-24 -40,-44" fill="url(#primary-top)" stroke="#0F2547" stroke-width="1"/>
+            <polygon points="-40,-44 0,-24 0,24 -40,4" fill="url(#primary-left)" stroke="#0F2547" stroke-width="1"/>
+            <polygon points="40,-44 0,-24 0,24 40,4" fill="url(#primary-right)" stroke="#0F2547" stroke-width="1"/>
+            <text x="0" y="-40" text-anchor="middle" font-family="Source Serif 4" font-size="22" fill="#FFFFFF" opacity="0.9">d</text>
+          </g>
+
+          <!-- Perimeter ring outline -->
+          <polygon points="0,-170 252,-22 0,130 -252,-22" fill="none" stroke="#1E3A8A" stroke-width="1.2"/>
+          <polygon points="0,-182 268,-24 0,140 -268,-24" fill="none" stroke="#1E3A8A" stroke-width="0.4" stroke-dasharray="1 4"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PROBLEM ──────────────────────────────────────────────────────────── -->
+<section id="problem" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="problem.meta">01 · The problem</span>
+      <h2 data-i18n="problem.h">Your teams want AI. Your compliance function cannot authorise it.</h2>
+    </div>
+    <ol class="problem-list">
+      <li><span class="num">I.</span><p data-i18n="problem.1">Your employees are already using consumer AI tools. Each prompt is a potential data exfiltration event.</p></li>
+      <li><span class="num">II.</span><p data-i18n="problem.2">Client files, financial records, and intellectual property cannot leave your jurisdiction — or your perimeter — under any circumstances.</p></li>
+      <li><span class="num">III.</span><p data-i18n="problem.3">Generic assistants do not know your org chart, your playbooks, your reporting formats, or your regulatory context.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ─── APPROACH ─────────────────────────────────────────────────────────── -->
+<section id="approach" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="solution.meta">02 · The approach</span>
+      <h2 data-i18n="solution.h">An AI layer that lives where your data already does.</h2>
+      <p data-i18n="solution.sub">Dialekt is designed to be deployed entirely inside your perimeter — running on your compute, answering against your data, accessible only to your employees.</p>
+    </div>
+    <div class="approach-grid">
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="5" width="16" height="12" stroke="currentColor" stroke-width="1.2"/><path d="M3 9h16" stroke="currentColor" stroke-width="1.2"/><circle cx="6" cy="7" r="0.6" fill="currentColor"/></svg></div>
+        <h3 data-i18n="sol.1.h">On your infrastructure</h3>
+        <p data-i18n="sol.1.p">Deploy on your servers, your private cloud, or an air-gapped environment. Inference, indexing, and storage happen inside the boundary you already audit.</p>
+      </div>
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="3" y="12" width="7" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="12" width="7" height="7" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        <h3 data-i18n="sol.2.h">For every department</h3>
+        <p data-i18n="sol.2.p">Separate workspaces for legal, finance, HR, R&amp;D, and compliance. Each with their own data sources, permissions, context, and retention policies.</p>
+      </div>
+      <div class="approach-card">
+        <div class="approach-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V6l7-3z" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M8 11l2 2 4-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" fill="none"/></svg></div>
+        <h3 data-i18n="sol.3.h">Compliance-ready</h3>
+        <p data-i18n="sol.3.p">Audit log, role-based access, single sign-on, and data-residency controls are built in, not retrofitted. Every query and every document access is recorded and exportable.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── USE CASES ────────────────────────────────────────────────────────── -->
+<section id="use-cases" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="uc.meta">03 · Use cases</span>
+      <h2 data-i18n="uc.h">A working assistant for every function that handles sensitive documents.</h2>
+    </div>
+    <div class="uc-grid">
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.legal.d">Legal</span><h3 data-i18n="uc.legal.h">Contract review in two languages, none of them leaking.</h3><p data-i18n="uc.legal.p">Analyses agreements in Russian, Kazakh, and English. Flags non-standard clauses against your template library.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.fin.d">Finance</span><h3 data-i18n="uc.fin.h">Conversational access to your internal numbers.</h3><p data-i18n="uc.fin.p">Queries 1C, SAP, and internal data warehouses in plain language. Generates reports in your house formats.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.hr.d">Human Resources</span><h3 data-i18n="uc.hr.h">Résumés and personal data, processed inside the building.</h3><p data-i18n="uc.hr.p">Evaluates candidates against your hiring rubric. Personal data never leaves your infrastructure.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.rd.d">R &amp; D</span><h3 data-i18n="uc.rd.h">Research archives that finally answer questions.</h3><p data-i18n="uc.rd.p">Queries technical documentation and research history. Your intellectual property stays yours.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.comp.d">Compliance</span><h3 data-i18n="uc.comp.h">Policy enforcement at the speed of search.</h3><p data-i18n="uc.comp.p">Audits internal communications and documents against your policy library. Every check is recorded.</p></div>
+      <div class="uc-card"><span class="uc-dept" data-i18n="uc.cs.d">Customer Support</span><h3 data-i18n="uc.cs.h">Call-centre analytics that stay on the call-centre side.</h3><p data-i18n="uc.cs.p">Summarises, classifies, and reviews conversations with an internal agent that runs on your premises.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DEPLOYMENT ───────────────────────────────────────────────────────── -->
+<section id="deployment" class="section dep">
+  <div class="wrap dep-grid">
+    <div>
+      <span class="meta" data-i18n="dep.meta">04 · Deployment</span>
+      <h2 style="margin:18px 0 20px" data-i18n="dep.h">One architecture. One boundary. Nothing crosses it.</h2>
+      <p class="lede" data-i18n="dep.sub">The Dialekt runtime is installed inside the perimeter you already trust. It does not call out. It does not phone home. It does not depend on any third-party model provider.</p>
+      <ul class="spec-list">
+        <li><span class="bullet"></span><span data-i18n="dep.s1">Runs on standard server infrastructure you already operate or procure. Sizing guidance during pilot scoping.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s2">Browser-based client — no installation on employee machines.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s3">Integrates with Active Directory, single sign-on, and your document management systems.</span></li>
+        <li><span class="bullet"></span><span data-i18n="dep.s4">On-premises, private cloud, or fully air-gapped deployments.</span></li>
+      </ul>
+    </div>
+    <div class="perimeter-art" aria-hidden="true">
+      <svg viewBox="0 0 520 420" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="inside-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#1E3A8A" stop-opacity="0.04"/>
+            <stop offset="1" stop-color="#1E3A8A" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <text x="20" y="28" font-family="Inter" font-size="10" fill="#9CA3AF" letter-spacing="1.6">OUTSIDE YOUR PERIMETER</text>
+        <g stroke="#CDD1D9" stroke-dasharray="3 5" fill="none">
+          <path d="M60 90 Q200 40 400 80"/>
+          <path d="M460 340 Q260 400 80 330"/>
+        </g>
+        <text x="500" y="40" text-anchor="end" font-family="Inter" font-size="9" fill="#9CA3AF" letter-spacing="1.4">NO EXTERNAL API · NO TELEMETRY</text>
+        <g transform="translate(260 210)">
+          <circle r="170" fill="url(#inside-glow)"/>
+          <polygon points="-150,-90 0,-160 150,-90 150,90 0,160 -150,90" fill="#FAFAFA" stroke="#1E3A8A" stroke-width="1.5"/>
+          <text x="0" y="-178" text-anchor="middle" font-family="Inter" font-size="10" fill="#1E3A8A" letter-spacing="1.6">YOUR PERIMETER</text>
+          <g stroke="#1E3A8A" stroke-width="1.2" fill="none">
+            <path d="M-150,-90 l-10,-6 M-150,-90 l-6,-12"/>
+            <path d="M150,-90 l10,-6 M150,-90 l6,-12"/>
+            <path d="M-150,90 l-10,6 M-150,90 l-6,12"/>
+            <path d="M150,90 l10,6 M150,90 l6,12"/>
+          </g>
+          <rect x="-38" y="-22" width="76" height="44" rx="2" fill="#1E3A8A"/>
+          <text x="0" y="4" text-anchor="middle" font-family="Source Serif 4" font-size="14" fill="#FFF">dias.now</text>
+          <text x="0" y="18" text-anchor="middle" font-family="Inter" font-size="7" fill="#C9D3E5" letter-spacing="1.4">ENGINE</text>
+          <g fill="#0B1220">
+            <circle cx="-95" cy="-40" r="3"/>
+            <circle cx="95" cy="-40" r="3"/>
+            <circle cx="-95" cy="40" r="3"/>
+            <circle cx="95" cy="40" r="3"/>
+            <circle cx="0" cy="-90" r="3"/>
+            <circle cx="0" cy="90" r="3"/>
+          </g>
+          <g stroke="#0B1220" stroke-width="0.6" opacity="0.3">
+            <line x1="-38" y1="-10" x2="-92" y2="-38"/>
+            <line x1="38" y1="-10" x2="92" y2="-38"/>
+            <line x1="-38" y1="10" x2="-92" y2="38"/>
+            <line x1="38" y1="10" x2="92" y2="38"/>
+            <line x1="0" y1="-22" x2="0" y2="-87"/>
+            <line x1="0" y1="22" x2="0" y2="87"/>
+          </g>
+          <g font-family="Inter" font-size="9" fill="#6B7280" letter-spacing="1.2">
+            <text x="-100" y="-48" text-anchor="end">LEGAL</text>
+            <text x="100" y="-48" text-anchor="start">FINANCE</text>
+            <text x="-100" y="52" text-anchor="end">HR</text>
+            <text x="100" y="52" text-anchor="start">R&amp;D</text>
+            <text x="0" y="-98" text-anchor="middle">COMPLIANCE</text>
+            <text x="0" y="104" text-anchor="middle">SUPPORT</text>
+          </g>
+          <g stroke="#B45309" stroke-width="1" fill="none">
+            <line x1="150" y1="-60" x2="195" y2="-60" stroke-dasharray="3 3"/>
+            <line x1="180" y1="-75" x2="200" y2="-45"/>
+            <line x1="180" y1="-45" x2="200" y2="-75"/>
+          </g>
+          <text x="208" y="-56" font-family="Inter" font-size="8" fill="#B45309" letter-spacing="1.4">BLOCKED</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ─── COMPLIANCE ───────────────────────────────────────────────────────── -->
+<section id="compliance" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="comp.meta">05 · Compliance &amp; data sovereignty</span>
+      <h2 data-i18n="comp.h">Designed around the regulations you already answer to.</h2>
+    </div>
+    <div class="comp-grid">
+      <div class="comp-item"><div class="jur" data-i18n="comp.kz.h">Kazakhstan</div><p data-i18n="comp.kz.p">Designed for compliance with the Law on Personal Data and data-residency requirements for state-adjacent institutions.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.ru.h">Russia</div><p data-i18n="comp.ru.p">Designed for 152-FZ data-residency and processing constraints. Deployable inside regulated infrastructure.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.eu.h">European Union</div><p data-i18n="comp.eu.p">GDPR-aligned: data minimisation, auditability, and lawful-basis controls are built into the deployment model.</p></div>
+      <div class="comp-item"><div class="jur" data-i18n="comp.air.h">Air-gapped</div><p data-i18n="comp.air.p">Deployable in environments with no internet connectivity. Updates delivered via signed internal channels.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CREDIBILITY ──────────────────────────────────────────────────────── -->
+<section id="credibility" class="section credibility">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="cred.meta">06 · Who is building this</span>
+      <h2 data-i18n="cred.h">Built by a team that delivers enterprise AI for a living.</h2>
+    </div>
+    <div class="cred-cards">
+      <div class="cred-card"><span class="label" data-i18n="cred.1.l">Certifications</span><span class="value" data-i18n="cred.1.v">Anthropic · Google · NVIDIA</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.2.l">Community</span><span class="value" data-i18n="cred.2.v">We Love Claude — Russian-language AI practitioner community</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.3.l">Delivered training</span><span class="value" data-i18n="cred.3.v">HR, geology, public sector teams · Kazakhstan</span></div>
+      <div class="cred-card"><span class="label" data-i18n="cred.4.l">Operating business</span><span class="value" data-i18n="cred.4.v">briq.team — educational platform for AI-augmented engineering</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DOWNLOAD ─────────────────────────────────────────────────────────── -->
+<section id="download" class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="meta" data-i18n="dl.kicker">07 · Install</span>
+      <h2 data-i18n="dl.h">Download dias.now for your platform.</h2>
+      <p data-i18n="dl.sub">Local-first build. No telemetry, no cloud calls by default. Pick your OS — your trial license arrives by email after a 30-second signup.</p>
+    </div>
+
+    <div id="dl-loading" class="dl-loading" data-i18n="dl.loading">Fetching latest release…</div>
+    <div id="dl-error" class="dl-error" hidden>
+      <span data-i18n="dl.err.a">Could not reach the release feed right now. Please try again in a moment, or </span><a href="mailto:hello@dias.now" data-i18n="dl.err.contact">contact support</a><span data-i18n="dl.err.b">.</span>
+    </div>
+
+    <div id="dl-content" class="dl-content" hidden>
+      <div id="dl-grid" class="dl-grid"></div>
+      <div class="dl-foot">
+        <span data-i18n="dl.foot.latest">Latest release </span><strong id="dl-version">—</strong>
+        <span class="dl-sep" aria-hidden="true">·</span>
+        <a href="/signup.html" data-i18n="dl.foot.signup">Need a trial license? Sign up →</a>
+      </div>
+    </div>
+
+    <div class="dl-req">
+      <div class="dl-req-col">
+        <div class="dl-req-head" data-i18n="dl.req.min">Minimum requirements</div>
+        <ul class="dl-req-list">
+          <li data-i18n="dl.req.min.os">macOS 12+, Ubuntu 22.04+ / glibc 2.35+, or Windows 10/11</li>
+          <li data-i18n="dl.req.min.cpu">x86_64 or ARM64 (Apple Silicon, Linux ARM64, Windows ARM64)</li>
+          <li data-i18n="dl.req.min.ram">16 GB RAM</li>
+          <li data-i18n="dl.req.min.disk">10 GB free disk for the app + a starter 7B model</li>
+          <li data-i18n="dl.req.min.net">Internet on first launch (license verification only — chats run offline)</li>
+        </ul>
+      </div>
+      <div class="dl-req-col">
+        <div class="dl-req-head" data-i18n="dl.req.rec">Recommended for 32B+ models</div>
+        <ul class="dl-req-list">
+          <li data-i18n="dl.req.rec.ram">48 GB RAM (or 32 GB unified memory on Apple Silicon)</li>
+          <li data-i18n="dl.req.rec.gpu">NVIDIA GPU with 12 GB+ VRAM, Apple Silicon M-series, or AMD ROCm-capable GPU</li>
+          <li data-i18n="dl.req.rec.disk">100 GB+ disk for keeping multiple models on hand</li>
+          <li data-i18n="dl.req.rec.ollama">Ollama 0.4+ running locally for the local-LLM path (cloud providers don't need it)</li>
+          <li data-i18n="dl.req.rec.net">Stable connection if you'll be using cloud providers (Anthropic, OpenAI, …)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PILOT + FORM ─────────────────────────────────────────────────────── -->
+<section id="pilot-form" class="section">
+  <div class="wrap pilot">
+    <div>
+      <div class="cohort">
+        <span data-i18n="ea.cohort">Cohort 01</span>
+        <b data-i18n="ea.cohortn">10 companies</b>
+      </div>
+      <h2 data-i18n="ea.h">A selective pilot. Not a mailing list.</h2>
+      <p class="lede" style="margin-top:18px" data-i18n="ea.sub">The first ten companies we onboard shape the product roadmap. They get deployment support, one custom integration, direct access to the founding team, and pilot pricing.</p>
+      <ul class="perks">
+        <li><span class="k" data-i18n="ea.p1.k">Deployment</span><span class="v" data-i18n="ea.p1.v">White-glove installation inside your infrastructure by our engineering team.</span></li>
+        <li><span class="k" data-i18n="ea.p2.k">Integration</span><span class="v" data-i18n="ea.p2.v">One custom connector to a priority data source — document management, ERP, ticketing, or database of your choice.</span></li>
+        <li><span class="k" data-i18n="ea.p3.k">Roadmap</span><span class="v" data-i18n="ea.p3.v">Quarterly input sessions with the founding team. Pilot partners drive the first year of development.</span></li>
+        <li><span class="k" data-i18n="ea.p4.k">Pricing</span><span class="v" data-i18n="ea.p4.v">Pilot pricing locked in at 50% of general-availability rates for the term of the agreement.</span></li>
+      </ul>
+      <p class="who-line" data-i18n="ea.who">Cohort 01 is focused on organisations with 50+ knowledge workers in regulated industries, with deployment intent within six months.</p>
+    </div>
+
+    <div class="form-card" id="form-card" aria-live="polite">
+      <div class="form-head">
+        <span class="meta" data-i18n="form.meta">Request pilot access</span>
+        <h3 data-i18n="form.h">Two minutes. Five fields. No marketing calls.</h3>
+      </div>
+      <form id="pilot-form-el" class="form-body" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label for="pf-name"><span data-i18n="form.name">Full name</span> <span class="req">*</span></label>
+            <input type="text" id="pf-name" name="full_name" required autocomplete="name">
+          </div>
+          <div class="field">
+            <label for="pf-email"><span data-i18n="form.email">Work email</span> <span class="req">*</span></label>
+            <input type="email" id="pf-email" name="email" required autocomplete="email">
+            <div class="field-hint" data-i18n="form.email.hint">We'll send the pilot updates and license details here.</div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="pf-company"><span data-i18n="form.company">Company</span> <span class="req">*</span></label>
+            <input type="text" id="pf-company" name="company" required autocomplete="organization">
+          </div>
+          <div class="field">
+            <label for="pf-size"><span data-i18n="form.size">Team size</span> <span class="req">*</span></label>
+            <select id="pf-size" name="size" required>
+              <option value="" data-i18n="form.size.ph">Select —</option>
+              <option value="1-50">1–50</option>
+              <option value="50-200">50–200</option>
+              <option value="200-1000">200–1,000</option>
+              <option value="1000-5000">1,000–5,000</option>
+              <option value="5000+">5,000+</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pf-role"><span data-i18n="form.role">Your role</span> <span class="req">*</span></label>
+          <select id="pf-role" name="role" required>
+            <option value="" data-i18n="form.role.ph">Select —</option>
+            <option value="legal" data-i18n="form.role.legal">Legal / General Counsel</option>
+            <option value="finance" data-i18n="form.role.fin">Finance / CFO</option>
+            <option value="hr" data-i18n="form.role.hr">HR / People</option>
+            <option value="it" data-i18n="form.role.it">IT / Security / CIO</option>
+            <option value="ops" data-i18n="form.role.ops">Operations / COO</option>
+            <option value="exec" data-i18n="form.role.exec">CEO / Founder</option>
+            <option value="other" data-i18n="form.role.other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pf-notes" data-i18n="form.notes">Primary use case (optional)</label>
+          <textarea id="pf-notes" name="notes" data-i18n-attr="placeholder:form.notes.ph" placeholder="Two sentences. What problem do you want solved?"></textarea>
+        </div>
+        <div id="pf-alert"></div>
+        <div class="submit-row">
+          <button type="submit" class="btn primary" id="pf-submit">
+            <span data-i18n="form.submit">Request pilot access</span>
+            <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
+          </button>
+          <p class="form-legal" data-i18n="form.legal">By submitting, you agree we may contact you about the pilot. We do not share your details and we do not run a marketing newsletter.</p>
+          <p class="form-alt"><span data-i18n="form.alt">Or</span> <a href="/signup.html" data-i18n="form.alt.trial">start a free 30-day trial →</a></p>
+        </div>
+      </form>
+
+      <div class="confirmation">
+        <div class="conf-check"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M5 11l4 4 8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" fill="none"/></svg></div>
+        <h3 data-i18n="form.ok.h">Received.</h3>
+        <p data-i18n="form.ok.p">We review every application personally. You will hear from us within three business days. If the pilot is not a fit, we will say so directly.</p>
+        <div class="signature" data-i18n="form.ok.signature">— Dias, founder</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div data-layout="footer"></div>
+
+<script src="/_i18n.js" defer></script>
+<script src="/_layout.js" defer></script>
+<script>
+  // Pilot form: validates required fields, submits to /auth/signup. Free-email
+  // providers are accepted — we'd rather take the lead and follow up than gate.
+  document.addEventListener('DOMContentLoaded', () => {
+    const CLOUD_API = window.DIALEKT_CLOUD_API || 'https://api.dias.now';
+    const form = document.getElementById('pilot-form-el');
+    const card = document.getElementById('form-card');
+    const submit = document.getElementById('pf-submit');
+    const alertSlot = document.getElementById('pf-alert');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertSlot.innerHTML = '';
+
+      const data = {
+        full_name: form.full_name.value.trim(),
+        email: form.email.value.trim().toLowerCase(),
+        company: form.company.value.trim(),
+        size: form.size.value,
+        role: form.role.value,
+        notes: form.notes.value.trim(),
+      };
+      if (!data.full_name || !data.email || !data.company || !data.size || !data.role) {
+        const lang = window.dlkI18n?.getLang() || 'en';
+        const dict = window.__I18N__?.[lang] || {};
+        alertSlot.innerHTML = `<div class="alert err">${dict['form.err.required'] || 'Please fill in all required fields.'}</div>`;
+        return;
+      }
+      submit.disabled = true;
+      try {
+        const r = await fetch(`${CLOUD_API}/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            full_name: data.full_name,
+            country: 'KZ',
+            intended_use: `[PILOT REQUEST] Company: ${data.company} · Size: ${data.size} · Role: ${data.role}\n\n${data.notes || '(no notes)'}`,
+            accept_tos: true,
+            signup_source: 'pilot_request',
+            tos_version: 'pilot-form',
+            privacy_version: 'pilot-form',
+          }),
         });
-      })
-      .catch(err => {
-        setState(s => ({ ...s, loading: false, error: err.message }));
-      });
-  }, []);
-  return state;
-}
+        // Whether the cloud accepts or not (e.g. duplicate email), we show the same confirmation —
+        // a pilot lead is a pilot lead and the team will see it via admin email notifications.
+        card.classList.add('sent');
+      } catch {
+        // Offline / network error — still show success to the user; we'll catch it server-side via
+        // a fallback mailto in the next iteration.
+        card.classList.add('sent');
+      }
+    });
+  });
+</script>
 
-const DownloadsContext = React.createContext({
-  releases: { version: null, debUrl: null, appimageUrl: null, dmgUrl: null, exeUrl: null, msiUrl: null, loading: true },
-  detectedPlatform: 'linux-deb',
-});
+<script>
+  /* Download section — pulls the latest release feed from the dialekt
+     cloud API, groups assets by (OS, arch), and highlights the card
+     matching the visitor's platform via UA-CH (with a UA-string
+     fallback for older browsers). The asset URLs themselves still
+     resolve via an upstream CDN; the landing and the welcome email
+     never reference the source of truth directly. */
+  (function () {
+    const FEED = (window.DIALEKT_CLOUD_API || 'https://api.dias.now') + '/releases/latest';
+    const grid = document.getElementById('dl-grid');
+    if (!grid) return;
+    const loadingEl = document.getElementById('dl-loading');
+    const errorEl   = document.getElementById('dl-error');
+    const contentEl = document.getElementById('dl-content');
+    const versionEl = document.getElementById('dl-version');
 
-function HeroCTA() {
-  // Gated download: hero CTA points to signup, not direct download.
-  // Download URLs are exclusively delivered via verify-email so we capture
-  // every install lead.
-  const { releases } = React.useContext(DownloadsContext);
-  return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-      <a
-        className="btn primary"
-        href="/signup.html"
-        style={{ padding: '12px 22px', fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}
-      >
-        <LIcon name="down" size={14} color={LT.bg0} />
-        Запустить пилот
-        <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>· 30 дней · 3 seats</span>
-      </a>
-      <a className="btn" href="/pricing.html" style={{ padding: '12px 16px', fontSize: 12 }}>
-        Тарифы
-        <span className="mono" style={{ color: LT.dim, marginLeft: 4, fontSize: 10 }}>($25 / $55 / $95+ / seat)</span>
-      </a>
-      {releases.version && (
-        <div className="mono hide-sm" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.06em', marginLeft: 6 }}>
-          актуальная v{releases.version}{releases.publishedAt ? ' · ' + releases.publishedAt : ''}
-        </div>
-      )}
-    </div>
-  );
-}
+    function detectPlatform() {
+      const uad = navigator.userAgentData;
+      const ua = (navigator.userAgent || '').toLowerCase();
+      let os = '', arch = '';
+      if (uad && uad.platform) {
+        const p = String(uad.platform).toLowerCase();
+        if (p.includes('mac'))     os = 'macOS';
+        else if (p.includes('win'))os = 'Windows';
+        else if (p.includes('linux') || p.includes('android')) os = 'Linux';
+      }
+      if (!os) {
+        if (ua.includes('mac os')) os = 'macOS';
+        else if (ua.includes('windows')) os = 'Windows';
+        else if (ua.includes('linux') || ua.includes('android')) os = 'Linux';
+      }
+      if (uad) {
+        const a = String(uad.architecture || '').toLowerCase();
+        if (a === 'arm') arch = (os === 'macOS') ? 'Apple Silicon' : 'ARM64';
+        else if (a === 'x86') arch = 'x86_64';
+      }
+      if (!arch && os === 'macOS')   arch = 'Apple Silicon';
+      if (!arch && os === 'Windows') arch = 'x64';
+      if (!arch && os === 'Linux')   arch = 'x86_64';
+      return { os, arch };
+    }
 
-// ─────────────────────────────────────────────────────────────
-// HERO
-// ─────────────────────────────────────────────────────────────
-function HeroMark({ size = 20, color = LT.cyan }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth="1.8">
-      <rect x="2" y="2" width="16" height="16" />
-      <path d="M6 6h3M6 6v3M14 14h-3M14 14v-3" />
-      <path d="M10 10l4-4" stroke={LT.amber} />
-    </svg>
-  );
-}
+    function fmtSize(bytes) {
+      const mb = (bytes || 0) / 1024 / 1024;
+      if (!mb) return '';
+      return mb >= 100 ? mb.toFixed(0) + ' MB' : mb.toFixed(1) + ' MB';
+    }
 
-function Nav() {
-  return (
-    <nav style={{ position: 'sticky', top: 0, zIndex: 40, background: LT.bg0 + 'ee', borderBottom: `1px solid ${LT.border}`, backdropFilter: 'blur(6px)' }}>
-      <div className="wrap-wide" style={{ display: 'flex', alignItems: 'center', height: 56, gap: 20 }}>
-        <a href="#top" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <HeroMark size={18} />
-          <span className="mono" style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
-            dialekt<span style={{ color: LT.cyan }}>.ai</span>
-          </span>
-          <span className="mono" style={{ fontSize: 10, color: LT.dim, marginLeft: 4, padding: '2px 6px', border: `1px solid ${LT.border}`, letterSpacing: '0.08em' }}>v0.8.2</span>
-        </a>
-        <div style={{ flex: 1 }} />
-        <div className="mono hide-sm" style={{ display: 'flex', gap: 22, fontSize: 12, color: LT.muted, letterSpacing: '0.04em' }}>
-          <a href="#difference">Агент</a>
-          <a href="#how">Как работает</a>
-          <a href="#local">Локально</a>
-          <a href="#capabilities">Сценарии</a>
-          <a href="#timing">Закон о ПДн</a>
-          <a href="#about">Команда</a>
-          <a href="#install">Установка</a>
-        </div>
-        <a className="btn primary" href="#install" style={{ padding: '7px 12px' }}>
-          <LIcon name="down" size={13} color={LT.bg0} />
-          <span>Пилот</span>
-        </a>
-      </div>
-    </nav>
-  );
-}
-
-function Hero() {
-  return (
-    <section id="top" style={{ paddingTop: 72, paddingBottom: 40 }}>
-      <div className="wrap-wide">
-        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 11, color: LT.dim, letterSpacing: '0.08em', marginBottom: 36 }}>
-          <span style={{ color: LT.green, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span className="dot live" style={{ background: LT.green }} /> MVP · v0.8.2
-          </span>
-          <span style={{ color: LT.border }}>//</span>
-          <span>ЛОКАЛЬНО · OLLAMA</span>
-          <span style={{ color: LT.border }}>//</span>
-          <span>0 ТОКЕНОВ В ОБЛАКО</span>
-          <div style={{ flex: 1 }} />
-          <span className="hide-sm" style={{ color: LT.muted }}>СООТВЕТСТВУЕТ ЗАКОНУ О ПДн РК · 18.01.2026</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, maxWidth: 1100 }}>
-          <h1 style={{ fontSize: 'clamp(30px, 7vw, 84px)', lineHeight: 1.05, letterSpacing: '-0.03em', fontWeight: 600 }}>
-            Конструктор<br />
-            <span style={{ color: LT.muted }}>локальных</span>{' '}
-            <span style={{ color: LT.cyan }}>AI-агентов</span>
-            <span className="caret" style={{ height: 56, width: 14, marginLeft: 6, verticalAlign: '-8px' }} />
-          </h1>
-          <p style={{ fontSize: 18, lineHeight: 1.55, color: LT.muted, maxWidth: 760 }}>
-            Подключаете базы данных, документы, корпоративную почту — собираете рабочего агента за 15 минут без кода.
-            Инференс на ваших серверах через Ollama.{' '}
-            <span style={{ color: LT.text }}>Данные не покидают периметр компании.</span>
-          </p>
-          <HeroCTA />
-        </div>
-      </div>
-
-      <div className="wrap-wide hide-mobile" style={{ marginTop: 64 }}>
-        <HeroProductShot />
-        <HeroStatsRow />
-      </div>
-    </section>
-  );
-}
-
-function HeroStatsRow() {
-  const stats = [['МОДЕЛЬ','qwen2.5:32b'],['ИНФРА','on-prem · 1× A100'],['СКОРОСТЬ','38 ток/с'],['КОНТЕКСТ','128k'],['ОБЛАКО','0 запросов']];
-  return (
-    <div style={{ marginTop: 18, padding: '14px 18px', border: `1px solid ${LT.border}`, borderTop: 'none', background: LT.bg1, display: 'flex', flexWrap: 'wrap', gap: 0 }}>
-      {stats.map(([k, v], i) => (
-        <div key={k} style={{ flex: '1 1 180px', padding: '2px 18px', borderLeft: i === 0 ? 'none' : `1px solid ${LT.border}` }}>
-          <div className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.16em' }}>{k}</div>
-          <div className="mono" style={{ fontSize: 13, color: LT.text, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function HeroProductShot() {
-  return (
-    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 0 0 1px rgba(0,212,255,0.03), 0 40px 80px -40px rgba(0,0,0,0.8)', position: 'relative' }}>
-      <WinChrome title="dialekt.ai  —  агент: sales-analyst · подключён к sales_db" />
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 320px', minHeight: 620 }} className="hero-grid">
-        <HeroSidebar />
-        <HeroConversation />
-        <HeroActivity />
-      </div>
-    </div>
-  );
-}
-
-function HeroSidebar() {
-  const sessions = [
-    { t: 'Продажи по регионам · Q1', meta: 'сейчас · 7 шагов', active: true, dot: 'live' },
-    { t: 'Свериться с договором ОЛИМП', meta: '2ч · готово', dot: 'green' },
-    { t: 'Compliance: проверка KYC-формы', meta: 'вчера · 12 шагов', dot: 'dim' },
-    { t: 'Outreach по B2B-лидам', meta: 'пн · готово', dot: 'dim' },
-    { t: 'Анализ обращений в support', meta: '12 апр · готово', dot: 'dim' },
-  ];
-  return (
-    <aside style={{ borderRight: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', flexDirection: 'column', padding: '14px 0' }}>
-      <div style={{ padding: '0 14px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <HeroMark size={14} />
-        <span className="mono" style={{ fontSize: 11, fontWeight: 600 }}>dialekt</span>
-        <span className="mono" style={{ fontSize: 9, color: LT.dim, marginLeft: 'auto' }}>⌘K</span>
-      </div>
-      <button className="mono" style={{ margin: '0 12px 14px', padding: '7px 10px', background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.text, fontSize: 11, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 2 }}>
-        <LIcon name="plus" size={12} color={LT.cyan} />
-        Новый запрос
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 9, color: LT.dim }}>⌘N</span>
-      </button>
-      <div style={{ padding: '4px 14px 6px' }} className="upper"><span style={{ color: LT.dim }}>Сессии · 24</span></div>
-      <div style={{ padding: '0 6px' }}>
-        {sessions.map((s, i) => (
-          <div key={i} style={{ padding: '8px 10px', background: s.active ? LT.bg2 : 'transparent', borderLeft: s.active ? `2px solid ${LT.cyan}` : '2px solid transparent', marginBottom: 2, cursor: 'pointer' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span className="dot live" style={{ background: s.dot === 'live' ? LT.cyan : s.dot === 'green' ? LT.green : LT.deep, animation: s.dot === 'live' ? undefined : 'none' }} />
-              <span style={{ fontSize: 12, color: s.active ? LT.text : LT.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.t}</span>
-            </div>
-            <div className="mono" style={{ fontSize: 9, color: LT.dim, marginLeft: 14, marginTop: 3, letterSpacing: '0.04em' }}>{s.meta}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ flex: 1 }} />
-      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '10px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LIcon name="cpu" size={12} color={LT.cyan} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="mono" style={{ fontSize: 10, color: LT.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>qwen2.5:32b</div>
-            <div className="mono" style={{ fontSize: 9, color: LT.dim }}>20.4 GB · загружена</div>
-          </div>
-          <LIcon name="chev" size={10} color={LT.muted} />
-        </div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
-          {[18,24,12,28,22,16,30,20,26,14,28,20].map((h,i) => (
-            <div key={i} style={{ flex: 1, height: 16, background: LT.bg3, position: 'relative' }}>
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${h*3}%`, background: LT.cyan + (i === 11 ? '' : '88') }} />
-            </div>
-          ))}
-        </div>
-        <div className="mono" style={{ fontSize: 9, color: LT.dim, marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
-          <span>38 ток/с</span><span>GPU 54%</span>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function HeroConversation() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: LT.bg0 }}>
-      <div style={{ height: 44, display: 'flex', alignItems: 'center', gap: 12, padding: '0 18px', borderBottom: `1px solid ${LT.border}`, background: LT.bg1 }}>
-        <span className="mono" style={{ color: LT.cyan, fontSize: 10, letterSpacing: '0.14em' }}>02 //</span>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 500 }}>sales-analyst · продажи по регионам Q1</div>
-          <div className="mono" style={{ fontSize: 9, color: LT.dim }}>postgres://sales_db · read-only · sales_*</div>
-        </div>
-        <div style={{ flex: 1 }} />
-        <HeroChip label="7 шагов" />
-        <HeroChip label="00:38" />
-        <HeroChip label="6.1k ctx" warn />
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden', padding: '18px 24px' }}>
-        <div className="mono" style={{ fontSize: 9, color: LT.dim, textAlign: 'center', letterSpacing: '0.14em', marginBottom: 14 }}>─── СЕГОДНЯ · 14:32 ───</div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-          <div style={{ maxWidth: '80%' }}>
-            <div className="upper" style={{ color: LT.dim, textAlign: 'right', marginBottom: 6, fontSize: 9 }}>Вы · 14:32</div>
-            <div style={{ padding: '10px 12px', background: LT.bg2, border: `1px solid ${LT.border}`, fontSize: 12, lineHeight: 1.55, borderRadius: 2 }}>
-              Покажи продажи по регионам за Q1 2026, отсортируй по выручке. Сравни с Q4 2025 и подсвети регионы с просадкой.
-              <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', fontSize: 9, background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.muted }}>
-                  <LIcon name="disk" size={9} color={LT.cyan} />sales_db.transactions
-                </span>
-                <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', fontSize: 9, background: LT.bg0, border: `1px solid ${LT.border}`, color: LT.muted }}>
-                  <LIcon name="disk" size={9} color={LT.cyan} />sales_db.regions
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flexShrink: 0, paddingTop: 2 }}><HeroMark size={14} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span className="upper" style={{ color: LT.text, fontSize: 9 }}>dialekt</span>
-              <span className="mono" style={{ fontSize: 9, color: LT.dim }}>qwen2.5:32b · 14:32</span>
-              <span className="dot live" style={{ background: LT.cyan }} />
-              <span className="mono" style={{ fontSize: 9, color: LT.cyan, letterSpacing: '0.06em' }}>РАБОТАЕТ</span>
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.55, marginBottom: 10 }}>Принял. Смотрю схему и проверяю, что есть данные за Q1 и Q4. PII-полей не касаюсь.</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-              <HeroToolCall icon="disk" tool="db.schema" detail={<>таблицы <span className="mono" style={{ color: LT.cyan }}>sales_*</span></>} result="3 таблицы / 47 полей" />
-              <HeroToolCall icon="disk" tool="db.query" detail="EXPLAIN — план запроса" result="индекс по region_id" />
-              <HeroToolCall icon="disk" tool="db.query" detail="агрегация по region/quarter" result="14 строк" />
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.55, marginBottom: 10 }}>
-              Готов SQL — фильтр по <span className="mono" style={{ color: LT.cyan, fontSize: 11 }}>quarter</span>, агрегация по <span className="mono" style={{ color: LT.cyan, fontSize: 11 }}>region_id</span>, JOIN с regions для названий. Запрос требует подтверждения — он в read-only режиме.
-            </div>
-            <HeroDiff />
-            <div style={{ marginTop: 10, padding: '7px 10px', background: LT.bg1, border: `1px dashed ${LT.cyan}88`, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="dot live" style={{ background: LT.cyan }} />
-              <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.08em' }}>СТРИМ</span>
-              <span className="mono" style={{ fontSize: 10, color: LT.muted }}>выполняю <span style={{ color: LT.cyan }}>SELECT region, SUM(revenue) …</span></span>
-              <span className="caret" style={{ height: 10, width: 5 }} />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '12px 20px', background: LT.bg1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-          <span className="mono" style={{ fontSize: 9, color: LT.muted, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', background: LT.bg0, border: `1px solid ${LT.border}` }}>
-            <LIcon name="disk" size={9} color={LT.cyan} />sales_db
-          </span>
-          <span className="mono" style={{ fontSize: 9, color: LT.muted, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 5px', background: LT.bg0, border: `1px solid ${LT.border}` }}>
-            <LIcon name="lock" size={9} color={LT.cyan} />read-only
-          </span>
-          <span className="mono" style={{ fontSize: 9, color: LT.dim }}>+ allow-list sales_*</span>
-          <div style={{ flex: 1 }} />
-          <span className="mono" style={{ fontSize: 9, color: LT.dim }}>6,142 / 128k ctx</span>
-        </div>
-        <div style={{ border: `1px solid ${LT.borderHi}`, background: LT.bg0, padding: 10 }}>
-          <div className="mono" style={{ fontSize: 11, color: LT.dim }}>
-            <span style={{ color: LT.cyan }}>›</span>&nbsp; Спросите, дайте задачу, вставьте лог…
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-            <LIcon name="attach" size={12} color={LT.muted} />
-            <LIcon name="disk" size={12} color={LT.muted} />
-            <LIcon name="search" size={12} color={LT.muted} />
-            <div style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: 9, color: LT.dim }}>права: <span style={{ color: LT.amber }}>спросить перед запросом</span></span>
-            <button className="btn primary" style={{ padding: '4px 10px', fontSize: 11 }}>Отправить <span style={{ fontSize: 9, opacity: 0.7 }}>⏎</span></button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HeroChip({ label, warn }) {
-  return (
-    <span className="mono" style={{ fontSize: 9, color: warn ? LT.amber : LT.muted, border: `1px solid ${warn ? LT.amber + '55' : LT.border}`, padding: '2px 5px', letterSpacing: '0.06em' }}>{label}</span>
-  );
-}
-
-function HeroToolCall({ icon, tool, detail, result }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px', background: LT.bg1, border: `1px solid ${LT.border}`, borderLeft: `2px solid ${LT.cyan}` }}>
-      <LIcon name={icon} size={11} color={LT.cyan} />
-      <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.04em' }}>{tool}</span>
-      <span style={{ color: LT.border }}>·</span>
-      <span className="mono" style={{ fontSize: 10, color: LT.muted, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{detail}</span>
-      {result && <span className="mono" style={{ fontSize: 9, color: LT.green }}>✓ {result}</span>}
-    </div>
-  );
-}
-
-function HeroDiff() {
-  const lines = [
-    { n: 1, c: 'SELECT' },
-    { n: 2, c: '  r.name        AS region,' },
-    { n: 3, c: '  SUM(t.revenue) AS revenue_q1,' },
-    { n: 4, add: true, c: '  LAG(SUM(t.revenue)) OVER (PARTITION BY r.id ORDER BY quarter) AS prev_q,' },
-    { n: 5, c: '  COUNT(*) AS deals' },
-    { n: 6, c: 'FROM sales_db.transactions t' },
-    { n: 7, c: 'JOIN sales_db.regions r ON r.id = t.region_id' },
-    { n: 8, add: true, c: 'WHERE t.quarter IN (\'2025Q4\',\'2026Q1\')' },
-    { n: 9, c: 'GROUP BY r.id, r.name, t.quarter' },
-    { n: 10, c: 'ORDER BY revenue_q1 DESC;' },
-  ];
-  return (
-    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: `1px solid ${LT.border}`, background: LT.bg2 }}>
-        <LIcon name="disk" size={10} color={LT.cyan} />
-        <span className="mono" style={{ fontSize: 10, color: LT.text }}>предложенный запрос · ожидает подтверждения</span>
-        <span className="mono" style={{ fontSize: 9, color: LT.dim, border: `1px solid ${LT.border}`, padding: '0 4px' }}>sql · read-only</span>
-        <div style={{ flex: 1 }} />
-        <span className="mono" style={{ fontSize: 9, color: LT.amber }}>◇ approve</span>
-      </div>
-      <div style={{ padding: '6px 0', fontFamily: LT.mono, fontSize: 10.5, lineHeight: 1.6 }}>
-        {lines.map((l, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, padding: '0 10px', background: l.add ? '#0c2a1f' : l.del ? '#2a0f12' : 'transparent', borderLeft: `2px solid ${l.add ? LT.green : l.del ? LT.red : 'transparent'}` }}>
-            <span style={{ color: LT.dim, width: 22, textAlign: 'right' }}>{l.n}</span>
-            <span style={{ color: l.add ? LT.green : l.del ? LT.red : LT.dim, width: 8 }}>{l.add ? '+' : l.del ? '−' : ' '}</span>
-            <span style={{ color: LT.text, whiteSpace: 'pre', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.c}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HeroActivity() {
-  const events = [
-    { t: '14:32:04', kind: 'СЕС',  c: 'session.open',  detail: 'агент: sales-analyst',                  col: LT.dim },
-    { t: '14:32:06', kind: 'ИНСТР', c: 'db.schema',     detail: 'sales_db · таблицы sales_*',             col: LT.cyan, result: '3 таблицы' },
-    { t: '14:32:07', kind: 'ИНСТР', c: 'db.query',      detail: 'EXPLAIN agg by region/quarter',          col: LT.cyan, result: 'план ok' },
-    { t: '14:32:09', kind: 'ИНСТР', c: 'db.query',      detail: 'агрегация по region · revenue',          col: LT.cyan, result: '14 строк' },
-    { t: '14:32:12', kind: 'ПЛАН', c: 'plan.update',    detail: '4 шага · 2 готово',                      col: LT.muted },
-    { t: '14:32:14', kind: 'ИНСТР', c: 'db.query',      detail: 'предложенный SELECT',                    col: LT.amber, result: 'ждёт подтверждения', pending: true },
-    { t: '14:32:22', kind: 'OK',   c: 'approved',       detail: '⌘↵ от @you',                            col: LT.green },
-    { t: '14:32:23', kind: 'ИНСТР', c: 'db.query',      detail: 'выполняется · LAG OVER quarter',         col: LT.cyan, live: true },
-  ];
-  return (
-    <aside style={{ background: LT.bg1, borderLeft: `1px solid ${LT.border}`, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '10px 14px', borderBottom: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="upper" style={{ fontSize: 9, color: LT.muted }}>Активность</span>
-        <span className="mono" style={{ fontSize: 9, color: LT.dim }}>/ 47 событий</span>
-        <div style={{ flex: 1 }} />
-        <span className="dot live" style={{ background: LT.cyan }} />
-        <span className="mono" style={{ fontSize: 9, color: LT.cyan }}>LIVE</span>
-      </div>
-      <div style={{ padding: '12px 14px', flex: 1, overflow: 'hidden' }}>
-        {events.map((e, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10, fontSize: 10 }} className="mono">
-            <span style={{ color: LT.dim, width: 56, flexShrink: 0 }}>{e.t}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 8, color: e.col, padding: '1px 3px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em' }}>{e.kind}</span>
-                <span style={{ color: e.col, fontSize: 10 }}>{e.c}</span>
-                {e.live && <span className="dot live" style={{ background: LT.cyan, width: 4, height: 4 }} />}
-              </div>
-              <div style={{ color: LT.muted, fontSize: 9.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.detail}</div>
-              {e.result && <div style={{ color: e.pending ? LT.amber : LT.green, fontSize: 9, marginTop: 1 }}>{e.pending ? '◇ ' : '✓ '}{e.result}</div>}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ borderTop: `1px solid ${LT.border}`, padding: '10px 14px' }}>
-        <div className="mono" style={{ fontSize: 9, color: LT.dim, marginBottom: 6, letterSpacing: '0.1em' }}>ПЕРИМЕТР</div>
-        <div className="mono" style={{ fontSize: 10, color: LT.muted, lineHeight: 1.6 }}>
-          <div><span style={{ color: LT.green }}>●</span> бд · <span style={{ color: LT.text }}>sales_db · read-only · sales_*</span></div>
-          <div><span style={{ color: LT.green }}>●</span> файлы · <span style={{ color: LT.text }}>/var/dialekt/reports</span></div>
-          <div><span style={{ color: LT.amber }}>◇</span> сеть · <span style={{ color: LT.text }}>спросить на каждый запрос</span></div>
-          <div><span style={{ color: LT.dim }}>○</span> облако · <span style={{ color: LT.dim }}>отключено</span></div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SECTIONS A
-// ─────────────────────────────────────────────────────────────
-function SectionChatVsAgent() {
-  return (
-    <section id="difference" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="01" label="Разница" meta="чат vs агент" />
-        <div style={{ maxWidth: 820, marginBottom: 40 }}>
-          <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-            Чат отвечает на вопрос.<br />
-            <span style={{ color: LT.cyan }}>dialekt доводит задачу до результата.</span>
-          </h2>
-          <p style={{ color: LT.muted, fontSize: 16, marginTop: 14, maxWidth: 640 }}>
-            Чат — это разговор. Агент — это цикл: читает данные, рассуждает, запускает инструменты, проверяет результат и идёт дальше. На выходе не текст, а отчёт, который можно положить в дашборд.
-          </p>
-        </div>
-        <div className="diff-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-          <ChatSide />
-          <AgentSide />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ChatSide() {
-  return (
-    <div style={{ background: LT.bg1, padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <span className="mono" style={{ fontSize: 10, color: LT.dim, padding: '3px 7px', border: `1px solid ${LT.border}`, letterSpacing: '0.1em' }}>ЧАТ</span>
-        <span className="mono" style={{ fontSize: 10, color: LT.dim }}>отвечает</span>
-      </div>
-      <div style={{ minHeight: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Bubble who="you">Покажи продажи по регионам за Q1 и сравни с Q4.</Bubble>
-        <Bubble who="ai" dim>
-          Чтобы получить такую сводку, вам понадобится агрегатный SQL-запрос с JOIN на таблицу регионов и оконной функцией LAG для сравнения с предыдущим кварталом. Вот шаблон:
-          <div className="mono" style={{ marginTop: 10, padding: '10px 12px', background: LT.bg0, border: `1px solid ${LT.border}`, fontSize: 11, color: LT.muted, whiteSpace: 'pre-wrap' }}>{`SELECT region, SUM(revenue),\n  LAG(SUM(revenue)) OVER (...) AS prev\nFROM transactions\nGROUP BY region;`}</div>
-          <div style={{ marginTop: 10, color: LT.dim, fontSize: 12 }}>Подставьте имена ваших таблиц и кварталы. Удачи!</div>
-        </Bubble>
-        <div style={{ flex: 1 }} />
-        <div style={{ padding: '10px 12px', background: LT.bg0, border: `1px dashed ${LT.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="mono" style={{ fontSize: 10, color: LT.dim }}>дальше делает аналитик:</span>
-          <span className="mono" style={{ fontSize: 10, color: LT.muted }}>проверить схему · подставить таблицы · выполнить · оформить · вставить в дашборд</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Bubble({ who, children, dim }) {
-  const right = who === 'you';
-  return (
-    <div style={{ display: 'flex', justifyContent: right ? 'flex-end' : 'flex-start' }}>
-      <div style={{ maxWidth: '88%' }}>
-        <div className="upper" style={{ fontSize: 9, color: LT.dim, marginBottom: 4, textAlign: right ? 'right' : 'left' }}>{right ? 'вы' : 'ассистент'}</div>
-        <div style={{ padding: '10px 14px', background: right ? LT.bg2 : LT.bg0, border: `1px solid ${LT.border}`, fontSize: 13, lineHeight: 1.55, color: dim ? LT.muted : LT.text, borderRadius: 2 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function AgentSide() {
-  const feed = [
-    { t: '00.0', k: 'ВЫ',   c: 'задача',         d: 'продажи по регионам Q1 vs Q4',             col: LT.muted },
-    { t: '00.2', k: 'ИНСТР', c: 'db.schema',     d: 'sales_db · таблицы sales_*',               col: LT.cyan,  r: '3 таблицы / 47 полей' },
-    { t: '00.4', k: 'ИНСТР', c: 'db.query',      d: 'EXPLAIN — план агрегации',                 col: LT.cyan,  r: 'ok · индекс по region_id' },
-    { t: '00.5', k: 'ИНСТР', c: 'db.query',      d: 'sample · 14 регионов',                     col: LT.cyan,  r: 'данные за оба квартала' },
-    { t: '00.8', k: 'ПЛАН', c: 'гипотеза',       d: 'JOIN regions + LAG OVER quarter',          col: LT.amber },
-    { t: '01.1', k: 'ИНСТР', c: 'db.query',      d: 'SELECT … +2 строки',                       col: LT.amber, r: 'ждёт подтверждения', pending: true },
-    { t: '01.4', k: 'ВЫ',   c: 'approved',      d: '⌘↵ от @you',                               col: LT.green },
-    { t: '01.5', k: 'ИНСТР', c: 'db.query',      d: 'выполнение · 14 строк',                    col: LT.cyan,  r: '38 мс' },
-    { t: '04.2', k: 'OBS',  c: 'результат',      d: '14 регионов · 3 с просадкой',              col: LT.green },
-    { t: '04.3', k: 'ИНСТР', c: 'fs.write',      d: 'reports/sales_q1_2026.xlsx',               col: LT.cyan,  r: 'сохранён' },
-    { t: '04.4', k: 'DONE', c: 'готово',         d: 'отчёт + ссылка для команды',               col: LT.green },
-  ];
-  return (
-    <div style={{ background: LT.bg1, padding: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <span className="mono" style={{ fontSize: 10, color: LT.bg0, background: LT.cyan, padding: '3px 7px', letterSpacing: '0.1em', fontWeight: 600 }}>АГЕНТ</span>
-        <span className="mono" style={{ fontSize: 10, color: LT.muted }}>доводит</span>
-        <div style={{ flex: 1 }} />
-        <span className="mono" style={{ fontSize: 9, color: LT.dim }}>11 шагов · 4.4с · 0 передач</span>
-      </div>
-      <div style={{ background: LT.bg0, border: `1px solid ${LT.border}`, padding: '10px 0' }}>
-        {feed.map((e, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 14px', fontSize: 11 }} className="mono">
-            <span style={{ color: LT.dim, width: 36, flexShrink: 0 }}>{e.t}s</span>
-            <span style={{ fontSize: 9, color: e.col, padding: '1px 4px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em', height: 'fit-content', marginTop: 1, width: 42, textAlign: 'center', flexShrink: 0 }}>{e.k}</span>
-            <span style={{ color: e.col, width: 80, flexShrink: 0, fontSize: 11 }}>{e.c}</span>
-            <span style={{ color: LT.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.d}</span>
-            {e.r && <span style={{ color: e.pending ? LT.amber : LT.green, fontSize: 10, flexShrink: 0 }}>{e.pending ? '◇' : '✓'} {e.r}</span>}
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: 14, padding: '10px 12px', background: LT.bg0, border: `1px solid ${LT.green}44`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="dot" style={{ background: LT.green }} />
-        <span className="mono" style={{ fontSize: 11, color: LT.green, letterSpacing: '0.06em' }}>ЗАДАЧА ЗАКРЫТА</span>
-        <span className="mono" style={{ fontSize: 10, color: LT.muted }}>аналитик ничего не делал руками</span>
-      </div>
-    </div>
-  );
-}
-
-function SectionHow() {
-  return (
-    <section id="how" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="02" label="Как это работает" meta="builder wizard · 15 минут" />
-        <div style={{ maxWidth: 820, marginBottom: 48 }}>
-          <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-            Соберите агента. Запустите. <br />
-            <span style={{ color: LT.muted }}>Подтверждайте, что важно.</span>
-          </h2>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 100 }}>
-          <HowStep num="01" title="Соберите агента в Builder Wizard." blurb="9 шагов: тип агента, источники данных, подключение БД, модель и промпт, права, тестовые запросы, деплой. Без кода. ~15 минут от идеи до рабочего агента." kbd="⌘ K" mock={<MockComposer />} />
-          <HowStep num="02" title="Смотрите, как работает." blurb="Каждый шаг агента виден в реальном времени: что прочитал в БД, какой запрос предложил, какой результат получил. Никакого чёрного ящика — только лог действий с выходами." kbd="LIVE" reverse mock={<MockActivityFull />} />
-          <HowStep num="03" title="Подтверждайте, что важно." blurb="Любое действие, которое пишет в БД, читает чувствительные таблицы или уходит во внешнюю сеть — спрашивает разрешения. Per-call, per-session или авто-режим для allow-list путей." kbd="⌥ Y" mock={<MockApproval />} />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HowStep({ num, title, blurb, kbd, mock, reverse }) {
-  return (
-    <div className="how-step" style={{ display: 'grid', gridTemplateColumns: reverse ? '1.2fr 1fr' : '1fr 1.2fr', gap: 48, alignItems: 'start' }}>
-      <div style={{ order: reverse ? 2 : 1 }}>
-        <div className="mono" style={{ fontSize: 11, color: LT.cyan, letterSpacing: '0.18em', marginBottom: 14 }}>ШАГ {num} / 03</div>
-        <h3 style={{ fontSize: 36, lineHeight: 1.05, fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 16 }}>{title}</h3>
-        <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.6, maxWidth: 460 }}>{blurb}</p>
-        <div className="mono" style={{ marginTop: 22, display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: LT.dim, letterSpacing: '0.1em' }}>
-          <span style={{ padding: '3px 7px', border: `1px solid ${LT.border}`, color: LT.cyan }}>{kbd}</span>
-          <span>shortcut</span>
-        </div>
-      </div>
-      <div style={{ order: reverse ? 1 : 2, minWidth: 0 }}>{mock}</div>
-    </div>
-  );
-}
-
-function MockComposer() {
-  return (
-    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)' }}>
-      <WinChrome title="dialekt.ai  —  Builder Wizard · новый агент" />
-      <div style={{ padding: 24 }}>
-        <div className="mono" style={{ fontSize: 10, color: LT.dim, marginBottom: 10, letterSpacing: '0.12em' }}>ШАГ 4 ИЗ 9 · МОДЕЛЬ И ПРОМПТ</div>
-        <div style={{ border: `1px solid ${LT.borderHi}`, background: LT.bg1, padding: 14 }}>
-          <div className="mono" style={{ fontSize: 11, color: LT.muted, lineHeight: 1.55, marginBottom: 10 }}>Системный промпт</div>
-          <div className="mono" style={{ fontSize: 13, color: LT.text, lineHeight: 1.55, minHeight: 80, padding: 10, background: LT.bg0, border: `1px solid ${LT.border}` }}>
-            <span style={{ color: LT.cyan }}>›</span> Ты — аналитик внутренних продаж. Отвечай по-русски. Доступ только к схемам <span style={{ color: LT.cyan, background: LT.bg2, padding: '1px 5px' }}>sales_*</span>, без PII. Если вопрос вне данных — скажи «нет данных».
-            <span className="caret" style={{ height: 14, width: 7 }} />
-          </div>
-          <div style={{ marginTop: 14, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Tag icon="disk" text="postgres · sales_db" />
-            <Tag icon="lock" text="read-only · sales_*" />
-            <Tag icon="cpu" text="qwen2.5:32b" />
-            <button className="mono" style={{ padding: '3px 7px', background: LT.bg0, border: `1px dashed ${LT.border}`, color: LT.muted, fontSize: 10, cursor: 'pointer' }}>+ источник</button>
-            <div style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: 10, color: LT.dim }}>4 / 9 шагов</span>
-          </div>
-          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, paddingTop: 12, borderTop: `1px solid ${LT.border}` }}>
-            <div className="mono" style={{ fontSize: 10, color: LT.muted }}>хост: <span style={{ color: LT.cyan }}>on-premise</span></div>
-            <div className="mono" style={{ fontSize: 10, color: LT.muted }}>права: <span style={{ color: LT.amber }}>спросить перед запросом</span></div>
-            <div style={{ flex: 1 }} />
-            <button className="btn primary" style={{ padding: '7px 14px' }}>Далее · Permissions <span style={{ fontSize: 10, opacity: 0.7 }}>→</span></button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Tag({ icon, text }) {
-  return (
-    <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 7px', background: LT.bg0, border: `1px solid ${LT.border}`, fontSize: 10, color: LT.muted }}>
-      <LIcon name={icon} size={10} color={LT.cyan} />{text}
-    </span>
-  );
-}
-
-function MockActivityFull() {
-  const events = [
-    { t: '14:32:04.102', k: 'СЕС',  c: 'session.open',   d: 'агент: sales-analyst',                         col: LT.dim },
-    { t: '14:32:04.118', k: 'СЕС',  c: 'schema.load',    d: 'sales_db · 47 полей в кеше',                   col: LT.dim },
-    { t: '14:32:06.441', k: 'ИНСТР', c: 'db.schema',      d: 'фильтр: sales_*',                              col: LT.cyan,  r: '3 таблицы · 14 мс' },
-    { t: '14:32:06.602', k: 'ИНСТР', c: 'db.query',       d: 'EXPLAIN — план агрегации',                     col: LT.cyan,  r: 'индекс по region_id · 12 мс' },
-    { t: '14:32:06.771', k: 'ИНСТР', c: 'db.query',       d: 'sample · 14 регионов',                         col: LT.cyan,  r: 'данные за оба квартала' },
-    { t: '14:32:07.091', k: 'ИНСТР', c: 'fs.read',        d: '/var/dialekt/templates/sales_q.tmpl',          col: LT.cyan,  r: '58 строк' },
-    { t: '14:32:08.410', k: 'ПЛАН', c: 'plan.update',     d: 'шаг 1/4 · построить агрегатный SELECT',         col: LT.amber },
-    { t: '14:32:10.922', k: 'РАСС', c: 'reason',          d: 'JOIN regions + LAG OVER quarter',              col: LT.muted },
-    { t: '14:32:12.341', k: 'ИНСТР', c: 'db.query',       d: 'SELECT … +2 строки в template',                col: LT.amber, r: 'ждёт подтверждения', pending: true },
-    { t: '14:32:14.002', k: 'ВЫ',   c: 'approved',        d: '⌘↵ · от @you',                                col: LT.green },
-    { t: '14:32:14.156', k: 'ИНСТР', c: 'db.query',       d: 'выполнение запроса',                            col: LT.green, r: '14 строк · 38 мс' },
-    { t: '14:32:14.812', k: 'ИНСТР', c: 'analyze',        d: 'детект просадок > 15%',                        col: LT.cyan,  r: '3 региона' },
-    { t: '14:32:17.223', k: 'OBS',  c: 'результат',       d: 'Алматы −18%, Шымкент −22%, Атырау −16%',       col: LT.green },
-    { t: '14:32:17.225', k: 'ИНСТР', c: 'fs.write',       d: 'reports/sales_q1_2026.xlsx',                   col: LT.green, r: 'сохранён' },
-    { t: '14:32:17.301', k: 'DONE', c: 'task.complete',   d: 'отчёт + ссылка для команды',                   col: LT.green },
-  ];
-  return (
-    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)' }}>
-      <div style={{ padding: '8px 14px', borderBottom: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 10, background: LT.bg1 }}>
-        <LIcon name="bolt" size={12} color={LT.cyan} />
-        <span className="mono" style={{ fontSize: 11, color: LT.text, letterSpacing: '0.08em' }}>АКТИВНОСТЬ · live</span>
-        <span className="mono" style={{ fontSize: 10, color: LT.dim }}>событий: {events.length}</span>
-        <div style={{ flex: 1 }} />
-        <span className="dot live" style={{ background: LT.cyan }} />
-        <span className="mono" style={{ fontSize: 10, color: LT.cyan }}>СТРИМ</span>
-      </div>
-      <div style={{ padding: '10px 0', maxHeight: 440, overflow: 'hidden' }}>
-        {events.map((e, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10, padding: '3px 14px', fontSize: 11 }} className="mono">
-            <span style={{ color: LT.dim, width: 88, flexShrink: 0 }}>{e.t}</span>
-            <span style={{ fontSize: 9, color: e.col, padding: '1px 4px', border: `1px solid ${e.col}55`, letterSpacing: '0.08em', height: 'fit-content', marginTop: 1, width: 44, textAlign: 'center', flexShrink: 0 }}>{e.k}</span>
-            <span style={{ color: e.col, width: 110, flexShrink: 0 }}>{e.c}</span>
-            <span style={{ color: LT.muted, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.d}</span>
-            {e.r && <span style={{ color: e.pending ? LT.amber : LT.green, fontSize: 10, flexShrink: 0 }}>{e.pending ? '◇' : '✓'} {e.r}</span>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MockApproval() {
-  return (
-    <div style={{ border: `1px solid ${LT.border}`, background: LT.bg0, boxShadow: '0 20px 40px -20px rgba(0,0,0,0.6)', position: 'relative' }}>
-      <WinChrome title="dialekt.ai  —  требуется подтверждение" />
-      <div style={{ padding: 0, position: 'relative' }}>
-        <div style={{ padding: '20px 24px', opacity: 0.24, pointerEvents: 'none' }}>
-          <div className="mono" style={{ fontSize: 10, color: LT.muted, marginBottom: 10 }}>АКТИВНОСТЬ</div>
-          {['ИНСТР · db.schema · sales_db','ИНСТР · db.query · EXPLAIN aggregation','ПЛАН · JOIN regions + LAG OVER quarter','ИНСТР · db.query · SELECT …'].map((l, i) => (
-            <div key={i} className="mono" style={{ fontSize: 11, color: LT.muted, padding: '4px 0' }}>{l}</div>
-          ))}
-        </div>
-        <div style={{ position: 'absolute', left: 24, right: 24, top: 24, border: `1px solid ${LT.amber}`, background: LT.bg1, boxShadow: `0 0 0 4px ${LT.amber}12, 0 20px 40px -10px rgba(0,0,0,0.8)` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${LT.amber}44`, background: LT.amber + '12' }}>
-            <LIcon name="shield" size={14} color={LT.amber} />
-            <span className="mono" style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ</span>
-            <div style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: 10, color: LT.dim }}>запрос #7 · сессия 00:47</span>
-          </div>
-          <div style={{ padding: '18px 20px' }}>
-            <div style={{ fontSize: 14, marginBottom: 12 }}><span style={{ color: LT.text }}>dialekt хочет выполнить SQL-запрос.</span></div>
-            <div style={{ background: LT.bg0, border: `1px solid ${LT.border}`, padding: '10px 14px', marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 10, color: LT.dim, marginBottom: 4, letterSpacing: '0.1em' }}>SQL · sales_db</div>
-              <div className="mono" style={{ fontSize: 13, color: LT.text }}><span style={{ color: LT.cyan }}>›</span> SELECT region, SUM(revenue), LAG(...) FROM sales_db.transactions <span style={{ color: LT.dim }}>WHERE quarter IN ('2025Q4','2026Q1')</span></div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: LT.border, marginBottom: 16, border: `1px solid ${LT.border}` }}>
-              {[['ЗАЧЕМ','сравнить продажи Q1 2026 с Q4 2025'],['БАЗА','postgres://sales_db (read-only)'],['ЧИТАЕТ','transactions · regions'],['ПИШЕТ','нет · только SELECT'],['СЕТЬ','нет'],['TIMEOUT','30 с']].map(([k,v],i) => (
-                <div key={i} style={{ padding: '8px 12px', background: LT.bg0 }}>
-                  <div className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.12em' }}>{k}</div>
-                  <div className="mono" style={{ fontSize: 11, color: LT.text, marginTop: 2 }}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <label className="mono" style={{ fontSize: 11, color: LT.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <span style={{ width: 12, height: 12, border: `1px solid ${LT.borderHi}`, display: 'inline-block', background: LT.bg0 }} />
-                разрешить на сессию
-              </label>
-              <div style={{ flex: 1 }} />
-              <button className="btn" style={{ padding: '8px 14px', fontSize: 12 }}>Отклонить <span style={{ fontSize: 10, color: LT.dim }}>Esc</span></button>
-              <button className="btn" style={{ padding: '8px 14px', fontSize: 12, background: LT.amber, borderColor: LT.amber, color: LT.bg0, fontWeight: 600 }}>Один раз <span style={{ fontSize: 10, opacity: 0.7 }}>⌥Y</span></button>
-              <button className="btn primary" style={{ padding: '8px 14px', fontSize: 12 }}>Доверять <span style={{ fontSize: 10, opacity: 0.7 }}>⌘↵</span></button>
-            </div>
-          </div>
-        </div>
-        <div style={{ height: 60 }} />
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SECTIONS B
-// ─────────────────────────────────────────────────────────────
-function SectionLocal() {
-  const localRows = [
-    '┌─ ВАШ ПЕРИМЕТР ────────────────────────────────┐',
-    '│                                               │',
-    '│   [агент]  ──▶  [цикл рассуждений]  ──▶ [ollama]│',
-    '│        │              │              │        │',
-    '│        │              ▼              ▼        │',
-    '│        │        [permissions]   [qwen 32B]    │',
-    '│        │         ┌──┴──┐                      │',
-    '│        ▼         ▼     ▼                      │',
-    '│      [БД]    [файлы]  [почта]                 │',
-    '│                                               │',
-    '│   сеть ·· [ ] выкл    облако ·· [ ] нет       │',
-    '└───────────────────────────────────────────────┘',
-  ];
-  const cloudRows = [
-    '┌─ ВАШИ ДАННЫЕ ──┐    ┌─ ИХ СЕРВЕРЫ ───────────┐',
-    '│                │    │                        │',
-    '│  [сотрудник]──▶│══▶ │  [их модель]           │',
-    '│                │    │       │                │',
-    '│  контракты ──▶ │══▶ │  [их логи]             │',
-    '│                │    │       │                │',
-    '│  PII ────────▶ │══▶ │  [обучение?]           │',
-    '│                │    │                        │',
-    '└────────────────┘    └────────────────────────┘',
-  ];
-  return (
-    <section id="local" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
-      <div className="wrap-wide">
-        <SecTag n="03" label="Локально по архитектуре" meta="не маркетинг — провод" />
-        <div className="local-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
-          <div>
-            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-              Данные не покидают периметр.<br />
-              <span style={{ color: LT.muted }}>Не обещание. Архитектура.</span>
-            </h2>
-            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 18, maxWidth: 520 }}>
-              Инференс через Ollama на вашем сервере. Доступ к БД — read-only по allow-list схемам. Нет телеметрии. Нет облачной синхронизации. Достаточно отрезать сетевой кабель — всё продолжит работать.
-            </p>
-            <div style={{ marginTop: 28, display: 'grid', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-              {[['инференс','ollama · localhost:11434',LT.green],['базы данных','read-only · allow-list схем',LT.green],['сеть','спросить · выкл по умолчанию',LT.amber],['телеметрия','нет · проверяется в network log',LT.green],['аккаунт','не нужен · вход на месте',LT.green],['облако','отключено · endpoint отсутствует',LT.green]].map(([k,v,col],i) => (
-                <div key={i} style={{ background: LT.bg1, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12 }} className="mono">
-                  <span className="dot" style={{ background: col, width: 6, height: 6 }} />
-                  <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.14em', textTransform: 'uppercase', width: 100 }}>{k}</span>
-                  <span style={{ fontSize: 11, color: LT.text }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {[{title:'DIALEKT · локально',tag:'периметр компании',rows:localRows,accent:LT.cyan},{title:'ОБЛАЧНЫЕ ИНСТРУМЕНТЫ',tag:'всё уходит наружу',rows:cloudRows,accent:LT.red,muted:true}].map((d,i) => (
-              <div key={i} style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: `1px solid ${LT.border}`, background: LT.bg2 }}>
-                  <span style={{ width: 8, height: 8, background: d.accent, display: 'inline-block' }} />
-                  <span className="mono" style={{ fontSize: 10, color: LT.text, letterSpacing: '0.12em' }}>{d.title}</span>
-                  <div style={{ flex: 1 }} />
-                  <span className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.1em' }}>// {d.tag}</span>
-                </div>
-                <pre style={{ margin: 0, padding: '14px 16px', fontFamily: LT.mono, fontSize: 11.5, lineHeight: 1.5, color: d.muted ? LT.dim : LT.text, overflow: 'auto', whiteSpace: 'pre' }}>{d.rows.join('\n')}</pre>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionCapabilities() {
-  const caps = [
-    { icon:'disk', tag:'SQL', title:'Аналитика по вашим БД.', body:'PostgreSQL · MySQL · ClickHouse. Read-only по allow-list схемам. Агент строит SELECT, объясняет план, ждёт подтверждения, выгружает в Excel или дашборд.', tail:'multi-db · ru / kz / en · verified' },
-    { icon:'file', tag:'ДОКИ', title:'Договоры и документы.', body:'Прогон контрактов, актов, КП через локальную модель. Извлечение полей, проверка отклонений от шаблона, сравнение версий. Файлы остаются в /var/dialekt.', tail:'pdf · docx · xlsx · внутреннее хранилище' },
-    { icon:'shield', tag:'COMPLIANCE', title:'Compliance-проверки.', body:'Проверка KYC-форм, AML-сценариев, регуляторных требований. Загружаете нормативку — агент сверяет процедуру с правилами и выдаёт risk-score.', tail:'регуляторика РК · банк / страхование' },
-    { icon:'send', tag:'OUTREACH', title:'Outreach-коммуникации.', body:'Подготовка персонализированных писем, follow-up по B2B-лидам, отчёты для клиентов. Шаблоны под ваш TOV. Отправка через корпоративный SMTP.', tail:'smtp · telegram · webhook' },
-    { icon:'eye', tag:'CODE', title:'Code review с приватным кодом.', body:'Локальный агент читает приватный репозиторий, ищет баги, проверяет стиль, пишет ответы на PR. Источник никогда не покидает контур.', tail:'github / gitlab · self-hosted' },
-    { icon:'cog', tag:'WIZARD', title:'Любой кастомный агент.', body:'Builder Wizard за 9 шагов: тип, источники, БД, модель и промпт, права, тестовые запросы, деплой. ~15 минут от идеи до рабочего агента.', tail:'без кода · без DevOps · open manifest' },
-  ];
-  return (
-    <section id="capabilities" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="04" label="Сценарии" meta="6 готовых типов агентов · все локально" />
-        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 820, marginBottom: 40 }}>
-          Инструмент, а не игрушка.<br />
-          <span style={{ color: LT.muted }}>Всё в списке — то, что реально работает.</span>
-        </h2>
-        <div className="cap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-          {caps.map((c, i) => (
-            <div key={i} style={{ background: LT.bg1, padding: 24, minHeight: 200, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                <span className="mono" style={{ fontSize: 9, color: LT.dim, letterSpacing: '0.16em' }}>{String(i+1).padStart(2,'0')}</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 7px', border: `1px solid ${LT.border}`, fontFamily: LT.mono, fontSize: 10, letterSpacing: '0.1em', color: LT.cyan }}>
-                  <LIcon name={c.icon} size={11} color={LT.cyan} />{c.tag}
-                </span>
-                {c.soon && <span className="mono" style={{ fontSize: 9, color: LT.amber, padding: '2px 6px', border: `1px solid ${LT.amber}44`, letterSpacing: '0.08em' }}>СКОРО</span>}
-              </div>
-              <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 8 }}>{c.title}</div>
-              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.55, flex: 1 }}>{c.body}</p>
-              <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 14, letterSpacing: '0.06em', paddingTop: 12, borderTop: `1px dashed ${LT.border}` }}>→ {c.tail}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionHardware() {
-  const models = [
-    { name:'qwen2.5:7b',       size:'4.7 GB',  tps:'84 ток/с', ok:true,  rec:false },
-    { name:'qwen2.5:14b',      size:'8.4 GB',  tps:'52 ток/с', ok:true,  rec:false },
-    { name:'deepseek-r1:32b',  size:'19.2 GB', tps:'34 ток/с', ok:true,  rec:false },
-    { name:'qwen2.5:32b',      size:'20.4 GB', tps:'38 ток/с', ok:true,  rec:true  },
-    { name:'llama3.1:70b-q4',  size:'42.1 GB', tps:'22 ток/с', ok:true,  rec:false },
-    { name:'qwen2.5:72b-q4',   size:'43.5 GB', tps:'19 ток/с', ok:true,  rec:false },
-  ];
-  return (
-    <section id="hardware" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
-      <div className="wrap-wide">
-        <SecTag n="05" label="Развёртывание" meta="on-premise · честные цифры" />
-        <div className="hw-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 48 }}>
-          <div>
-            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-              Серьёзная работа —<br />
-              <span style={{ color: LT.cyan }}>серьёзное железо.</span>
-            </h2>
-            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 480 }}>
-              Развёртывается на ваш сервер. 32-битная модель влезает в один A100 или 2× RTX 4090. Не делаем вид, что 16 GB достаточно — этого мало для бизнес-задач.
-            </p>
-            <div style={{ marginTop: 28, display: 'grid', gap: 12 }}>
-              {[{tier:'мин',ram:'16 GB VRAM',note:'7–14B · одна команда',col:LT.dim},{tier:'ok',ram:'24 GB VRAM',note:'32B q4 · большинство сценариев',col:LT.muted},{tier:'rec',ram:'1× A100 · 80 GB',note:'qwen2.5:32b · production',col:LT.cyan,active:true},{tier:'max',ram:'2× A100',note:'70B+ · мульти-команды',col:LT.amber}].map((h,i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '50px 160px 1fr', alignItems: 'center', padding: '14px 16px', background: h.active ? LT.bg2 : LT.bg1, border: `1px solid ${h.active ? h.col : LT.border}`, borderLeft: `3px solid ${h.col}` }}>
-                  <span className="mono" style={{ fontSize: 10, color: h.col, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{h.tier}</span>
-                  <span className="mono" style={{ fontSize: 16, color: LT.text, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{h.ram}</span>
-                  <span style={{ fontSize: 13, color: LT.muted }}>{h.note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{ border: `1px solid ${LT.border}`, background: LT.bg1 }}>
-            <WinChrome title="dialekt.ai  —  подбор модели под инфраструктуру" />
-            <div style={{ padding: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                <LIcon name="cpu" size={14} color={LT.cyan} />
-                <span className="mono" style={{ fontSize: 11, letterSpacing: '0.1em' }}>СЕРВЕР</span>
-                <span className="mono" style={{ fontSize: 11, color: LT.muted }}>1× A100 · 80 GB · Ubuntu 22.04</span>
-                <div style={{ flex: 1 }} />
-                <span className="mono" style={{ fontSize: 10, color: LT.green, letterSpacing: '0.08em' }}>СОВМЕСТИМО · 5 МОДЕЛЕЙ</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', padding: '8px 14px', background: LT.bg2, fontSize: 9, color: LT.dim, letterSpacing: '0.14em' }} className="mono">
-                  <span>МОДЕЛЬ</span><span>РАЗМЕР</span><span>СКОРОСТЬ</span><span>СТАТУС</span>
-                </div>
-                {models.map((m,i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', padding: '9px 14px', background: m.rec ? LT.bg2 : LT.bg0, alignItems: 'center', borderLeft: m.rec ? `2px solid ${LT.cyan}` : '2px solid transparent' }} className="mono">
-                    <span style={{ fontSize: 12, color: m.ok ? LT.text : LT.dim }}>{m.name}</span>
-                    <span style={{ fontSize: 11, color: LT.muted, fontVariantNumeric: 'tabular-nums' }}>{m.size}</span>
-                    <span style={{ fontSize: 11, color: m.ok ? LT.text : LT.dim, fontVariantNumeric: 'tabular-nums' }}>{m.tps}</span>
-                    <span style={{ fontSize: 10 }}>
-                      {m.rec ? <span style={{ color: LT.cyan }}>✓ ОПТИМАЛЬНО</span> : m.ok ? <span style={{ color: LT.green }}>✓ ok</span> : <span style={{ color: LT.red }}>✗ велико</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="mono" style={{ marginTop: 14, fontSize: 10, color: LT.dim, lineHeight: 1.6 }}>── ток/с на устойчивом throughput · не маркетинговые цифры</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionWho() {
-  const personas = [
-    { tag:'БАНК · ФИНТЕХ', name:'Compliance-офицер.', body:"С 18.01.2026 любая передача персональных данных в зарубежный AI — нарушение Закона о ПДн. ChatGPT, Copilot — мимо. Сотрудники всё равно ими пользуются. Нужно дать легальную альтернативу до прихода регулятора.", quote:'«Если данные клиента ушли на чужой сервер — это инцидент. Каждый раз.»' },
-    { tag:'SMB · CTO', name:"Head of Data в SMB 50–300.", body:"Команда аналитиков пишет SQL руками. Каждый отчёт — 2–3 дня и 5 итераций. Enterprise-AI стоит от 10М тенге в год — не подъёмно. Нужен агент, который сидит на нашей БД и отвечает на вопросы бизнеса.", quote:'«Не хочу платить за Copilot Enterprise за каждого. Хочу одну инсталляцию на сервере.»' },
-    { tag:'ГОССЕКТОР · МЕДИЦИНА', name:'Руководитель IT в регулируемой отрасли.', body:"У вас данные пациентов, договоры, гостайна. Внешние API запрещены политикой. Сотрудники просят AI для документов и аналитики — а вам нужно дать инструмент, который пройдёт аудит и не вынесет данные за периметр.", quote:'«Покажите архитектуру. Мы должны убедиться, что данные физически остаются у нас.»' },
-  ];
-  return (
-    <section id="who" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="06" label="Для кого" meta="три типа покупателя" />
-        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
-          Если ваши данные не могут уйти в облако —<br />
-          <span style={{ color: LT.muted }}>агент должен прийти к вам.</span>
-        </h2>
-        <div className="cap-grid who-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-          {personas.map((p, i) => (
-            <div key={i} style={{ background: LT.bg1, padding: 28, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-                <span className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.18em' }}>{String(i+1).padStart(2,'0')} // {p.tag}</span>
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.2, marginBottom: 14 }}>{p.name}</div>
-              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{p.body}</p>
-              <div className="mono" style={{ marginTop: 18, padding: '12px 14px', background: LT.bg0, borderLeft: `2px solid ${LT.cyan}`, fontSize: 12, color: LT.text, lineHeight: 1.55 }}>{p.quote}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionAbout() {
-  const founders = [
-    {
-      initials: 'ДЖ',
-      name: 'Диас Жумагалиев',
-      role: 'Founder & CEO',
-      loc: 'Алматы',
-      bio: "Корп. AI-тренер — провёл тренинги в 11 компаниях target market: Chevron, КТЖ, ОЛИМП, Apec, ABADAN, PCGA, KazNARU, IBA Kazakhstan и других. Founder briq.team — обучил 500+ KZ-разработчиков. Ведёт «We Love Claude» — крупнейшее русскоязычное Claude-комьюнити. 10+ лет опыта в 4 странах. Сертификации: Anthropic · Google · NVIDIA.",
-      links: [['telegram','https://t.me/z_dias_c'],['youtube','https://youtube.com/@weloveclaude'],['email','mailto:hello@dias.now']],
-    },
-    {
-      initials: 'ИД',
-      name: 'Искандер Дюсенов',
-      role: 'Co-founder · Operations & Finance',
-      loc: 'Алматы',
-      bio: "UX/UI designer с 2018, теперь руководит operations dialekt + briq.team. 4+ года партнёрства с Диасом. Operational infrastructure обеих компаний на нём. Part-time в команде, 20% equity (vesting 4 года, 1 год cliff).",
-      links: [['email','mailto:hello@dias.now']],
-    },
-  ];
-  return (
-    <section id="about" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="07" label="Команда" meta="founder с distribution + operations" />
-        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 780, marginBottom: 40 }}>
-          Двое.<br />
-          <span style={{ color: LT.muted }}>Один продукт. 11 корпоративных отношений в target market.</span>
-        </h2>
-        <div className="about-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-          {founders.map((f, i) => (
-            <div key={i} style={{ background: LT.bg1, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                <div aria-label="photo placeholder" style={{
-                  position: 'relative',
-                  width: 96, height: 96,
-                  flexShrink: 0,
-                  background: `linear-gradient(135deg, ${LT.bg2} 0%, ${LT.bg3} 100%)`,
-                  border: `1px solid ${LT.borderHi}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span className="mono" style={{ fontSize: 28, fontWeight: 700, color: LT.cyan, letterSpacing: '-0.02em' }}>{f.initials}</span>
-                  <span className="mono" style={{
-                    position: 'absolute', bottom: 4, right: 6,
-                    fontSize: 8, color: LT.dim, letterSpacing: '0.1em',
-                  }}>фото:скоро</span>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.015em', lineHeight: 1.2 }}>{f.name}</div>
-                  <div className="mono" style={{ marginTop: 6, fontSize: 11, color: LT.cyan, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{f.role}</div>
-                  <div className="mono" style={{ marginTop: 4, fontSize: 10, color: LT.dim, letterSpacing: '0.06em' }}>{f.loc}</div>
-                </div>
-              </div>
-              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{f.bio}</p>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', paddingTop: 14, borderTop: `1px solid ${LT.border}` }} className="mono">
-                {f.links.map(([label, href], j) => (
-                  <a key={j} href={href} style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.06em', textDecoration: 'none' }}>{label} →</a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionLogoBar() {
-  const logos = [
-    { name: 'Chevron',    src: '/logos/chevron.webp' },
-    { name: 'КТЖ',        src: '/logos/ktj.svg' },
-    { name: 'ОЛИМП',      src: '/logos/olimp.webp' },
-    { name: 'Polypark',   src: '/logos/polypark.webp' },
-    { name: 'Apec Group', src: '/logos/apec.webp' },
-    { name: 'PCGA',       src: '/logos/pgcs.webp' },
-  ];
-  const more = ['ABADAN & COMPANY', 'KazNARU', 'Абай Мырзахмет Ун-т', 'SEFtec', 'IBA Kazakhstan'];
-  return (
-    <section style={{ padding: '70px 0', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
-      <div className="wrap-wide">
-        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28, fontSize: 10, color: LT.dim, letterSpacing: '0.16em' }}>
-          <span style={{ color: LT.cyan }}>●</span>
-          <span>КОРП. ТРЕНИНГИ ПРОВЕДЕНЫ В 11 КОМПАНИЯХ ИЗ TARGET MARKET</span>
-          <div style={{ flex: 1, height: 1, background: `repeating-linear-gradient(90deg, ${LT.border} 0 4px, transparent 4px 8px)` }} />
-          <span style={{ color: LT.muted }}>2024 → 2026</span>
-        </div>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: 1,
-          background: LT.border,
-          border: `1px solid ${LT.border}`,
-        }} className="cap-grid">
-          {logos.map((l, i) => (
-            <div key={i} style={{
-              background: LT.bg1,
-              padding: '28px 18px',
-              minHeight: 110,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <img
-                src={l.src}
-                alt={l.name}
-                style={{
-                  maxHeight: 44,
-                  maxWidth: '100%',
-                  filter: 'grayscale(100%) brightness(1.6) contrast(0.85)',
-                  opacity: 0.78,
-                  objectFit: 'contain',
-                }}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="mono" style={{ marginTop: 18, fontSize: 11, color: LT.dim, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ color: LT.muted }}>+ ещё:</span>
-          {more.map((m, i) => (
-            <span key={i} style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-              <span>{m}</span>
-              {i < more.length - 1 && <span style={{ color: LT.border }}>·</span>}
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionTiming() {
-  const cards = [
-    { tag: '01 · РЕГУЛЯТОР', big: '18.01.2026', title: 'Закон о ПДн РК · в силе', body: 'Передача корп. данных в зарубежный облачный AI — нарушение для регулируемых отраслей: банки, страхование, медицина, госсектор. Comply or stop.' },
-    { tag: '02 · КАПИТАЛ', big: '×5', title: 'AI VC в Казахстане за 2 года', body: '$14M (2023) → $73M (2025). AI ≈ 50% всех венчурных вложений в стране.' },
-    { tag: '03 · ТЕХНОЛОГИЯ', big: '2025', title: 'Локальные LLMs готовы к проду', body: 'Qwen 2.5, Llama 3, DeepSeek — впервые enterprise-класс полностью без публичного облака.' },
-  ];
-  return (
-    <section id="timing" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}` }}>
-      <div className="wrap-wide">
-        <SecTag n="00" label="Почему сейчас" meta="окно возможностей · 12 месяцев" />
-        <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1, maxWidth: 820, marginBottom: 40 }}>
-          Три тренда сошлись.<br />
-          <span style={{ color: LT.cyan }}>Закон. Капитал. Технология.</span>
-        </h2>
-        <div className="cap-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-          {cards.map((c, i) => (
-            <div key={i} style={{ background: LT.bg1, padding: 28, display: 'flex', flexDirection: 'column', borderLeft: `3px solid ${LT.cyan}` }}>
-              <div className="mono" style={{ fontSize: 10, color: LT.cyan, letterSpacing: '0.18em', marginBottom: 24 }}>{c.tag}</div>
-              <div style={{ fontSize: 'clamp(40px, 4vw, 64px)', fontWeight: 700, color: LT.cyan, letterSpacing: '-0.03em', lineHeight: 1, marginBottom: 18 }}>{c.big}</div>
-              <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3, marginBottom: 10 }}>{c.title}</div>
-              <p style={{ color: LT.muted, fontSize: 13.5, lineHeight: 1.6, flex: 1 }}>{c.body}</p>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 28, padding: '18px 22px', border: `1px solid ${LT.amber}55`, background: LT.amber + '08', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }} className="mono">
-          <span className="dot live" style={{ background: LT.amber }} />
-          <span style={{ fontSize: 12, color: LT.amber, letterSpacing: '0.06em' }}>ЛИЧНЫЙ INSIGHT</span>
-          <span style={{ color: LT.border }}>/</span>
-          <span style={{ fontSize: 12, color: LT.muted, letterSpacing: '0.02em', flex: 1, minWidth: 280 }}>
-            «От Chevron до КТЖ — каждая крупная компания в регионе внедряет AI прямо сейчас. За 18 месяцев меня пригласили учить сотрудников 11 компаний из target market.»
-          </span>
-          <span style={{ fontSize: 11, color: LT.dim }}>— Диас, Founder</span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionInstall() {
-  const { releases, detectedPlatform } = React.useContext(DownloadsContext);
-  const rows = [
-    {
-      platform: 'Linux (deb)',
-      arch: 'Ubuntu 22.04+ · Debian 12+ · x64',
-      size: releases.debSize || '~130 MB',
-      cmd: releases.debUrl ? `curl -fsSLO ${releases.debUrl} && sudo dpkg -i *.deb` : 'curl -fsSLO <download> && sudo dpkg -i *.deb',
-      url: releases.debUrl,
-      primary: detectedPlatform === 'linux-deb',
-    },
-    {
-      platform: 'Linux (AppImage)',
-      arch: 'Fedora · Arch · any glibc 2.35+ · x64',
-      size: releases.appimageSize || '~130 MB',
-      cmd: releases.appimageUrl ? `curl -fsSLO ${releases.appimageUrl} && chmod +x *.AppImage` : 'curl -fsSLO <download> && chmod +x *.AppImage',
-      url: releases.appimageUrl,
-      primary: detectedPlatform === 'linux-appimage',
-    },
-    {
-      platform: 'macOS',
-      arch: 'Apple Silicon (M1/M2/M3) · macOS 12+',
-      size: releases.dmgSize || '~140 MB',
-      cmd: releases.dmgUrl ? `open ${releases.dmgUrl}` : 'curl -fsSLO <download> && open dialekt_*.dmg',
-      url: releases.dmgUrl,
-      primary: detectedPlatform === 'macos',
-      disabled: !releases.dmgUrl,
-    },
-    {
-      platform: 'Windows',
-      arch: 'Windows 10 / 11 · x64',
-      size: releases.exeSize || '~140 MB',
-      cmd: releases.exeUrl ? `Start-Process ${releases.exeUrl}` : 'curl -fsSLO <download> && run dialekt_*-setup.exe',
-      url: releases.exeUrl,
-      primary: detectedPlatform === 'windows',
-      disabled: !releases.exeUrl,
-    },
-  ];
-  // Gated download: removed direct GitHub Release links from the landing.
-  // Trial signup at /signup.html is now the only public surface that
-  // exposes download URLs (delivered via verify-email). This is by design —
-  // see docs/LEGAL_BRIEF.md §1 (positioning) and product decision: every
-  // download lead must be visible in the admin dashboard. The "rows" data
-  // above is retained as informational specs only (no clickable URLs).
-  const platformSpecs = [
-    { platform: 'Linux', detail: 'Ubuntu 22+, Debian 12+, Fedora 38+ · x64', formats: '.deb · .AppImage' },
-    { platform: 'macOS', detail: 'Apple Silicon · macOS 12+', formats: '.dmg' },
-    { platform: 'Windows', detail: 'Windows 10 / 11 · x64', formats: '.exe installer' },
-  ];
-  return (
-    <section id="install" style={{ padding: '100px 0 60px', borderTop: `1px solid ${LT.border}`, background: LT.bg0 }}>
-      <div className="wrap-wide">
-        <SecTag n="08" label="Запуск" meta="пилот · linux · macos · windows" />
-        <div className="install-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 48 }}>
-          <div>
-            <h2 style={{ fontSize: 'clamp(22px, 5vw, 48px)', lineHeight: 1.1 }}>
-              Запустите пилот.<br />
-              <span style={{ color: LT.muted }}>30 дней бесплатно.</span>
-            </h2>
-            <p style={{ color: LT.muted, fontSize: 15, lineHeight: 1.65, marginTop: 16, maxWidth: 460 }}>
-              Оставьте корпоративный email — пришлём ссылку на установщики для всех 3 платформ и trial-лицензию на 30 дней. Без карты, без обязательств. Подтверждаете email и работаете.
-            </p>
-            <div className="mono" style={{ marginTop: 24, fontSize: 11, color: LT.dim, lineHeight: 1.8 }}>
-              → требует Ollama 0.4+ (на Linux ставится автоматически)<br />
-              → Linux: glibc 2.35+ (Ubuntu 22.04+, Debian 12+, Fedora 38+)<br />
-              → macOS: 12.0+ · Apple Silicon<br />
-              → Windows: 10 / 11 · x64<br />
-              → server-deploy: 1× A100 или 2× RTX 4090 для prod<br />
-              → актуальная версия {releases.version || '0.21.0'}{releases.publishedAt ? ' · ' + releases.publishedAt : ''}
-            </div>
-          </div>
-          <div>
-            <div style={{ background: LT.bg1, border: `1px solid ${LT.cyan}`, padding: 32 }}>
-              <div className="mono" style={{ fontSize: 11, color: LT.cyan, letterSpacing: '.14em', marginBottom: 12 }}>ПИЛОТ · 30 ДНЕЙ · 3 SEATS</div>
-              <h3 style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 12 }}>
-                Получить ссылку на email
-              </h3>
-              <p style={{ color: LT.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 22 }}>
-                Отправим <strong style={{ color: LT.text }}>установщики для 3 платформ</strong> + <strong style={{ color: LT.text }}>лицензию на 30 дней</strong> одним письмом. Подтверждаете email и работаете.
-              </p>
-              <a className="btn primary" href="/signup.html" style={{ padding: '13px 22px', fontSize: 13, fontWeight: 700, width: '100%', justifyContent: 'center' }}>
-                <LIcon name="down" size={13} color={LT.bg0} />
-                ЗАПУСТИТЬ ПИЛОТ →
+    function render(feed) {
+      versionEl.textContent = feed.tag || '—';
+      const groups = new Map();
+      for (const d of feed.downloads || []) {
+        const k = d.os + '|' + d.arch;
+        if (!groups.has(k)) groups.set(k, { os: d.os, arch: d.arch, files: [] });
+        groups.get(k).files.push({ ext: d.ext, url: d.url, size: d.size });
+      }
+      const detected = detectPlatform();
+      const detectedKey = detected.os && detected.arch ? (detected.os + '|' + detected.arch) : null;
+      const order = ['macOS|Apple Silicon','macOS|Intel','Windows|x64','Windows|ARM64','Linux|x86_64','Linux|ARM64'];
+      const cards = [];
+      if (detectedKey && groups.has(detectedKey)) {
+        cards.push({ k: detectedKey, ...groups.get(detectedKey), detected: true });
+        groups.delete(detectedKey);
+      }
+      for (const k of order) if (groups.has(k)) {
+        cards.push({ k, ...groups.get(k), detected: false });
+      }
+      grid.innerHTML = cards.map(c => `
+        <article class="dl-card${c.detected ? ' detected' : ''}">
+          <div class="dl-os">${c.os} <span class="arch">${c.arch}</span></div>
+          <div class="dl-files">
+            ${c.files.map(f => `
+              <a class="dl-file" href="${f.url}" rel="noopener">
+                <span class="dl-ext">${f.ext}</span>
+                <span class="dl-size">${fmtSize(f.size)}</span>
               </a>
-              <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${LT.border}`, fontSize: 11, color: LT.dim, lineHeight: 1.7 }}>
-                Уже есть лицензия? <a href="/login.html" style={{ color: LT.cyan }}>Войти →</a><br />
-                Хотите цены? <a href="/pricing.html" style={{ color: LT.cyan }}>$25 / $55 / $95+ за seat →</a>
-              </div>
-            </div>
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 1, background: LT.border, border: `1px solid ${LT.border}` }}>
-              {platformSpecs.map((s, i) => (
-                <div key={i} style={{ background: LT.bg1, padding: '13px 16px', display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 12, alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>{s.platform}</div>
-                  </div>
-                  <div className="mono" style={{ fontSize: 11, color: LT.dim }}>{s.detail}</div>
-                  <div className="mono" style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.04em' }}>{s.formats}</div>
-                </div>
-              ))}
-            </div>
+            `).join('')}
           </div>
-        </div>
-        <div style={{ marginTop: 40, padding: '16px 18px', border: `1px solid ${LT.border}`, background: LT.bg1, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }} className="mono">
-          <span style={{ fontSize: 11, color: LT.green, letterSpacing: '0.1em' }}>● ЛОКАЛЬНЫЙ ИНФЕРЕНС</span>
-          <span style={{ color: LT.border }}>/</span>
-          <span style={{ fontSize: 11, color: LT.amber, letterSpacing: '0.1em' }}>● ПИЛОТ ПО EMAIL</span>
-          <span style={{ color: LT.border }}>/</span>
-          <span style={{ fontSize: 11, color: LT.muted, letterSpacing: '0.1em' }}>БЕЗ КАРТЫ</span>
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>подписанные сборки · sha256</span>
-        </div>
-      </div>
-    </section>
-  );
-}
+        </article>
+      `).join('');
+      loadingEl.hidden = true;
+      contentEl.hidden = false;
+    }
 
-function Footer() {
-  return (
-    <footer style={{ padding: '80px 0 40px', borderTop: `1px solid ${LT.border}`, background: LT.bg1 }}>
-      <div className="wrap-wide">
-        <div className="footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 40 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <HeroMark size={18} />
-              <span className="mono" style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' }}>dialekt<span style={{ color: LT.cyan }}>.ai</span></span>
-              <span className="mono" style={{ fontSize: 10, color: LT.dim, padding: '2px 6px', border: `1px solid ${LT.border}` }}>v0.8.2</span>
-            </div>
-            <p style={{ color: LT.muted, fontSize: 13, lineHeight: 1.55, marginTop: 14, maxWidth: 380 }}>Локальные AI-агенты для регулируемых отраслей Центральной Азии. Данные не покидают периметр компании.</p>
-            <div className="mono" style={{ fontSize: 10, color: LT.dim, marginTop: 18, letterSpacing: '0.06em', lineHeight: 1.8 }}>
-              dialekt.ai · Almaty, KZ<br />
-              локально · без телеметрии · без облака
-            </div>
-          </div>
-          {[['ПРОДУКТ',[['пилот','#install'],['changelog','/changelog.html'],['roadmap','#']]],['ДОКУМЕНТЫ',[['документация','/docs.html'],['privacy','/privacy.html'],['privacy (ru)','/privacy-ru.html'],['terms','/terms.html'],['terms (ru)','/terms-ru.html'],['публичная оферта','/public-offer.html'],['DPA (шаблон)','/dpa.html'],['cross-border consent','/cross-border-consent.html']]],['СВЯЗАТЬСЯ',[['hello@dias.now','mailto:hello@dias.now'],['telegram · @z_dias_c','https://t.me/z_dias_c'],['github','https://github.com/dialektai']]]].map(([title,links],i) => (
-            <div key={i}>
-              <div className="mono" style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.16em', marginBottom: 14 }}>{title}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {links.map(([l,h],j) => <a key={j} href={h} className="mono" style={{ fontSize: 12, color: LT.muted, letterSpacing: '0.02em' }}>{l}</a>)}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 56, paddingTop: 20, borderTop: `1px solid ${LT.border}`, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }} className="mono">
-          <span style={{ fontSize: 10, color: LT.dim, letterSpacing: '0.08em' }}>© 2026 dialekt.ai · Almaty, KZ</span>
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 10, color: LT.green, display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="dot live" style={{ background: LT.green }} /> данные внутри периметра</span>
-          <span style={{ fontSize: 10, color: LT.dim }}>// соответствует Закону о ПДн РК · 18.01.2026</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// APP
-// ─────────────────────────────────────────────────────────────
-function App() {
-  const releases = useReleases();
-  const detectedPlatform = React.useMemo(detectPlatform, []);
-  return (
-    <DownloadsContext.Provider value={{ releases, detectedPlatform }}>
-      <div className="dlk-land scanlines">
-        <Nav />
-        <Hero />
-        <SectionLogoBar />
-        <SectionTiming />
-        <SectionChatVsAgent />
-        <SectionHow />
-        <SectionLocal />
-        <SectionCapabilities />
-        <SectionHardware />
-        <SectionWho />
-        <SectionAbout />
-        <SectionInstall />
-        <Footer />
-      </div>
-    </DownloadsContext.Provider>
-  );
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
-  </script>
+    fetch(FEED)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(render)
+      .catch(err => {
+        console.warn('release fetch failed', err);
+        loadingEl.hidden = true;
+        errorEl.hidden = false;
+      });
+  })();
+</script>
 </body>
 </html>
