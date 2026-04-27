@@ -115,7 +115,10 @@ export default function App() {
 }
 
 function AppRoutes() {
-  const [screen, setScreen] = useState('main');
+  // null until first-launch routing resolves — prevents MainScreen
+  // (chat) from flashing for a frame before /settings comes back and
+  // we redirect to license / mode-setup / onboarding.
+  const [screen, setScreen] = useState(null);
   const [screenProps, setScreenProps] = useState({});
 
   const nav = (s, props = {}) => {
@@ -142,7 +145,7 @@ function AppRoutes() {
         }
 
         // Already completed onboarding past the license gate — done.
-        if (s.onboarding_completed) return;
+        if (s.onboarding_completed) { nav('main'); return; }
 
         // Mode not set → show mode selection
         if (!('mode' in s)) {
@@ -153,7 +156,9 @@ function AppRoutes() {
         // Mode set but Ollama not checked yet → check Ollama
         nav('onboarding-ollama');
       } catch {
-        // backend offline — stay on main
+        // backend offline — fall back to main; OfflineScreen surfaces
+        // diagnostics from there.
+        nav('main');
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -170,6 +175,12 @@ function AppRoutes() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Routing not resolved yet — keep the boot-gate background visible
+  // instead of flashing MainScreen.
+  if (screen === null) {
+    return <div style={{ width: '100%', height: '100%', background: '#0a0d12' }} />;
+  }
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
