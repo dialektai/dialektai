@@ -31,6 +31,10 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
+      - name: Install Playwright Chromium
+        run: |
+          cd python && source venv/bin/activate
+          python -m playwright install chromium --with-deps
       - name: Run pytest
         run: |
           cd python && source venv/bin/activate
