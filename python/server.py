@@ -3210,6 +3210,27 @@ async def ollama_check():
     }
 
 
+@app.get("/ollama/tags")
+async def ollama_tags():
+    """Proxy Ollama's /api/tags through the backend.
+
+    The frontend cannot call Ollama directly: Tauri WebView origin
+    (tauri://localhost) is not in Ollama's default CORS allow-list, so the
+    direct fetch always fails with a CORS error and installedTags stays empty.
+    Routing through the backend avoids CORS entirely — server-to-server HTTP
+    has no origin restrictions.
+    """
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=3) as c:
+            r = await c.get("http://localhost:11434/api/tags")
+            if r.status_code == 200:
+                return r.json()
+    except Exception:
+        pass
+    return {"models": []}
+
+
 # ── Ollama automated install (Linux only) ─────────────────────────────────────
 #
 # We pin the install script to its public URL and verify a SHA-256 hash
