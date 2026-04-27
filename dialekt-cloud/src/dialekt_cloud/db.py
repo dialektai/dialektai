@@ -248,6 +248,38 @@ CREATE TABLE IF NOT EXISTS admin_login_attempts (
 );
 CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_email_time ON admin_login_attempts(email, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_ip_time ON admin_login_attempts(ip, created_at DESC);
+
+-- ── GPU Relay (Cloud-Assisted tier) ──────────────────────────────────────
+-- Per-tenant Bearer keys for the gpu-relay.dias.now proxy. Plaintext keys
+-- are NEVER stored — only their SHA-256. Issuance flow shows the
+-- plaintext exactly once at creation time. relay_usage rows are written
+-- by the relay process for every successful /generate or /chat call.
+
+CREATE TABLE IF NOT EXISTS relay_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    rate_limit_per_minute INT NOT NULL DEFAULT 120,
+    monthly_token_quota BIGINT,                       -- NULL = unlimited
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_used_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_relay_keys_tenant ON relay_keys(tenant_id) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_relay_keys_hash ON relay_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS relay_usage (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    relay_key_id UUID NOT NULL REFERENCES relay_keys(id),
+    model TEXT NOT NULL,
+    prompt_tokens INT NOT NULL,
+    completion_tokens INT NOT NULL,
+    latency_ms INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_relay_usage_tenant_time ON relay_usage(tenant_id, created_at DESC);
 """
 
 
