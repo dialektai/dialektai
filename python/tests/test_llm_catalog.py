@@ -220,3 +220,15 @@ def test_providers_with_status_lists_all(monkeypatch):
     for entry in out:
         assert {"id", "name", "blurb", "auth_kind", "configured"}.issubset(entry.keys())
         assert entry["configured"] is False
+
+
+def test_replicate_catalog_entry_notes_post_pilot():
+    """Replicate lives in the catalog (litellm routing is wired) but has no
+    Settings UI in v0.27. The notes field must explicitly say so — prevents
+    pilots from believing there is a Replicate settings page when there isn't."""
+    provider = get_provider("replicate")
+    assert provider is not None, "replicate must remain in catalog for litellm routing"
+    assert provider.notes, "replicate notes must be non-empty (signals no UI in current release)"
+    assert "post-pilot" in provider.notes or "no Settings" in provider.notes, (
+        "replicate notes must say it has no Settings UI in current release"
+    )
