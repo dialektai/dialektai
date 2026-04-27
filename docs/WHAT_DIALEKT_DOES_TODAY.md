@@ -1,9 +1,9 @@
 # What dialekt does today
 
-**Version:** v0.20.0 (in flight — branch `feat/m2-mcp-production-complete`, awaiting ship)
-**Last shipped:** v0.11.1 (Этап 1 MCP Client, 2026-04-23)
-**Date:** 2026-04-25
-**Status:** Pilot-ready (v0.11.1 production); v0.20.0 RC adds MCP Servers UI end-to-end
+**Version:** v0.27.0
+**Last shipped:** v0.27.0 (2026-04-27) — scheduler, web search, visual engine, IBA pilot agents
+**Date:** 2026-04-27
+**Status:** Pilot-ready
 
 > This is the **executive pilot-facing summary**. For the full catalog of working agents and their sample queries, see [`AGENT_CATALOG.md`](AGENT_CATALOG.md).
 
@@ -19,7 +19,7 @@
 
 ## What you can build today (verified working)
 
-Every item below is exercised end-to-end on v0.10.0 with a real chat turn captured in `scripts/pilot_verify/evidence.json`. No simulations. Details per agent in [`AGENT_CATALOG.md`](AGENT_CATALOG.md).
+Every capability below is backed by passing tests in `python/tests/` (846 passing on v0.27.0). Details per agent type in [`AGENT_CATALOG.md`](AGENT_CATALOG.md).
 
 ### SQL Analytics agents
 PostgreSQL, MySQL, ClickHouse. Natural-language queries in Russian, English, or Kazakh → SQL → table results. Read-only by default, with row-limits and query timeout enforced. Setup per connection: 5 minutes.
@@ -36,12 +36,21 @@ General-purpose assistants (the bundled "General Assistant" with ComfyUI image/v
 ### Multi-tool agents
 Combinations — e.g. a Data Engineer helper with simultaneous access to a PostgreSQL connection, the filesystem, and the shell for ETL-style workflows. Setup: 10 minutes.
 
-### MCP-enabled agents (v0.20.0)
-External Model Context Protocol servers (GitHub, Slack, filesystem, Linear, Figma, etc.) are configurable through Settings → MCP Servers without editing YAML. The Builder Wizard has a new "MCP Tools" step where users tick the servers an agent can call. Destructive tool calls (anything write-shaped) prompt for explicit consent in a chat-overlay modal — three-button decision (Approve once / Approve for session / Deny) with keyboard shortcuts and full audit trail. Credentials live in the OS keychain via the same `${secrets.<ref>}` interpolation Этап 1 shipped. Manifest-level toggling (`capabilities.groups: [mcp_tools]`) is handled silently when MCP servers are selected.
+### MCP-enabled agents (v0.20+)
+External Model Context Protocol servers (GitHub, Slack, filesystem, Linear, Figma, etc.) are configurable through Settings → MCP Servers without editing YAML. The Builder Wizard has a new "MCP Tools" step where users tick the servers an agent can call. Destructive tool calls (anything write-shaped) prompt for explicit consent in a chat-overlay modal — three-button decision (Approve once / Approve for session / Deny) with keyboard shortcuts and full audit trail. Credentials live in the OS keychain.
 
-**Real-server validation:** GitHub MCP path validated end-to-end against `@modelcontextprotocol/server-github` on 2026-04-25 — 10/10 stages green including consent prompt, audit chain linkage, real issue creation, OS-keychain lifecycle. See `docs/MCP_PRODUCTION_VALIDATION.md`. Slack MCP deferred until a maintained Slack server with a reliable connection-test gate is identified. The full unit + integration test suite passes 602 tests on this branch with zero regressions.
+**Real-server validation:** GitHub MCP path validated end-to-end — 10/10 stages green including consent prompt, audit chain linkage, real issue creation, OS-keychain lifecycle. See `docs/MCP_PRODUCTION_VALIDATION.md`.
 
-**Total in catalog:** 10 verified working configurations across 5 categories + 3 MCP-enabled blueprints (validation pending). Add your own by remixing the manifests — see [`SETTINGS_COMBOS_TODAY.md`](SETTINGS_COMBOS_TODAY.md) for field combinations that will pass validation and fire at runtime.
+### Scheduled / cron agents (NEW in v0.27)
+Agents can run on a cron schedule and deliver results via Telegram. Set a `scheduled` trigger in the manifest with a standard cron expression (`0 9 * * 1-5` = every weekday at 9 AM). APScheduler handles the runtime. Supports Telegram delivery to a configured `telegram_chat_id` + `telegram_bot_token` stored in the OS keychain.
+
+**Limitation:** email (SMTP) delivery is not yet implemented — Telegram-only in v0.27. Email delivery is targeted for v0.28.
+
+### Web search agents (NEW in v0.27)
+Agents can query the web via Tavily, Brave Search, or DuckDuckGo. Configure a provider in Settings → Web Search. Once credentials are set, any agent can call web search via the `web_search` capability group.
+
+### Visual engine — HTML/PNG rendering (NEW in v0.27)
+Agents can render HTML templates to PNG images via Playwright/Chromium. Upload a template (Jinja-style `{{KEY}}` variables), call the render endpoint, receive a PNG back. Used for social-media cards, reports, certificates.
 
 ---
 
@@ -58,14 +67,19 @@ Every step is dialekt-native, no external config files or deployment pipeline.
 
 ---
 
-## What's in v0.10.0
+## What's in v0.27.0
 
-- 5/5 CI workflows green: `ci.yml`, `integration-mysql.yml`, `integration-clickhouse.yml`, `integration-postgres.yml`, `e2e.yml`
-- 440+ passing tests in `python/tests/` + `dialekt-cloud/tests/`
-- 35/35 multi-role E2E scenarios green (Admin × Developer × End-User)
-- Plugin architecture consolidated into `dialekt.llm._plugin_context.PluginContext` — in-process ASGI dispatch for tests, HTTP for production, single lazy-init singleton with threading-safe replace/close semantics
-- Schema distribution via GitHub tags (no PyPI dependency — works in locked-down corporate networks)
-- Multi-role findings closed: UF-1 (plugin hardcoded URL), ADM-1 (tenant status filter), P1 (TOCTOU race), P1.5 (close leak), P2 (loose E2E assertion)
+- **846 passing tests** in `python/tests/` (zero failures, 70 env-conditional skips)
+- CI jobs: unit tests, cloud tests, integration tests, frontend build — all green
+- Scheduler runtime (APScheduler) + cron session + Telegram delivery
+- Web search adapter (Tavily / Brave / DuckDuckGo) + Settings UI
+- Visual engine (HTML → PNG via Playwright/Chromium) + template registry
+- IBA pilot agent templates: `content_editor`, `smm_manager`, `schedule_planner`
+- MCP Audit Dashboard (v0.25), Process Resilience health registry (v0.26)
+- GPU Relay mode for cloud LLM providers
+- Agent Library with cloud-sync catalog
+- Invoice billing (KZ legal, ru/en templates)
+- LLM performance layer: prompt wrapper, few-shot memory, retry loop
 
 ---
 
@@ -85,19 +99,23 @@ Typical pilot: 6 seats × $55/mo = **$330 MRR = $3 960 ARR**.
 
 | Feature | Status | Target |
 |---|---|---|
-| Scheduled / cron agents | ❌ schema-valid, no runtime | M2 (Q3 2026) |
-| Webhook triggers | ❌ not a schema variant | M3 (Q4 2026) |
+| Scheduled / cron agents | ✅ ships v0.27, Telegram delivery only | v0.28 for email |
+| Web search (Tavily / Brave / DDG) | ✅ ships v0.27 | — |
+| Visual engine (HTML → PNG) | ✅ ships v0.27 | — |
+| Telegram delivery for scheduled agents | ✅ ships v0.27 | — |
+| Email / SMTP delivery from scheduler | ❌ not yet | v0.28 |
+| Webhook triggers | ❌ not in schema | M3 (Q4 2026) |
 | Multi-agent workflows (A → B) | ❌ one agent per WS session | M3 |
-| Vision capabilities | ❌ no vision Ollama model installed | M2 |
-| Web search integration (Tavily/Brave/etc.) | ❌ no adapter | M2 |
-| Email / SMTP send | ❌ no transport | M2 |
-| Browser automation (Selenium) | ❓ code exists, untested on Linux | M2 (verify) |
-| Per-agent secrets UI | ❌ `secrets_required` is advisory | M2 |
-| Custom manifest variables (anything beyond `{{connection_id}}`) | ❌ not substituted at runtime | M2 |
-| Output destinations (`filesystem`, `webhook`, `email_or_telegram`) | ❌ schema-valid, no delivery | M2 |
-| Capability checkboxes as a security boundary | ⚠️ advisory metadata, not a sandbox | M2 (per-agent sandboxing) |
+| Vision capabilities (image description) | ⚠️ code ready, needs vision model (llava / moondream) installed in Ollama | operator-installed |
+| Browser automation (Playwright crawling) | ⚠️ untested for crawling use cases | verify per pilot |
+| Per-agent secrets UI | ⚠️ `secrets_required` is advisory, not enforced | M3 |
+| Custom manifest variables beyond `{{connection_id}}` | ❌ not substituted at runtime | M3 |
+| `model.parameters` in manifest (temperature, max_tokens) | ⚠️ advisory — global settings override; change in Settings → Model | — |
+| Capability checkboxes as security boundary | ⚠️ advisory metadata, not a sandbox | M3 |
+| Bitrix24 / CRM integrations | ❌ not built | P2, next pilots |
+| Replicate image generation UI | ❌ not built | post-pilot |
 
-These gaps are documented in detail in [`CAPABILITIES_INVENTORY.md`](CAPABILITIES_INVENTORY.md). The rule: do not promise anything in this table for pilots starting before Q3 2026.
+These gaps are documented in detail in [`CAPABILITIES_INVENTORY.md`](CAPABILITIES_INVENTORY.md).
 
 ---
 
@@ -106,7 +124,7 @@ These gaps are documented in detail in [`CAPABILITIES_INVENTORY.md`](CAPABILITIE
 - Download: https://dialekt.dias.now
 - Backend health (self-hosted cloud tenant): `GET https://dialekt-cloud.dias.now/health`
 - Source: https://github.com/dialektai/dialektai
-- Release notes: https://github.com/dialektai/dialektai/releases/tag/v0.10.0
+- Release notes: https://github.com/dialektai/dialektai/releases/tag/v0.27.0
 - CI dashboard: https://github.com/dialektai/dialektai/actions
 - Manifest validator: https://github.com/dialektai/dialekt-manifest-validator
 
@@ -124,8 +142,8 @@ These gaps are documented in detail in [`CAPABILITIES_INVENTORY.md`](CAPABILITIE
 ---
 
 **See also:**
-- [`AGENT_CATALOG.md`](AGENT_CATALOG.md) — 10+ verified agent configurations with sample queries
+- [`AGENT_CATALOG.md`](AGENT_CATALOG.md) — verified agent configurations with sample queries
 - [`TOOLS_AVAILABLE_TODAY.md`](TOOLS_AVAILABLE_TODAY.md) — what an agent's code can call
 - [`SETTINGS_COMBOS_TODAY.md`](SETTINGS_COMBOS_TODAY.md) — manifest fields that work at runtime
 - [`CAPABILITIES_INVENTORY.md`](CAPABILITIES_INVENTORY.md) — developer-level deep dive
-- [`MULTI_ROLE_E2E_REPORT.md`](MULTI_ROLE_E2E_REPORT.md) — the 35/35 multi-role sweep behind v0.10.0
+- [`IBA_PILOT_READINESS.md`](IBA_PILOT_READINESS.md) — IBA-specific readiness report (v0.27)
