@@ -605,6 +605,13 @@ CREATE INDEX IF NOT EXISTS idx_batch_jobs_status   ON batch_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_batch_files_job_id  ON batch_job_files(job_id, ordinal);
 """
 
+# Pulled in here so a single executescript at boot brings up every
+# table the server depends on. Importing at module level keeps the
+# boot path linear; the scheduler runtime itself is lazy-imported
+# inside lifespan() once the DB connection is available.
+from dialekt.scheduler import SCHEDULED_RUNS_SCHEMA  # noqa: E402
+_SCHEMA = _SCHEMA + "\n" + SCHEDULED_RUNS_SCHEMA
+
 
 async def _init_db():
     await db.executescript(_SCHEMA)
@@ -734,11 +741,30 @@ async def lifespan(app: FastAPI):
     set_context(_build_plugin_context(app))
     log.info("plugin context: in-process (DialektSQL + retry_loop use ASGI directly)")
 
+    # v0.27 §3.2: scheduled-trigger runtime. Boots once the DB is up so
+    # SCHEDULED_RUNS_SCHEMA exists when start() inserts catch-up rows.
+    # Skipped only when the env var DIALEKT_DISABLE_SCHEDULER=1 — the
+    # test suite uses that escape hatch when a test would otherwise
+    # race a real cron tick against its assertions.
+    app.state.scheduler = None
+    if os.environ.get("DIALEKT_DISABLE_SCHEDULER") != "1":
+        try:
+            from dialekt.scheduler import DialektScheduler
+            app.state.scheduler = DialektScheduler(db)
+            await app.state.scheduler.start()
+        except Exception:
+            log.exception("scheduler boot failed — interactive agents still work")
+
     yield
     from mcp_servers.postgres_mcp import close_all_pools
     from mcp_servers.mysql_mcp import close_all_pools_mysql
     await close_all_pools()
     await close_all_pools_mysql()
+    if getattr(app.state, "scheduler", None) is not None:
+        try:
+            await app.state.scheduler.stop()
+        except Exception:
+            log.exception("scheduler shutdown failed")
     try:
         await stop_refresher(app.state.license_refresher)
     except Exception:
@@ -1666,6 +1692,20 @@ async def license_trial():
 
 # ── Agent endpoints ───────────────────────────────────────────────────────────
 
+
+async def _scheduler_reload_safe() -> None:
+    """Best-effort reload — agent CRUD must succeed even if the
+    scheduler is disabled (DIALEKT_DISABLE_SCHEDULER=1) or boot
+    failed. Re-syncs cron jobs after a manifest changes shape."""
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        return
+    try:
+        await sched.reload()
+    except Exception:
+        log.exception("scheduler reload failed (CRUD continued)")
+
+
 @app.get("/agents")
 async def list_agents_endpoint():
     return await db_list_agents()
@@ -1683,6 +1723,7 @@ async def create_agent_endpoint(body: dict):
         manifest_yaml=body.get("manifest_yaml"),
         version=body.get("version", "1.0.0"),
     )
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": name}
 
 
@@ -1699,6 +1740,7 @@ async def update_agent_endpoint(agent_id: str, body: dict):
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_update_agent(agent_id, **body)
+    await _scheduler_reload_safe()
     return {"ok": True}
 
 
@@ -1707,6 +1749,7 @@ async def delete_agent_endpoint(agent_id: str):
     if not await db_get_agent(agent_id):
         raise HTTPException(404, "Agent not found")
     await db_delete_agent(agent_id)
+    await _scheduler_reload_safe()
     return {"ok": True}
 
 
@@ -1732,6 +1775,7 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
         version=version,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": name, "warnings": warnings}
 
 
@@ -1769,6 +1813,7 @@ async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
         source_template_id=source_template_id,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
+    await _scheduler_reload_safe()
     return {"id": agent_id, "name": m.metadata.name, "warnings": warnings}
 
 
