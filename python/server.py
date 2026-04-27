@@ -3585,9 +3585,12 @@ COMFY_OUTPUT = Path(_comfy_output_env) if _comfy_output_env else _HOME / "projec
 async def serve_file(path: str):
     from fastapi.responses import FileResponse
     p = Path(path).resolve()
+    visual_root_env = os.environ.get("DIALEKT_VISUAL_ROOT")
+    visual_root = Path(visual_root_env) if visual_root_env else Path.home() / ".dialekt" / "visual"
     allowed = [
         COMFY_OUTPUT.resolve(),
         Path("/tmp/dialekt_files").resolve(),
+        (visual_root / "out").resolve(),
     ]
     if not any(str(p).startswith(str(a)) for a in allowed):
         raise HTTPException(403, "path not allowed")

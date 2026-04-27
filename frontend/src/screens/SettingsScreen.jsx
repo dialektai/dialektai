@@ -504,6 +504,359 @@ function ComingSoonBanner({ version = 'v1.1', label }) {
   );
 }
 
+// ── Section: Branding ────────────────────────────────────────────────────────
+//
+// Pilot brand profile editor — colors + logo + optional font. Saves via
+// POST /branding/upload (multipart) then renders a synthetic showcase
+// PNG via POST /branding/{id}/preview so the user sees the result inline.
+// One profile per pilot is enough for v0.27 — list/switch UX comes later.
+
+const BRAND_DEFAULTS = {
+  brand_id: '',
+  name: '',
+  primary_color:    '#FF5629',
+  secondary_color:  '#3A5ADC',
+  background_color: '#0C1014',
+  text_color:       '#F5F1EA',
+  font_family: '',
+};
+
+function isHex(s) {
+  return /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s.trim());
+}
+
+function ColorRow({ label, sub, value, onChange }) {
+  // Browser <input type=color> needs strict #RRGGBB. The visible hex
+  // input below it is unconstrained so the user can still paste 3-char
+  // shorthand or alpha — server side normalises.
+  const swatch = isHex(value) && value.length >= 4
+    ? (value.length === 4
+        ? '#' + value.slice(1).split('').map(c => c + c).join('')
+        : value)
+    : '#888888';
+  return (
+    <Row label={label} sub={sub}>
+      <input
+        type="color" value={swatch}
+        onChange={e => onChange(e.target.value.toUpperCase())}
+        style={{
+          width: 36, height: 22, padding: 0, border: `1px solid ${T.border}`,
+          background: 'transparent', cursor: 'pointer',
+        }}
+      />
+      <input
+        type="text" value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="#RRGGBB"
+        style={{
+          width: 110, marginLeft: 10,
+          background: T.bg0, border: `1px solid ${isHex(value) || !value ? T.border : T.amber}`,
+          color: T.text, fontFamily: T.mono, fontSize: 12,
+          padding: '4px 8px',
+        }}
+      />
+    </Row>
+  );
+}
+
+function DropFile({ label, sub, value, accept, onChange }) {
+  const ref = useRef(null);
+  const [over, setOver] = useState(false);
+  const onPick = (file) => onChange(file || null);
+  return (
+    <div
+      onDragEnter={e => { e.preventDefault(); setOver(true); }}
+      onDragOver={e => { e.preventDefault(); }}
+      onDragLeave={e => { if (e.currentTarget === e.target) setOver(false); }}
+      onDrop={e => {
+        e.preventDefault(); setOver(false);
+        const f = e.dataTransfer?.files?.[0];
+        if (f) onPick(f);
+      }}
+      style={{
+        padding: '14px 16px',
+        borderBottom: `1px solid ${T.border}`,
+        background: over ? `${T.cyan}11` : 'transparent',
+        outline: over ? `1px dashed ${T.cyan}` : 'none',
+        outlineOffset: '-4px',
+      }}
+    >
+      <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
+             onChange={e => onPick(e.target.files?.[0])} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: T.text }}>{label}</div>
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>{sub}</div>
+          {value && (
+            <div className="mono" style={{ fontSize: 11, color: T.cyan, marginTop: 6 }}>
+              {value.name} · {Math.ceil(value.size / 1024)}KB
+            </div>
+          )}
+        </div>
+        <button className="dlk-btn" onClick={() => ref.current?.click()}>
+          {value ? 'Replace' : 'Choose file'}
+        </button>
+        {value && (
+          <button className="dlk-btn ghost" onClick={() => onPick(null)} title="Clear">
+            <Icon name="x" size={11} color={T.dim} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BrandingSection() {
+  const [form, setForm] = useState(BRAND_DEFAULTS);
+  const [logoFile, setLogoFile] = useState(null);
+  const [fontFile, setFontFile] = useState(null);
+  const [savedBrand, setSavedBrand] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [busy, setBusy] = useState(null);  // null | 'saving' | 'previewing'
+  const [error, setError] = useState(null);
+  const [brands, setBrands] = useState([]);
+
+  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Load existing brands on mount; pick the first one so the user can
+  // edit instead of always starting blank.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/branding`);
+        if (!r.ok) return;
+        const { brands: list } = await r.json();
+        setBrands(list || []);
+        if ((list || []).length > 0) {
+          loadBrand(list[0]);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const loadBrand = (b) => {
+    setForm({
+      brand_id: b.id,
+      name: b.name,
+      primary_color:    b.colors.primary    || '#000000',
+      secondary_color:  b.colors.secondary  || '',
+      background_color: b.colors.background || '#FFFFFF',
+      text_color:       b.colors.text       || '#111111',
+      font_family:      b.font_family       || '',
+    });
+    setSavedBrand(b);
+    setPreviewUrl(null);
+    setError(null);
+  };
+
+  const validate = () => {
+    if (!form.brand_id || !/^[a-z0-9][a-z0-9_-]{0,62}$/.test(form.brand_id)) {
+      return 'brand_id: 1–63 chars, [a-z0-9_-], must start with [a-z0-9]';
+    }
+    if (!form.name.trim()) return 'name is required';
+    if (!isHex(form.primary_color)) return 'primary color must be #RRGGBB';
+    if (form.secondary_color && !isHex(form.secondary_color)) return 'secondary color must be #RRGGBB';
+    if (!isHex(form.background_color)) return 'background color must be #RRGGBB';
+    if (!isHex(form.text_color)) return 'text color must be #RRGGBB';
+    return null;
+  };
+
+  const saveAndPreview = async () => {
+    const err = validate();
+    if (err) { setError(err); return; }
+    setError(null); setBusy('saving'); setPreviewUrl(null);
+    try {
+      const fd = new FormData();
+      fd.append('brand_id', form.brand_id);
+      fd.append('name', form.name);
+      fd.append('primary_color', form.primary_color);
+      fd.append('secondary_color', form.secondary_color);
+      fd.append('background_color', form.background_color);
+      fd.append('text_color', form.text_color);
+      if (form.font_family) fd.append('font_family', form.font_family);
+      if (logoFile) fd.append('logo', logoFile, logoFile.name);
+      if (fontFile) fd.append('font', fontFile, fontFile.name);
+
+      const r = await fetch(`${API}/branding/upload`, { method: 'POST', body: fd });
+      if (!r.ok) {
+        const txt = await r.text();
+        setError(`save failed (${r.status}): ${txt}`);
+        return;
+      }
+      const { brand } = await r.json();
+      setSavedBrand(brand);
+      // Refresh brand list
+      const listR = await fetch(`${API}/branding`);
+      if (listR.ok) setBrands((await listR.json()).brands || []);
+
+      // Render preview
+      setBusy('previewing');
+      const pr = await fetch(`${API}/branding/${brand.id}/preview`, { method: 'POST' });
+      if (!pr.ok) {
+        setError(`preview failed: ${pr.status}`);
+        return;
+      }
+      const { file } = await pr.json();
+      // /files endpoint serves any path under /tmp/dialekt_files OR
+      // ~/.dialekt/visual/out/, with a cache-buster to defeat browser
+      // caching of the previous render under the same URL.
+      setPreviewUrl(`${API}/files?path=${encodeURIComponent(file)}&_=${Date.now()}`);
+    } catch (e) {
+      setError(`unexpected error: ${e.message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <BodyShell
+      crumb="01 / SETUP → BRANDING"
+      title="Branding"
+      desc="Pilot brand profile applied to generated visuals (Instagram posts, announcements, schedules) when the agent renders a template with brand_id."
+    >
+      {brands.length > 1 && (
+        <Card title="Existing brands" n="A">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 12 }}>
+            {brands.map(b => (
+              <button
+                key={b.id}
+                className={`dlk-btn ${savedBrand?.id === b.id ? 'primary' : ''}`}
+                onClick={() => loadBrand(b)}
+              >
+                {b.name}
+              </button>
+            ))}
+            <button className="dlk-btn ghost" onClick={() => {
+              setForm(BRAND_DEFAULTS);
+              setSavedBrand(null); setPreviewUrl(null); setError(null);
+              setLogoFile(null); setFontFile(null);
+            }}>+ New brand</button>
+          </div>
+        </Card>
+      )}
+
+      <Card title="Identity" n={brands.length > 1 ? 'B' : 'A'}>
+        <Row label="Brand ID" sub="lower-case identifier used in API and file paths (e.g. iba)">
+          <input
+            type="text" value={form.brand_id}
+            onChange={e => set('brand_id')(e.target.value.toLowerCase())}
+            disabled={!!savedBrand}
+            placeholder="iba"
+            style={{
+              width: 200, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontFamily: T.mono, fontSize: 12, padding: '5px 8px',
+              opacity: savedBrand ? 0.5 : 1,
+            }}
+          />
+        </Row>
+        <Row label="Display name" sub="shown in the preview and brand picker" last>
+          <input
+            type="text" value={form.name}
+            onChange={e => set('name')(e.target.value)}
+            placeholder="International Business Academy"
+            style={{
+              width: 280, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontSize: 12, padding: '5px 8px',
+            }}
+          />
+        </Row>
+      </Card>
+
+      <Card title="Colors" n={brands.length > 1 ? 'C' : 'B'}>
+        <ColorRow label="Primary" sub="main accent — headlines, buttons, eyebrow"
+          value={form.primary_color} onChange={set('primary_color')} />
+        <ColorRow label="Secondary" sub="optional — supporting accent"
+          value={form.secondary_color} onChange={set('secondary_color')} />
+        <ColorRow label="Background" sub="canvas fill"
+          value={form.background_color} onChange={set('background_color')} />
+        <ColorRow label="Text" sub="body copy on the canvas"
+          value={form.text_color} onChange={set('text_color')} />
+      </Card>
+
+      <Card title="Assets" n={brands.length > 1 ? 'D' : 'C'}>
+        <DropFile
+          label="Logo"
+          sub="PNG, SVG, JPG, or WebP. Drop or pick. Used by .brand-logo in templates."
+          accept="image/png,image/svg+xml,image/jpeg,image/webp"
+          value={logoFile}
+          onChange={setLogoFile}
+        />
+        <DropFile
+          label="Custom font (optional)"
+          sub="TTF, OTF, WOFF, or WOFF2. Templates can reference var(--brand-font)."
+          accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+          value={fontFile}
+          onChange={setFontFile}
+        />
+        <Row label="Font family alias" sub="CSS @font-face name (defaults to BrandFont)" last>
+          <input
+            type="text" value={form.font_family}
+            onChange={e => set('font_family')(e.target.value)}
+            placeholder="BrandFont"
+            style={{
+              width: 200, background: T.bg0,
+              border: `1px solid ${T.border}`, color: T.text,
+              fontFamily: T.mono, fontSize: 12, padding: '5px 8px',
+            }}
+          />
+        </Row>
+      </Card>
+
+      {error && (
+        <div className="mono" style={{
+          padding: '10px 14px', marginBottom: 14, fontSize: 11,
+          color: T.amber, border: `1px solid ${T.amber}55`,
+          background: `${T.amber}0a`,
+        }}>{error}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <button
+          className="dlk-btn primary"
+          style={{ padding: '8px 18px', opacity: busy ? 0.5 : 1 }}
+          onClick={saveAndPreview}
+          disabled={!!busy}
+        >
+          {busy === 'saving' ? 'Saving…'
+            : busy === 'previewing' ? 'Rendering preview…'
+            : 'Save & Preview'}
+        </button>
+        {savedBrand && (
+          <button
+            className="dlk-btn ghost"
+            onClick={async () => {
+              if (!confirm(`Delete brand ${savedBrand.id}?`)) return;
+              await fetch(`${API}/branding/${savedBrand.id}`, { method: 'DELETE' });
+              setForm(BRAND_DEFAULTS); setSavedBrand(null); setPreviewUrl(null);
+              const r = await fetch(`${API}/branding`);
+              if (r.ok) setBrands((await r.json()).brands || []);
+            }}
+          >
+            Delete brand
+          </button>
+        )}
+      </div>
+
+      {previewUrl && (
+        <Card title="Preview" n={brands.length > 1 ? 'E' : 'D'}
+          right={<span className="mono" style={{ fontSize: 10, color: T.dim }}>1080×1080</span>}>
+          <div style={{ padding: 14, display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={previewUrl}
+              alt="Brand preview"
+              style={{ maxWidth: '100%', height: 'auto',
+                       border: `1px solid ${T.border}` }}
+            />
+          </div>
+        </Card>
+      )}
+    </BodyShell>
+  );
+}
+
+
 // ── Section: Permissions ──────────────────────────────────────────────────────
 
 function PermissionsSection() {
@@ -4096,6 +4449,7 @@ const NAV_GROUPS = [
   { title: 'Setup', items: [
     { k: 'Models',      icon: 'sparkle' },
     { k: 'Personality', icon: 'chat'    },
+    { k: 'Branding',    icon: 'diamond' },
     { k: 'Appearance',  icon: 'diamond' },
     { k: 'Shortcuts',   icon: 'terminal'},
   ]},
@@ -4126,6 +4480,7 @@ function renderSection(s) {
     case 'Permissions':        return <PermissionsSection />;
     case 'Models':             return <ModelsSection />;
     case 'Personality':        return <PersonalitySection />;
+    case 'Branding':           return <BrandingSection />;
     case 'Appearance':         return <AppearanceSection />;
     case 'Shortcuts':          return <ShortcutsSection />;
     case 'Filesystem':         return <FilesystemSection />;
