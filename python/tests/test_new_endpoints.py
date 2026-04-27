@@ -48,7 +48,7 @@ def test_ollama_check_returns_expected_fields(client):
 def test_ollama_check_install_url_format(client):
     r = client.get("/ollama/check")
     url = r.json()["install_url"]
-    assert url.startswith("https://ollama.com/download/")
+    assert url == "https://ollama.com/download"
 
 
 def test_ollama_check_installed_is_bool(client):
