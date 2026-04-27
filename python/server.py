@@ -572,6 +572,37 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_log_ts       ON audit_log(ts);
 CREATE INDEX IF NOT EXISTS idx_audit_log_agent_id ON audit_log(agent_id, ts);
 CREATE INDEX IF NOT EXISTS idx_audit_log_kind     ON audit_log(kind, ts);
+
+CREATE TABLE IF NOT EXISTS batch_jobs (
+    id             TEXT PRIMARY KEY,
+    agent_id       TEXT NOT NULL,
+    tenant_id      TEXT,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    total          INTEGER NOT NULL DEFAULT 0,
+    done           INTEGER NOT NULL DEFAULT 0,
+    variables_json TEXT,
+    error          TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS batch_job_files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id      TEXT NOT NULL REFERENCES batch_jobs(id) ON DELETE CASCADE,
+    ordinal     INTEGER NOT NULL,
+    input_path  TEXT NOT NULL,
+    input_name  TEXT NOT NULL,
+    output_path TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',
+    duration_ms INTEGER,
+    error       TEXT,
+    started_at  TEXT,
+    finished_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_agent_id ON batch_jobs(agent_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_batch_jobs_status   ON batch_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_batch_files_job_id  ON batch_job_files(job_id, ordinal);
 """
 
 
@@ -1134,6 +1165,328 @@ async def audit_log_query(
             "duration_ms": r[8], "error_kind": r[9], "extra": extra,
         })
     return {"rows": rows, "truncated": truncated}
+
+
+# ── Instagram Graph API endpoints ────────────────────────────────────────────
+#
+# Native publish surface for Instagram Business / Creator accounts. The
+# user creates their own Facebook App and pastes App ID + App Secret —
+# we never share a dialekt-owned app, both because Meta's terms forbid
+# proxying credentials and because per-user apps avoid one suspended
+# review torching every pilot.
+#
+# Storage: app_id, app_secret, access_token, token_expires (ISO),
+# ig_user_id, username — all in the keychain via dialekt.secrets.
+# Nothing Instagram-related lands in ~/.dialekt/config.json.
+#
+# Publish path is gated by an explicit ``confirmed: true`` body flag so
+# an MCP-driven agent can't reach this endpoint without a UI confirm —
+# defence in depth on top of the frontend ConfirmModal.
+
+_INSTAGRAM_SECRET_KEYS = (
+    "instagram_app_id",
+    "instagram_app_secret",
+    "instagram_access_token",
+    "instagram_token_expires",
+    "instagram_ig_user_id",
+    "instagram_username",
+)
+
+# OAuth state → started_at_ts. CSRF defence + redirect_uri lookup on
+# the way back. Pruned on read; bounded by a hard cap so a malicious
+# /setup/start flood can't blow memory.
+_instagram_oauth_state: dict[str, dict] = {}
+_INSTAGRAM_STATE_TTL_SECONDS = 600
+_INSTAGRAM_STATE_MAX_ENTRIES = 32
+
+
+def _instagram_redirect_uri() -> str:
+    """The callback URL we hand to Facebook. Must match an entry the
+    user added under "Valid OAuth Redirect URIs" in their FB App.
+    """
+    port = int(os.environ.get("DIALEKT_PORT", "8765"))
+    return f"http://localhost:{port}/social/instagram/setup/callback"
+
+
+def _instagram_prune_state() -> None:
+    import time
+    now = time.time()
+    expired = [
+        k for k, v in _instagram_oauth_state.items()
+        if now - v.get("started_at", 0) > _INSTAGRAM_STATE_TTL_SECONDS
+    ]
+    for k in expired:
+        _instagram_oauth_state.pop(k, None)
+    while len(_instagram_oauth_state) > _INSTAGRAM_STATE_MAX_ENTRIES:
+        oldest = min(
+            _instagram_oauth_state,
+            key=lambda k: _instagram_oauth_state[k].get("started_at", 0),
+        )
+        _instagram_oauth_state.pop(oldest, None)
+
+
+@app.post("/social/instagram/setup/start")
+async def instagram_setup_start(body: dict):
+    """Stash App ID + Secret in the keychain and return the FB authorize URL.
+
+    The user opens the URL in a browser, grants permissions, and FB
+    redirects to ``/social/instagram/setup/callback`` with ``code``.
+    """
+    import secrets as _stdlib_secrets
+    import time
+    from dialekt.secrets import set_secret
+    from dialekt.tools.social import oauth_flow
+
+    app_id = (body.get("app_id") or "").strip()
+    app_secret = (body.get("app_secret") or "").strip()
+    if not app_id or not app_secret:
+        raise HTTPException(400, "app_id and app_secret are required")
+
+    set_secret("instagram_app_id", app_id)
+    set_secret("instagram_app_secret", app_secret)
+
+    state = _stdlib_secrets.token_urlsafe(24)
+    redirect_uri = _instagram_redirect_uri()
+    _instagram_prune_state()
+    _instagram_oauth_state[state] = {
+        "started_at": time.time(),
+        "redirect_uri": redirect_uri,
+    }
+    auth_url = oauth_flow.build_auth_url(app_id, redirect_uri, state=state)
+    return {"auth_url": auth_url, "state": state, "redirect_uri": redirect_uri}
+
+
+@app.get("/social/instagram/setup/callback")
+async def instagram_setup_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+):
+    """OAuth landing page. Exchanges the code for a long-lived token,
+    fetches the IG Business account, persists everything, and renders
+    a tiny HTML page telling the user to switch back to dialekt.
+    """
+    from dialekt.audit import log_event
+    from dialekt.secrets import get_secret, set_secret
+    from dialekt.tools.social import oauth_flow
+
+    def _html(title: str, msg: str, ok: bool) -> Response:
+        body = (
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            f"<title>{title}</title>"
+            "<style>body{font-family:system-ui;background:#0d0e10;color:#e4e6ea;"
+            "display:flex;align-items:center;justify-content:center;height:100vh;"
+            "margin:0}div{max-width:480px;padding:32px;border:1px solid "
+            f"{'#1f6f4a' if ok else '#7a2a2a'};text-align:center}}"
+            "h1{margin:0 0 12px;font-size:18px;letter-spacing:-.01em}"
+            "p{color:#9aa0a8;font-size:13px;line-height:1.6;margin:0}</style>"
+            f"</head><body><div><h1>{title}</h1><p>{msg}</p></div></body></html>"
+        )
+        return Response(content=body, media_type="text/html",
+                        status_code=200 if ok else 400)
+
+    if error:
+        await log_event(
+            db, kind="instagram_oauth", action="callback", result="error",
+            error_kind=error, extra={"description": error_description},
+        )
+        return _html("Instagram setup failed", error_description or error, False)
+
+    if not code or not state:
+        return _html("Instagram setup failed",
+                     "Missing code or state in the callback URL.", False)
+
+    _instagram_prune_state()
+    pending = _instagram_oauth_state.pop(state, None)
+    if not pending:
+        await log_event(db, kind="instagram_oauth", action="callback",
+                        result="error", error_kind="state_mismatch")
+        return _html("Instagram setup failed",
+                     "Setup state expired or didn't match. Run setup again.", False)
+
+    app_id = get_secret("instagram_app_id")
+    app_secret = get_secret("instagram_app_secret")
+    if not app_id or not app_secret:
+        return _html("Instagram setup failed",
+                     "App credentials missing — re-enter App ID and Secret.", False)
+
+    try:
+        short = await oauth_flow.exchange_code_for_token(
+            app_id, app_secret, code, pending["redirect_uri"],
+        )
+        long_lived = await oauth_flow.exchange_for_long_lived(
+            app_id, app_secret, short["access_token"],
+        )
+        info = await oauth_flow.get_ig_business_account(long_lived["access_token"])
+    except oauth_flow.OAuthError as e:
+        await log_event(db, kind="instagram_oauth", action="callback",
+                        result="error", error_kind="graph_error",
+                        extra={"detail": str(e)})
+        return _html("Instagram setup failed", str(e), False)
+
+    set_secret("instagram_access_token", long_lived["access_token"])
+    set_secret("instagram_token_expires",
+               oauth_flow.expires_at_from_payload(long_lived))
+    set_secret("instagram_ig_user_id", info["ig_user_id"])
+    set_secret("instagram_username", info.get("username") or "")
+
+    await log_event(
+        db, kind="instagram_oauth", action="callback", result="success",
+        target=info["ig_user_id"],
+        extra={"username": info.get("username"), "page_id": info.get("page_id")},
+    )
+    return _html(
+        "Instagram connected",
+        f"Signed in as @{info.get('username') or info['ig_user_id']}. "
+        "You can close this window and return to dialekt.",
+        True,
+    )
+
+
+async def _instagram_ensure_fresh_token() -> tuple[str, str]:
+    """Read token + ig_user_id from the keychain, refreshing in place
+    when we're inside the 7-day refresh window. Returns
+    ``(access_token, ig_user_id)`` or raises HTTPException(409).
+    """
+    from dialekt.secrets import get_secret, set_secret
+    from dialekt.tools.social import oauth_flow
+
+    token = get_secret("instagram_access_token")
+    ig_user_id = get_secret("instagram_ig_user_id")
+    if not token or not ig_user_id:
+        raise HTTPException(409, "Instagram is not connected — finish setup first")
+
+    expires = get_secret("instagram_token_expires")
+    if oauth_flow.needs_refresh(expires):
+        app_id = get_secret("instagram_app_id")
+        app_secret = get_secret("instagram_app_secret")
+        if not app_id or not app_secret:
+            raise HTTPException(409, "Instagram App credentials missing — re-run setup")
+        try:
+            payload = await oauth_flow.refresh_long_lived(app_id, app_secret, token)
+        except oauth_flow.OAuthError as e:
+            raise HTTPException(502, f"Instagram token refresh failed: {e}")
+        token = payload["access_token"]
+        set_secret("instagram_access_token", token)
+        set_secret(
+            "instagram_token_expires",
+            oauth_flow.expires_at_from_payload(payload),
+        )
+    return token, ig_user_id
+
+
+@app.post("/social/instagram/publish")
+async def instagram_publish(body: dict):
+    """Publish a feed post, story, or Reel to the connected account.
+
+    Body: ``{kind, media:[url,...], caption?, confirmed: true}``
+
+    ``confirmed`` MUST be ``true`` — the frontend sets it after the user
+    accepts the destructive ConfirmModal. Prevents an agent calling
+    this endpoint without a human in the loop.
+    """
+    import time
+    from dialekt.audit import log_event
+    from dialekt.tools.social.instagram_publisher import (
+        InstagramPublisher, PublishError,
+    )
+    from dialekt.tools.social.oauth_flow import OAuthError
+
+    if body.get("confirmed") is not True:
+        raise HTTPException(412, "confirmed=true required — destructive action")
+
+    kind = body.get("kind")
+    if kind not in ("feed_post", "story", "reel"):
+        raise HTTPException(400, "kind must be feed_post, story, or reel")
+
+    media = body.get("media") or []
+    if not isinstance(media, list) or not media:
+        raise HTTPException(400, "media must be a non-empty list of URLs")
+    primary = media[0]
+    if not isinstance(primary, str) or not primary.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            400,
+            "media[0] must be an HTTPS URL — Instagram Graph API does not "
+            "accept local file paths. Upload the file first and pass the URL.",
+        )
+
+    caption = body.get("caption") or ""
+    if not isinstance(caption, str):
+        raise HTTPException(400, "caption must be a string")
+
+    token, ig_user_id = await _instagram_ensure_fresh_token()
+
+    started = time.monotonic()
+    try:
+        async with InstagramPublisher(ig_user_id, token) as pub:
+            if kind == "feed_post":
+                media_id = await pub.publish_feed_post(primary, caption)
+            elif kind == "story":
+                media_id = await pub.publish_story(primary)
+            else:
+                media_id = await pub.publish_reel(primary, caption)
+    except (PublishError, OAuthError) as e:
+        await log_event(
+            db, kind="instagram_publish", action=kind, result="error",
+            target=ig_user_id, duration_ms=int((time.monotonic() - started) * 1000),
+            error_kind=type(e).__name__,
+            extra={"detail": str(e), "caption_len": len(caption)},
+        )
+        raise HTTPException(502, f"Instagram publish failed: {e}")
+
+    await log_event(
+        db, kind="instagram_publish", action=kind, result="success",
+        target=ig_user_id, duration_ms=int((time.monotonic() - started) * 1000),
+        extra={"media_id": media_id, "caption_len": len(caption)},
+    )
+    return {"media_id": media_id, "kind": kind}
+
+
+@app.get("/social/instagram/status")
+async def instagram_status():
+    """Snapshot of connection state for the Settings panel.
+
+    Never returns secret values — only presence flags and metadata
+    safe to render. The token-expiry stamp is exposed because the UI
+    surfaces "renews on …" copy.
+    """
+    from dialekt.secrets import get_secret
+    from dialekt.tools.social import oauth_flow
+
+    app_id = get_secret("instagram_app_id")
+    has_secret = bool(get_secret("instagram_app_secret"))
+    token = get_secret("instagram_access_token")
+    expires = get_secret("instagram_token_expires")
+    return {
+        "configured": bool(app_id and has_secret),
+        "has_token": bool(token),
+        "ig_user_id": get_secret("instagram_ig_user_id"),
+        "username": get_secret("instagram_username"),
+        "expires": expires,
+        "needs_refresh": oauth_flow.needs_refresh(expires) if token else False,
+        "app_id_prefix": (app_id[:6] + "…") if app_id else None,
+        "redirect_uri": _instagram_redirect_uri(),
+    }
+
+
+@app.delete("/social/instagram", status_code=204)
+async def instagram_disconnect():
+    """Wipe every Instagram secret. Used by the "Disconnect" button.
+
+    The FB App on the user's side is untouched — they revoke our token
+    from facebook.com if they want a complete teardown.
+    """
+    from dialekt.audit import log_event
+    from dialekt.secrets import delete_secret
+    for key in _INSTAGRAM_SECRET_KEYS:
+        try:
+            delete_secret(key)
+        except Exception:
+            pass
+    _instagram_oauth_state.clear()
+    await log_event(db, kind="instagram_oauth", action="disconnect", result="success")
+    return Response(status_code=204)
 
 
 # ── Cloud sync endpoints (skeleton — requires dialekt Cloud) ─────────────────
@@ -3183,6 +3536,277 @@ async def ollama_pull_stream(model: str):
         generate(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── Batch processing ──────────────────────────────────────────────────────────
+#
+# Run an agent over many files in one job. Endpoints:
+#   POST /batch                  — create + schedule
+#   GET  /batch/{id}             — JSON snapshot (job + per-file states)
+#   GET  /batch/{id}/stream      — SSE event stream until terminal
+#   GET  /batch/{id}/zip         — zip of completed outputs
+#   POST /batch/{id}/cancel      — set cancel flag (idempotent)
+#
+# Lifecycle: handler creates the DB row, registers a cancel Event +
+# subscribers list, fires asyncio.create_task(run_batch_job(...)).
+# Runner emits events via on_event → _batch_fanout pushes to every
+# subscribed asyncio.Queue. SSE endpoint pops from its queue until a
+# terminal event arrives.
+
+_active_batch_tasks: dict[str, asyncio.Task] = {}
+_batch_cancel_events: dict[str, threading.Event] = {}
+_batch_subscribers: dict[str, list[asyncio.Queue]] = {}
+
+_BATCH_TERMINAL_TYPES = {"completed", "failed", "cancelled"}
+
+
+def _batch_fanout(job_id: str, event: dict) -> None:
+    """Runner-side callback. Pushes to every subscriber queue.
+
+    Called from the runner's worker thread via the on_event hook —
+    must be thread-safe and never block. Uses asyncio.Queue's
+    ``put_nowait`` because subscribers should keep up; if a slow
+    consumer falls behind we drop events for that one rather than
+    stalling the whole batch.
+    """
+    subs = _batch_subscribers.get(job_id)
+    if not subs:
+        return
+    for q in subs:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            log.warning("batch %s — subscriber queue full, dropping event", job_id)
+
+
+async def _batch_run_wrapped(job_id: str) -> None:
+    """asyncio task body. Wraps the runner so we can swallow exceptions
+    into a 'failed' DB state instead of crashing the event loop, and
+    always clean up the global registries.
+    """
+    cancel = _batch_cancel_events.get(job_id) or threading.Event()
+    try:
+        from dialekt.batch import run_batch_job
+        await run_batch_job(
+            db, job_id,
+            on_event=lambda e: _batch_fanout(job_id, e),
+            cancel_event=cancel,
+        )
+    except Exception as exc:
+        log.exception("batch %s — runner crashed", job_id)
+        try:
+            from dialekt.batch import set_job_error
+            await set_job_error(db, job_id, f"runner crashed: {exc}")
+        except Exception:
+            pass
+        _batch_fanout(job_id, {"type": "failed", "job_id": job_id, "error": str(exc)})
+    finally:
+        _active_batch_tasks.pop(job_id, None)
+        _batch_cancel_events.pop(job_id, None)
+        # Wake any still-subscribed SSE streams so they can close cleanly.
+        for q in _batch_subscribers.pop(job_id, []):
+            try:
+                q.put_nowait({"type": "_eof"})
+            except asyncio.QueueFull:
+                pass
+
+
+@app.post("/batch", status_code=201)
+async def batch_create(body: dict):
+    """Create a batch job and schedule the runner.
+
+    Body:
+        agent_id: str (required) — must reference an existing agent
+        file_paths: list[str] (required, non-empty) — paths returned
+            by /upload, or any absolute path the dialekt process can
+            read. Aliased ``file_ids`` and ``files`` are also accepted
+            so callers don't have to remember the exact spelling
+        variables: dict (optional) — instruction (str), output_ext (str)
+        tenant_id: str (optional)
+
+    Returns: {job_id, status, total}
+    """
+    from dialekt.batch import create_job
+
+    agent_id = body.get("agent_id")
+    if not agent_id:
+        raise HTTPException(422, "agent_id required")
+
+    raw_files = (
+        body.get("file_paths")
+        or body.get("file_ids")
+        or body.get("files")
+        or []
+    )
+    file_paths: list[str] = []
+    for entry in raw_files:
+        if isinstance(entry, str):
+            file_paths.append(entry)
+        elif isinstance(entry, dict) and entry.get("path"):
+            file_paths.append(entry["path"])
+        else:
+            raise HTTPException(422, f"unsupported file entry: {entry!r}")
+    if not file_paths:
+        raise HTTPException(422, "file_paths must be a non-empty list")
+
+    variables = body.get("variables") or {}
+    if not isinstance(variables, dict):
+        raise HTTPException(422, "variables must be an object")
+
+    cursor = await db.execute("SELECT id FROM agents WHERE id = ?", (agent_id,))
+    if await cursor.fetchone() is None:
+        raise HTTPException(404, f"agent {agent_id} not found")
+
+    job = await create_job(
+        db,
+        agent_id=agent_id,
+        file_paths=file_paths,
+        variables=variables,
+        tenant_id=body.get("tenant_id"),
+    )
+
+    cancel = threading.Event()
+    _batch_cancel_events[job.id] = cancel
+    _batch_subscribers[job.id] = []
+    task = asyncio.create_task(_batch_run_wrapped(job.id))
+    _active_batch_tasks[job.id] = task
+
+    log.info("batch %s scheduled — agent %s, %d files", job.id, agent_id, job.total)
+    return {"job_id": job.id, "status": job.status, "total": job.total}
+
+
+@app.get("/batch/{job_id}")
+async def batch_get(job_id: str):
+    """Return the current job state plus per-file rows."""
+    from dialekt.batch import get_job, list_files
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    files = await list_files(db, job_id)
+    return {
+        "job": job.to_dict(),
+        "files": [f.to_dict() for f in files],
+        "running": job_id in _active_batch_tasks,
+    }
+
+
+@app.get("/batch/{job_id}/stream")
+async def batch_stream(job_id: str):
+    """Server-Sent Events stream of runner events until terminal state.
+
+    Late subscribers (job already finished): we send the final state
+    one-shot and close. Live subscribers: we replay the current state
+    first so the UI can render an in-progress job correctly even when
+    the page was refreshed mid-batch.
+    """
+    from fastapi.responses import StreamingResponse
+    from dialekt.batch import get_job, list_files
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=1024)
+    subs = _batch_subscribers.setdefault(job_id, [])
+    subs.append(queue)
+
+    async def gen():
+        try:
+            # Replay current state for late subscribers / page refresh.
+            files = await list_files(db, job_id)
+            snapshot = {
+                "type": "snapshot",
+                "job": job.to_dict(),
+                "files": [f.to_dict() for f in files],
+            }
+            yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+
+            # If the job is already terminal, no more events will come —
+            # close immediately after the snapshot.
+            if job.status in _BATCH_TERMINAL_TYPES:
+                return
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # Heartbeat keeps proxies (nginx, cloudflare) from
+                    # severing the connection mid-batch.
+                    yield ": heartbeat\n\n"
+                    continue
+                if event.get("type") == "_eof":
+                    return
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") in _BATCH_TERMINAL_TYPES:
+                    return
+        finally:
+            try:
+                _batch_subscribers.get(job_id, []).remove(queue)
+            except ValueError:
+                pass
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/batch/{job_id}/cancel")
+async def batch_cancel(job_id: str):
+    """Idempotent cancellation. Tripping the threading.Event is the
+    runner's signal; the runner does the actual DB status flip when
+    it observes the flag between files."""
+    from dialekt.batch import get_job
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    cancel = _batch_cancel_events.get(job_id)
+    if cancel is not None:
+        cancel.set()
+    return {"job_id": job_id, "cancel_requested": True, "status": job.status}
+
+
+@app.get("/batch/{job_id}/zip")
+async def batch_zip(job_id: str):
+    """Return a ZIP of every successful per-file output plus the
+    runner's _manifest.json. Available once the job is terminal —
+    while running, we 409 to keep the artefact deterministic."""
+    from fastapi.responses import StreamingResponse
+    import io
+    import zipfile
+    from dialekt.batch import get_job, list_files, DEFAULT_OUTPUT_ROOT
+
+    job = await get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "batch job not found")
+    if job.status not in _BATCH_TERMINAL_TYPES:
+        raise HTTPException(409, f"batch is {job.status} — wait for terminal state")
+
+    files = await list_files(db, job_id)
+    out_dir = (DEFAULT_OUTPUT_ROOT / job_id).expanduser()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            if f.status != "done" or not f.output_path:
+                continue
+            p = Path(f.output_path)
+            if p.exists():
+                zf.write(p, arcname=p.name)
+        manifest = out_dir / "_manifest.json"
+        if manifest.exists():
+            zf.write(manifest, arcname="_manifest.json")
+
+    buf.seek(0)
+    fname = f"batch_{job_id[:8]}.zip"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
 

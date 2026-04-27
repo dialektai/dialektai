@@ -1281,6 +1281,357 @@ function ScreenSection() {
   );
 }
 
+// ── Section: Instagram ───────────────────────────────────────────────────────
+//
+// Native publisher (no MCP) for Instagram Graph API. Two modes:
+//
+//  • Setup Wizard — shown when /social/instagram/status reports
+//    configured=false. Walks the user through creating their own
+//    Facebook App (we never proxy a shared dialekt App), pasting in
+//    App ID + App Secret, and clicking Connect to open the FB OAuth
+//    consent dialog in the system browser.
+//
+//  • Connected panel — shows linked @username, token expiry, manual
+//    publish form (feed_post / story / reel) and Disconnect button.
+//
+// Every publish goes through ConfirmModal because the action is
+// destructive (visible to followers, only deletable through Instagram
+// itself). The backend additionally requires confirmed=true on the
+// POST body — defence in depth against an MCP-driven agent reaching
+// the endpoint without a human in the loop.
+
+const IG_SETUP_STEPS = [
+  { i: 1, t: 'Open Meta for Developers',
+    d: 'Go to developers.facebook.com and sign in with the Facebook account that owns the Page linked to your Instagram.' },
+  { i: 2, t: 'Create a new App',
+    d: 'Click "Create App" → choose use case "Other" → app type "Business".' },
+  { i: 3, t: 'Add the Instagram product',
+    d: 'In the App dashboard sidebar: "Add product" → "Instagram" → "Set up". This enables the Graph API permissions dialekt needs.' },
+  { i: 4, t: 'Configure OAuth redirect',
+    d: 'Under App Settings → Basic, add the redirect URI shown below to "Valid OAuth Redirect URIs" — without it, Facebook rejects the login.' },
+  { i: 5, t: 'Copy App ID and App Secret',
+    d: 'Both shown in App Settings → Basic. Click "Show" to reveal the secret. dias.now stores them in your OS keychain — never in plaintext.' },
+  { i: 6, t: 'Paste them below and click Connect',
+    d: 'A browser tab opens to facebook.com. Approve the permissions, then return here.' },
+  { i: 7, t: 'Auto-renewal',
+    d: 'Tokens last 60 days. dias.now refreshes within the last week before expiry — no action needed from you.' },
+];
+
+function InstagramSection() {
+  const { addToast, showConfirm } = useContext(Ctx);
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [appId, setAppId] = useState('');
+  const [appSecret, setAppSecret] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [pubKind, setPubKind] = useState('feed_post');
+  const [pubMedia, setPubMedia] = useState('');
+  const [pubCaption, setPubCaption] = useState('');
+
+  const reload = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/social/instagram/status`);
+      const j = await r.json();
+      setStatus(j);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const startConnect = async () => {
+    if (!appId.trim() || !appSecret.trim()) {
+      addToast('App ID and App Secret are required', 'error');
+      return;
+    }
+    setConnecting(true);
+    try {
+      const r = await fetch(`${API}/social/instagram/setup/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_id: appId.trim(), app_secret: appSecret.trim() }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || 'setup failed');
+      window.open(j.auth_url, '_blank', 'noopener,noreferrer');
+      addToast('Opened Facebook in a browser tab — return here when done', 'ok');
+      const id = setInterval(async () => {
+        const s = await fetch(`${API}/social/instagram/status`).then(x => x.json()).catch(() => null);
+        if (s?.has_token) {
+          clearInterval(id);
+          setStatus(s);
+          setAppId(''); setAppSecret('');
+          addToast(`Connected as @${s.username || s.ig_user_id}`, 'ok');
+        }
+      }, 2500);
+      setTimeout(() => clearInterval(id), 5 * 60 * 1000);
+    } catch (e) {
+      addToast(`Connect failed: ${e.message}`, 'error');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const disconnect = () => showConfirm({
+    title: 'Disconnect Instagram?',
+    body: 'Removes App ID, App Secret, and access token from the keychain. Posts already published stay live on Instagram. You can revoke the token from facebook.com → Settings → Apps separately.',
+    action: 'Disconnect', danger: true,
+    onConfirm: async () => {
+      try {
+        await fetch(`${API}/social/instagram`, { method: 'DELETE' });
+        await reload();
+        addToast('Disconnected', 'ok');
+      } catch (e) {
+        addToast(`Disconnect failed: ${e.message}`, 'error');
+      }
+    },
+  });
+
+  const requestPublish = () => {
+    if (!pubMedia.trim()) {
+      addToast('Media URL is required', 'error');
+      return;
+    }
+    if (!/^https?:\/\//i.test(pubMedia.trim())) {
+      addToast('Media must be an HTTPS URL — local file paths are not accepted by Instagram', 'error');
+      return;
+    }
+    const labels = { feed_post: 'feed post', story: 'story', reel: 'Reel' };
+    const summary = pubCaption.trim()
+      ? `Caption: "${pubCaption.length > 80 ? pubCaption.slice(0, 77) + '…' : pubCaption}"`
+      : 'No caption.';
+    showConfirm({
+      title: `Publish ${labels[pubKind]} to @${status?.username || 'Instagram'}?`,
+      body: `${summary} Once published, the post is visible to your followers and can only be deleted from Instagram itself.`,
+      action: 'Publish', danger: true,
+      onConfirm: async () => {
+        setPublishing(true);
+        try {
+          const r = await fetch(`${API}/social/instagram/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              kind: pubKind,
+              media: [pubMedia.trim()],
+              caption: pubCaption,
+              confirmed: true,
+            }),
+          });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || 'publish failed');
+          addToast(`Published — media id ${j.media_id}`, 'ok');
+          setPubMedia(''); setPubCaption('');
+        } catch (e) {
+          addToast(`Publish failed: ${e.message}`, 'error');
+        } finally {
+          setPublishing(false);
+        }
+      },
+    });
+  };
+
+  const formatExpiry = (iso) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      const days = Math.round((d - Date.now()) / (24 * 3600 * 1000));
+      return `${d.toLocaleDateString()} (${days >= 0 ? `in ${days}d` : `${-days}d ago`})`;
+    } catch { return iso; }
+  };
+
+  return (
+    <BodyShell crumb="02 / CAPABILITIES → INSTAGRAM" title="Instagram"
+      desc="Publish feed posts, stories, and Reels to your Instagram Business or Creator account through the Meta Graph API. You bring your own Facebook App — dias.now never proxies credentials.">
+
+      {/* Account requirements — always visible */}
+      <Card title="Account requirements" n="A">
+        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            'Instagram Business or Creator account (a personal account cannot publish via Graph API).',
+            'The Instagram account must be linked to a Facebook Page you administer.',
+            'You must hold ownership of (or admin access to) the Facebook App used for OAuth.',
+          ].map((line, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Icon name="stop" size={11} color={T.amber} />
+              <span style={{ fontSize: 12, color: T.muted, lineHeight: 1.55 }}>{line}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {loading ? (
+        <div style={{ color: T.dim, fontSize: 13, padding: '24px 0' }}>Loading…</div>
+      ) : status?.has_token ? (
+        <>
+          <Card title={`Connected · @${status.username || status.ig_user_id}`} n="B"
+            right={
+              <span className="mono" style={{ fontSize: 10, color: T.green, letterSpacing: '.08em' }}>
+                ACTIVE
+              </span>
+            }>
+            <Row label="Instagram username" sub="from the linked FB Page">
+              <span className="mono" style={{ fontSize: 12, color: T.text }}>
+                @{status.username || '—'}
+              </span>
+            </Row>
+            <Row label="IG user ID" sub="numeric Graph API id">
+              <span className="mono" style={{ fontSize: 11, color: T.dim }}>{status.ig_user_id}</span>
+            </Row>
+            <Row label="App ID" sub="kept in OS keychain (never in config.json)">
+              <span className="mono" style={{ fontSize: 11, color: T.dim }}>
+                {status.app_id_prefix || '—'}
+              </span>
+            </Row>
+            <Row label="Token expires" sub="dias.now refreshes within 7 days of expiry">
+              <span className="mono" style={{ fontSize: 11,
+                color: status.needs_refresh ? T.amber : T.dim }}>
+                {formatExpiry(status.expires)}
+              </span>
+            </Row>
+            <Row label="Disconnect" sub="removes credentials from this machine" last>
+              <button className="dlk-btn"
+                style={{ borderColor: T.red + '66', color: T.red }}
+                onClick={disconnect}>
+                Disconnect
+              </button>
+            </Row>
+          </Card>
+
+          <Card title="Publish" n="C">
+            <div style={{
+              padding: '10px 14px', borderBottom: `1px solid ${T.border}`,
+              display: 'flex', gap: 8, alignItems: 'center',
+              background: '#2a1f0a', color: T.amber,
+            }}>
+              <Icon name="stop" size={11} color={T.amber} />
+              <span className="mono" style={{ fontSize: 10, letterSpacing: '.06em' }}>
+                Each publish requires explicit confirmation — once live, deletion only on Instagram.
+              </span>
+            </div>
+            <Row label="Kind" sub="feed post · story · reel">
+              <Select value={pubKind} onChange={setPubKind} options={[
+                { v: 'feed_post', l: 'Feed post (image)' },
+                { v: 'story',     l: 'Story (image, 24h)' },
+                { v: 'reel',      l: 'Reel (video)' },
+              ]} />
+            </Row>
+            <Row label="Media URL" sub="must be HTTPS — Instagram does not accept local paths">
+              <input
+                type="url"
+                value={pubMedia}
+                onChange={e => setPubMedia(e.target.value)}
+                placeholder="https://…/photo.jpg"
+                style={{
+                  width: 360, background: T.bg0, border: `1px solid ${T.border}`,
+                  outline: 'none', fontFamily: T.mono, fontSize: 11, color: T.text,
+                  padding: '6px 10px', caretColor: T.cyan,
+                }}
+              />
+            </Row>
+            <Row label="Caption" sub="ignored for stories" last>
+              <textarea
+                value={pubCaption}
+                onChange={e => setPubCaption(e.target.value)}
+                rows={3}
+                placeholder="What's the post about?"
+                style={{
+                  width: 360, background: T.bg0, border: `1px solid ${T.border}`,
+                  outline: 'none', fontFamily: T.mono, fontSize: 11, color: T.text,
+                  padding: '6px 10px', resize: 'vertical', caretColor: T.cyan,
+                }}
+              />
+            </Row>
+            <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="dlk-btn primary"
+                disabled={publishing || !pubMedia.trim()}
+                onClick={requestPublish}
+                style={{ opacity: publishing || !pubMedia.trim() ? 0.5 : 1 }}>
+                {publishing ? 'Publishing…' : 'Publish'}
+              </button>
+            </div>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card title="Setup wizard" n="B">
+            {IG_SETUP_STEPS.map((s, i) => (
+              <div key={s.i} style={{
+                display: 'flex', gap: 14, padding: '14px 16px',
+                borderBottom: i < IG_SETUP_STEPS.length - 1 ? `1px solid ${T.border}` : 'none',
+              }}>
+                <span className="mono" style={{
+                  width: 22, height: 22, lineHeight: '22px', textAlign: 'center',
+                  border: `1px solid ${T.cyan}66`, color: T.cyan, fontSize: 11,
+                  flexShrink: 0,
+                }}>{s.i}</span>
+                <div>
+                  <div style={{ fontSize: 13, color: T.text, marginBottom: 4 }}>{s.t}</div>
+                  <div style={{ fontSize: 11, color: T.muted, lineHeight: 1.55 }}>{s.d}</div>
+                </div>
+              </div>
+            ))}
+          </Card>
+
+          <Card title="OAuth redirect URI" n="C">
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontSize: 12, color: T.muted, lineHeight: 1.55 }}>
+                Add this exact URL to your FB App under{' '}
+                <span className="mono" style={{ color: T.text }}>App Settings → Basic → Valid OAuth Redirect URIs</span>:
+              </span>
+              <div className="mono" style={{
+                background: T.bg0, border: `1px solid ${T.border}`,
+                padding: '8px 10px', fontSize: 11, color: T.cyan,
+                userSelect: 'all',
+              }}>
+                {status?.redirect_uri || `http://localhost:8765/social/instagram/setup/callback`}
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Credentials" n="D">
+            <Row label="App ID" sub="from App Settings → Basic">
+              <input
+                value={appId}
+                onChange={e => setAppId(e.target.value)}
+                placeholder="123456789012345"
+                style={{
+                  width: 280, background: T.bg0, border: `1px solid ${T.border}`,
+                  outline: 'none', fontFamily: T.mono, fontSize: 11, color: T.text,
+                  padding: '6px 10px', caretColor: T.cyan,
+                }}
+              />
+            </Row>
+            <Row label="App Secret" sub="kept in OS keychain — never returned to the UI" last>
+              <input
+                type="password"
+                value={appSecret}
+                onChange={e => setAppSecret(e.target.value)}
+                placeholder="••••••••••••••••"
+                style={{
+                  width: 280, background: T.bg0, border: `1px solid ${T.border}`,
+                  outline: 'none', fontFamily: T.mono, fontSize: 11, color: T.text,
+                  padding: '6px 10px', caretColor: T.cyan,
+                }}
+              />
+            </Row>
+            <div style={{ padding: '12px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="dlk-btn primary"
+                disabled={connecting || !appId.trim() || !appSecret.trim()}
+                onClick={startConnect}
+                style={{ opacity: connecting || !appId.trim() || !appSecret.trim() ? 0.5 : 1 }}>
+                {connecting ? 'Opening browser…' : 'Connect'}
+              </button>
+            </div>
+          </Card>
+        </>
+      )}
+    </BodyShell>
+  );
+}
+
 // ── Section: MCP tools ────────────────────────────────────────────────────────
 
 const MCP_TOOLS = [
@@ -3283,6 +3634,7 @@ const NAV_GROUPS = [
     { k: 'MCP Servers',     icon: 'cog' },
     { k: 'Connections',     icon: 'folder'  },
     { k: 'Agents',          icon: 'diamond' },
+    { k: 'Instagram',       icon: 'sparkle' },
   ]},
   { title: 'System', items: [
     { k: 'Storage & memory',   icon: 'file'   },
@@ -3308,6 +3660,7 @@ function renderSection(s) {
     case 'MCP Servers':        return <MCPSection />;
     case 'Connections':        return <ConnectionsSection />;
     case 'Agents':             return <AgentsSection />;
+    case 'Instagram':          return <InstagramSection />;
     case 'Storage & memory':   return <StorageSection />;
     case 'Performance':        return <PerformanceSection />;
     case 'Privacy & telemetry':return <PrivacySection />;

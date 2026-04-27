@@ -687,13 +687,153 @@ function AutonomyPicker({ value, onChange }) {
   );
 }
 
+// ── Batch processing UI ──────────────────────────────────────────
+
+function BatchConfirmModal({ count, onConfirm, onCancel, busy }) {
+  const [instruction, setInstruction] = useState('');
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000,
+    }}>
+      <div style={{
+        background: T.bg1, border: `1px solid ${T.cyan}55`,
+        padding: '22px 26px', minWidth: 420, maxWidth: 540,
+        boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+      }}>
+        <div className="upper" style={{ color: T.cyan, marginBottom: 6 }}>BATCH</div>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>
+          Process {count} files in one batch?
+        </div>
+        <div style={{ fontSize: 12, color: T.muted, marginBottom: 16, lineHeight: 1.55 }}>
+          The active agent will run on every file in turn. Outputs land in
+          ~/.dialekt/batch/&lt;job&gt;/ and you can download a ZIP when finished.
+        </div>
+        <label className="upper" style={{ color: T.dim, display: 'block', marginBottom: 6 }}>
+          Instruction (optional)
+        </label>
+        <textarea
+          value={instruction}
+          onChange={e => setInstruction(e.target.value)}
+          placeholder="e.g. Rewrite this resume in IBA format. Return only the result."
+          rows={3}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: T.bg0, border: `1px solid ${T.border}`,
+            color: T.text, fontFamily: T.mono, fontSize: 12,
+            padding: '8px 10px', resize: 'vertical', marginBottom: 18,
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="dlk-btn ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="dlk-btn primary"
+            style={{ padding: '6px 14px', opacity: busy ? 0.5 : 1 }}
+            onClick={() => onConfirm(instruction.trim())}
+            disabled={busy}
+          >
+            {busy ? 'Scheduling…' : `Process ${count} files`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BatchProgressCard({ jobId, snapshot, onCancel, onDownload, onDismiss }) {
+  if (!snapshot) return null;
+  const { job, files = [] } = snapshot;
+  const total = job?.total || files.length || 0;
+  const done = job?.done || 0;
+  const status = job?.status || 'pending';
+  const errored = files.filter(f => f.status === 'error').length;
+  const cancelled = files.filter(f => f.status === 'cancelled').length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  const isTerminal = status === 'completed' || status === 'failed' || status === 'cancelled';
+  const tone = status === 'completed' ? T.green
+    : status === 'failed' ? T.red
+    : status === 'cancelled' ? T.amber
+    : T.cyan;
+
+  return (
+    <div style={{
+      border: `1px solid ${tone}55`,
+      background: T.bg1,
+      padding: '12px 14px',
+      marginBottom: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: tone, letterSpacing: '.14em',
+          border: `1px solid ${tone}88`, padding: '2px 6px',
+        }}>BATCH · {status.toUpperCase()}</span>
+        <span className="mono" style={{ fontSize: 11, color: T.muted }}>
+          {jobId.slice(0, 8)}
+        </span>
+        <div style={{ flex: 1 }} />
+        {!isTerminal && (
+          <button className="dlk-btn ghost" onClick={onCancel} title="Cancel batch">
+            <Icon name="x" size={11} color={T.amber} />
+          </button>
+        )}
+        {isTerminal && (
+          <button className="dlk-btn ghost" onClick={onDismiss} title="Dismiss">
+            <Icon name="x" size={11} color={T.dim} />
+          </button>
+        )}
+      </div>
+      <div style={{
+        height: 4, background: T.border, position: 'relative', marginBottom: 6,
+      }}>
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0,
+          width: `${pct}%`, background: tone,
+          transition: 'width 0.2s linear',
+        }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11 }}>
+        <span className="mono" style={{ color: T.text }}>{done} / {total}</span>
+        {errored > 0 && (
+          <span className="mono" style={{ color: T.red }}>· {errored} errored</span>
+        )}
+        {cancelled > 0 && (
+          <span className="mono" style={{ color: T.amber }}>· {cancelled} cancelled</span>
+        )}
+        <div style={{ flex: 1 }} />
+        {isTerminal && status !== 'failed' && (
+          <button className="dlk-btn primary" style={{ padding: '4px 10px' }} onClick={onDownload}>
+            <Icon name="download" size={11} color="#000" />Download ZIP
+          </button>
+        )}
+      </div>
+      {job?.error && (
+        <div className="mono" style={{ fontSize: 10, color: T.red, marginTop: 6 }}>
+          {job.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── Composer ──────────────────────────────────────────────────────
 
-function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, messages, disabled, disabledHint }) {
+function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, messages, disabled, disabledHint, activeAgentId }) {
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const taRef = useRef(null);
   const fileRef = useRef(null);
+
+  // Batch state
+  const [pendingBatch, setPendingBatch] = useState(null);   // { paths: [...] }
+  const [batchScheduling, setBatchScheduling] = useState(false);
+  const [activeBatch, setActiveBatch] = useState(null);     // { jobId, snapshot }
+  const [dragOver, setDragOver] = useState(false);
+  const sseRef = useRef(null);
 
   const appendText = (str) => {
     setText(t => t ? t + '\n' + str : str);
@@ -738,6 +878,162 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
     setUploading(false);
   };
 
+  // ── Batch flow ────────────────────────────────────────────
+  // Drop 2+ files anywhere on the composer → confirm modal → POST /batch
+  // → live progress card driven by SSE. One batch at a time per chat
+  // (UI guard); schedule a second only after the first is dismissed.
+
+  const uploadFiles = async (files) => {
+    const paths = [];
+    for (const f of files) {
+      const fd = new FormData();
+      fd.append('file', f, f.name);
+      const res = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+      const { path } = await res.json();
+      paths.push(path);
+    }
+    return paths;
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (disabled || activeBatch || pendingBatch) return;
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (files.length < 2) {
+      // Single file: defer to existing @file: flow so users don't lose
+      // the established muscle memory.
+      if (files.length === 1) {
+        setUploading(true);
+        try {
+          const paths = await uploadFiles(files);
+          appendText(`@file:${paths[0]}`);
+        } finally {
+          setUploading(false);
+        }
+      }
+      return;
+    }
+    if (!activeAgentId) {
+      appendText('[batch needs an active agent — pick one from the sidebar]');
+      return;
+    }
+    setUploading(true);
+    try {
+      const paths = await uploadFiles(files);
+      setPendingBatch({ paths });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const subscribeBatch = (jobId) => {
+    if (sseRef.current) sseRef.current.close();
+    const es = new EventSource(`${API}/batch/${jobId}/stream`);
+    sseRef.current = es;
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'snapshot') {
+          setActiveBatch(b => b && b.jobId === jobId ? { ...b, snapshot: data } : b);
+          return;
+        }
+        // Patch incoming events into the snapshot.
+        setActiveBatch(b => {
+          if (!b || b.jobId !== jobId) return b;
+          const snap = b.snapshot ? { ...b.snapshot } : { job: { total: 0, done: 0 }, files: [] };
+          const job = { ...(snap.job || {}) };
+          const files = [...(snap.files || [])];
+          if (data.type === 'progress') {
+            job.done = data.done;
+            job.total = data.total;
+          } else if (data.type === 'file_start' || data.type === 'file_done'
+                  || data.type === 'file_error' || data.type === 'file_cancelled') {
+            const i = files.findIndex(f => f.ordinal === data.ordinal);
+            if (i >= 0) {
+              const status = ({
+                file_start: 'running', file_done: 'done',
+                file_error: 'error', file_cancelled: 'cancelled',
+              })[data.type];
+              files[i] = {
+                ...files[i],
+                status,
+                output_path: data.output_path ?? files[i].output_path,
+                duration_ms: data.duration_ms ?? files[i].duration_ms,
+                error: data.error ?? files[i].error,
+              };
+            }
+          } else if (data.type === 'completed' || data.type === 'failed' || data.type === 'cancelled') {
+            job.status = data.type;
+            if (data.error) job.error = data.error;
+          } else if (data.type === 'started') {
+            job.status = 'running';
+          }
+          return { ...b, snapshot: { ...snap, job, files } };
+        });
+      } catch (err) {
+        console.warn('batch SSE parse failed', err);
+      }
+    };
+    es.onerror = () => {
+      // The stream closes naturally on terminal — only log unexpected errors.
+      try { es.close(); } catch {}
+    };
+  };
+
+  const confirmBatch = async (instruction) => {
+    if (!pendingBatch || batchScheduling) return;
+    setBatchScheduling(true);
+    try {
+      const res = await fetch(`${API}/batch`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: activeAgentId,
+          file_paths: pendingBatch.paths,
+          variables: instruction ? { instruction } : {},
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        appendText(`[batch failed to schedule: ${res.status} ${detail}]`);
+        setPendingBatch(null);
+        return;
+      }
+      const { job_id } = await res.json();
+      setPendingBatch(null);
+      setActiveBatch({ jobId: job_id, snapshot: null });
+      subscribeBatch(job_id);
+    } catch (err) {
+      appendText(`[batch error: ${err.message}]`);
+    } finally {
+      setBatchScheduling(false);
+    }
+  };
+
+  const cancelBatch = async () => {
+    if (!activeBatch) return;
+    try {
+      await fetch(`${API}/batch/${activeBatch.jobId}/cancel`, { method: 'POST' });
+    } catch {}
+  };
+
+  const downloadBatchZip = () => {
+    if (!activeBatch) return;
+    window.open(`${API}/batch/${activeBatch.jobId}/zip`, '_blank');
+  };
+
+  const dismissBatch = () => {
+    if (sseRef.current) { try { sseRef.current.close(); } catch {} }
+    sseRef.current = null;
+    setActiveBatch(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sseRef.current) { try { sseRef.current.close(); } catch {} }
+    };
+  }, []);
+
   const handleScreen = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
@@ -777,9 +1073,51 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
   const approxTokens = msgCount * 120;
 
   return (
-    <div style={{ borderTop: `1px solid ${T.border}`, padding: '14px 28px 18px', background: T.bg1, flexShrink: 0 }}>
+    <div
+      style={{
+        borderTop: `1px solid ${T.border}`,
+        padding: '14px 28px 18px',
+        background: T.bg1,
+        flexShrink: 0,
+        position: 'relative',
+        outline: dragOver ? `2px dashed ${T.cyan}` : 'none',
+        outlineOffset: '-6px',
+      }}
+      onDragEnter={e => { e.preventDefault(); if (!disabled) setDragOver(true); }}
+      onDragOver={e => { e.preventDefault(); }}
+      onDragLeave={e => {
+        // Only clear when leaving the wrapper, not crossing a child.
+        if (e.currentTarget === e.target) setDragOver(false);
+      }}
+      onDrop={handleDrop}
+    >
+      {pendingBatch && (
+        <BatchConfirmModal
+          count={pendingBatch.paths.length}
+          busy={batchScheduling}
+          onCancel={() => setPendingBatch(null)}
+          onConfirm={confirmBatch}
+        />
+      )}
       <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={onFiles} />
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
+        {activeBatch && (
+          <BatchProgressCard
+            jobId={activeBatch.jobId}
+            snapshot={activeBatch.snapshot}
+            onCancel={cancelBatch}
+            onDownload={downloadBatchZip}
+            onDismiss={dismissBatch}
+          />
+        )}
+        {dragOver && !pendingBatch && !activeBatch && (
+          <div className="mono" style={{
+            fontSize: 11, color: T.cyan, marginBottom: 8,
+            textAlign: 'center', letterSpacing: '.1em',
+          }}>
+            DROP 2+ FILES TO BATCH-PROCESS · 1 FILE TO ATTACH
+          </div>
+        )}
         {contextChips.length > 0 && (
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {contextChips.slice(0, 3).map((c, i) => (
@@ -913,7 +1251,7 @@ export default function ChatColumn({
   messages = [], streaming = false, connected = false,
   sessionTitle, sessionId, autonomy = 'ask-write', activeModel,
   onSend, onStop, onNewSession, onSessionTitleChange, onAutonomyChange, onConfirm,
-  bindingNotice,
+  bindingNotice, activeAgentId,
 }) {
   const bottomRef = useRef(null);
   const [ctxMenu, setCtxMenu] = useState(null); // {x, y, msgs}
@@ -1073,6 +1411,7 @@ export default function ChatColumn({
         messages={messages}
         disabled={!!bindingNotice}
         disabledHint={bindingNotice ? 'Сначала подключите базу данных' : null}
+        activeAgentId={activeAgentId}
       />
     </main>
   );

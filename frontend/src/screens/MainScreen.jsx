@@ -136,6 +136,7 @@ export default function MainScreen({ onNav, initialMessage, initialAgentId, sess
         sessionId={sessionId}
         autonomy={autonomy}
         activeModel={activeModel}
+        activeAgentId={selectedAgentId}
         onSend={handleSend}
         onStop={stop}
         onNewSession={handleNewSession}
