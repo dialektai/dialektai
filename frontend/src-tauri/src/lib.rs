@@ -13,13 +13,25 @@ pub fn run() {
         .expect("error while running dialekt");
 }
 
+/// Compile-time signal that this build was produced with a Developer ID
+/// certificate (CI release pipeline sets APPLE_SIGNING_IDENTITY before
+/// invoking cargo). The Python sidecar reads `DIALEKT_SIGNED` to decide
+/// whether to use the macOS Keychain (signed → stable Designated
+/// Requirement → ACL persists across launches) or the encrypted-file
+/// fallback (unsigned local builds — Keychain ACL is hash-pinned and
+/// breaks on every PyInstaller rebuild).
+const SIGNED_BUILD: &str = match option_env!("APPLE_SIGNING_IDENTITY") {
+    Some(_) => "1",
+    None => "0",
+};
+
 /// Spawn the bundled Python backend sidecar.
 /// Fails gracefully in dev mode (sidecar not present — start server.py manually).
 fn spawn_python_server(app: &tauri::AppHandle) {
     let shell = app.shell();
 
     let cmd = match shell.sidecar("dialekt-server") {
-        Ok(c) => c,
+        Ok(c) => c.env("DIALEKT_SIGNED", SIGNED_BUILD),
         Err(_) => {
             eprintln!("[dialekt] Sidecar 'dialekt-server' not bundled. Start python/server.py manually.");
             return;
