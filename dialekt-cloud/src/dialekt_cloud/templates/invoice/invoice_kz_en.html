@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice No. {{ invoice_number }}</title>
+<style>
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; margin: 0; }
+  h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
+  .subtitle { text-align: center; font-size: 10pt; color: #555; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #000; padding: 5px 8px; font-size: 10pt; }
+  th { background: #f0f0f0; font-weight: bold; text-align: left; }
+  .no-border td { border: none; padding: 2px 0; }
+  .section { margin: 16px 0; }
+  .section-title { font-weight: bold; font-size: 10pt; border-bottom: 2px solid #000; padding-bottom: 2px; margin-bottom: 8px; }
+  .total-row td { font-weight: bold; background: #f9f9f9; }
+  .footer-text { margin-top: 20px; font-size: 9pt; color: #555; text-align: center; }
+  .bank-table td { font-size: 9.5pt; border: 1px solid #ccc; padding: 4px 6px; }
+  .bank-table th { font-size: 9.5pt; background: #f5f5f5; border: 1px solid #ccc; padding: 4px 6px; }
+</style>
+</head>
+<body>
+
+<h1>INVOICE No. {{ invoice_number }}</h1>
+<div class="subtitle">issued {{ issued_date }}</div>
+
+<div class="section">
+  <div class="section-title">Seller</div>
+  <table class="no-border">
+    <tr><td style="width:160px;font-weight:bold">Name:</td><td>{{ seller.name }}</td></tr>
+    <tr><td style="font-weight:bold">BIN/IIN:</td><td>{{ seller.bin }}</td></tr>
+    <tr><td style="font-weight:bold">Address:</td><td>{{ seller.address }}</td></tr>
+    <tr><td style="font-weight:bold">IBAN:</td><td>{{ seller.iban }}</td></tr>
+    <tr><td style="font-weight:bold">Bank:</td><td>{{ seller.bank }}</td></tr>
+    <tr><td style="font-weight:bold">BIK:</td><td>{{ seller.bik }}</td></tr>
+    <tr><td style="font-weight:bold">Phone:</td><td>{{ seller.phone }}</td></tr>
+    <tr><td style="font-weight:bold">Email:</td><td>{{ seller.email }}</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Buyer</div>
+  <table class="no-border">
+    <tr><td style="width:160px;font-weight:bold">Name:</td><td>{% if buyer.legal_form %}{{ buyer.legal_form }} {% endif %}{{ buyer.company_name }}</td></tr>
+    {% if buyer.bin %}<tr><td style="font-weight:bold">BIN/IIN:</td><td>{{ buyer.bin }}</td></tr>{% endif %}
+    {% if buyer.legal_form == 'ИП' and buyer.talon_number %}<tr><td style="font-weight:bold">Registration receipt:</td><td>{{ buyer.talon_number }}</td></tr>{% endif %}
+    {% if buyer.postal_code or buyer.legal_address %}<tr><td style="font-weight:bold">Address:</td><td>{% if buyer.postal_code %}{{ buyer.postal_code }}, {% endif %}{{ buyer.legal_address }}</td></tr>{% endif %}
+    {% if buyer.phone %}<tr><td style="font-weight:bold">Phone:</td><td>{{ buyer.phone }}</td></tr>{% endif %}
+    {% if buyer.bank_iban %}<tr><td style="font-weight:bold">IBAN:</td><td>{{ buyer.bank_iban }}</td></tr>{% endif %}
+    {% if buyer.bank_name %}<tr><td style="font-weight:bold">Bank:</td><td>{{ buyer.bank_name }}</td></tr>{% endif %}
+    {% if buyer.bank_bik %}<tr><td style="font-weight:bold">BIK:</td><td>{{ buyer.bank_bik }}</td></tr>{% endif %}
+    {% if buyer.kbe %}<tr><td style="font-weight:bold">KBE:</td><td>{{ buyer.kbe }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Items</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>Description</th>
+        <th style="width:60px;text-align:center">Qty</th>
+        <th style="width:80px;text-align:center">Unit</th>
+        <th style="width:110px;text-align:right">Price, ₸</th>
+        <th style="width:120px;text-align:right">Amount, ₸</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>dias.now subscription ({{ plan }}), {{ seats }} seat{{ 's' if seats != 1 else '' }}{{ ', ' + period_months|string + ' months' if period_months > 1 else ', 1 month' }}</td>
+        <td style="text-align:center">1</td>
+        <td style="text-align:center">service</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }}</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      {% if has_nds %}
+      <tr>
+        <td colspan="5" style="text-align:right;font-weight:bold">VAT (12%):</td>
+        <td style="text-align:right">{{ "%.0f"|format(amount_kzt * 0.12) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" style="text-align:right">VAT:</td>
+        <td style="text-align:right;font-size:9pt;color:#555">Not applicable</td>
+      </tr>
+      {% endif %}
+      <tr class="total-row">
+        <td colspan="5" style="text-align:right">TOTAL DUE:</td>
+        <td style="text-align:right">{{ amount_kzt_fmt }} ₸</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Payment details</div>
+  <table class="bank-table">
+    <tr><th>IBAN</th><td>{{ seller.iban }}</td></tr>
+    <tr><th>Bank</th><td>{{ seller.bank }}</td></tr>
+    <tr><th>BIK</th><td>{{ seller.bik }}</td></tr>
+    <tr><th>Beneficiary</th><td>{{ seller.name }}</td></tr>
+    <tr><th>Payment reference</th><td>Payment for invoice {{ invoice_number }} — dias.now subscription</td></tr>
+  </table>
+</div>
+
+<div class="footer-text">
+  Payable within 5 business days from the invoice issue date.<br>
+  This invoice constitutes grounds for payment in accordance with the contract terms.<br>
+  Please reference the invoice number on the payment.
+</div>
+
+</body>
+</html>
