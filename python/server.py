@@ -478,8 +478,32 @@ CREATE TABLE IF NOT EXISTS agents (
     manifest_yaml TEXT,
     version       TEXT NOT NULL DEFAULT '1.0.0',
     status        TEXT NOT NULL DEFAULT 'draft',
+    -- Set when the agent was installed from the public library catalog.
+    -- NULL for user-authored agents. Used by the "Update available"
+    -- UX (mentor): when a library entry's version bumps, installed
+    -- copies show an opt-in update prompt. The installed agent stays
+    -- independent — we never auto-mirror manifest changes.
+    source_template_id TEXT,
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Local cache of the public library catalog. Refreshed via
+-- POST /library/sync (called on app start when online + on-demand
+-- via a "Refresh library" button). The bundled fallback ships with
+-- the app installer so first-launch isn't an empty screen.
+CREATE TABLE IF NOT EXISTS library_templates (
+    id                  TEXT PRIMARY KEY,
+    manifest_yaml       TEXT NOT NULL,
+    name                TEXT NOT NULL,
+    description         TEXT NOT NULL DEFAULT '',
+    category            TEXT NOT NULL,
+    tags                TEXT NOT NULL DEFAULT '[]',  -- JSON array
+    requires_connection INTEGER NOT NULL DEFAULT 0,
+    requires_mcp        INTEGER NOT NULL DEFAULT 0,
+    version             TEXT NOT NULL DEFAULT '1.0.0',
+    signature           TEXT,
+    cached_at           TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -565,6 +589,12 @@ async def _migrate_agents():
             "ALTER TABLE sessions ADD COLUMN agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL"
         )
         log.info("Migration: added agent_id column to sessions")
+
+    cursor = await db.execute("PRAGMA table_info(agents)")
+    agent_cols = [row[1] for row in await cursor.fetchall()]
+    if "source_template_id" not in agent_cols:
+        await db.execute("ALTER TABLE agents ADD COLUMN source_template_id TEXT")
+        log.info("Migration: added source_template_id column to agents")
 
     cursor = await db.execute("SELECT id FROM agents WHERE name = 'General Assistant' LIMIT 1")
     row = await cursor.fetchone()
@@ -772,12 +802,13 @@ async def db_save_message(session_id: str, role: str, type_: str,
 async def db_create_agent(name: str, description: str, system_prompt: str,
                           manifest_yaml: str | None = None,
                           version: str = "1.0.0",
-                          status: str = "draft") -> str:
+                          status: str = "draft",
+                          source_template_id: str | None = None) -> str:
     agent_id = str(uuid.uuid4())
     await db.execute(
-        "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status)"
-        " VALUES (?,?,?,?,?,?,?)",
-        (agent_id, name, description, system_prompt, manifest_yaml, version, status),
+        "INSERT INTO agents (id, name, description, system_prompt, manifest_yaml, version, status, source_template_id)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (agent_id, name, description, system_prompt, manifest_yaml, version, status, source_template_id),
     )
     await db.commit()
     return agent_id
@@ -1345,14 +1376,22 @@ async def import_agent_endpoint(file: UploadFile = File(...)):
     return {"id": agent_id, "name": name, "warnings": warnings}
 
 
-@app.post("/agents/import-yaml", status_code=201)
-async def import_agent_yaml_endpoint(body: dict):
-    """Import agent from YAML string (used by the builder wizard)."""
+async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
+                               source_template_id: str | None = None) -> dict:
+    """Validate a manifest YAML and create an agent from it.
+
+    Shared between POST /agents/import-yaml (builder wizard) and
+    POST /library/{id}/install (catalog install) — keeping this in
+    one function eliminates the divergence risk for v2 features
+    (post-install hooks, telemetry, "imported from library" toast).
+
+    Raises HTTPException(400|422) on validation failure.
+    Returns {"id": agent_id, "name": str, "warnings": [...]}.
+    """
     from dialekt_manifest import ManifestValidator
-    yaml_str = (body.get("manifest_yaml") or "").strip()
+    yaml_str = (yaml_str or "").strip()
     if not yaml_str:
         raise HTTPException(400, "manifest_yaml is required")
-    status = body.get("status", "draft")
     if status not in ("draft", "published"):
         status = "draft"
     result = ManifestValidator().validate_string(yaml_str)
@@ -1368,9 +1407,19 @@ async def import_agent_yaml_endpoint(body: dict):
         manifest_yaml=yaml_str,
         version=m.metadata.version,
         status=status,
+        source_template_id=source_template_id,
     )
     warnings = [{"code": w.code.value, "message": w.message} for w in result.warnings]
     return {"id": agent_id, "name": m.metadata.name, "warnings": warnings}
+
+
+@app.post("/agents/import-yaml", status_code=201)
+async def import_agent_yaml_endpoint(body: dict):
+    """Import agent from YAML string (used by the builder wizard)."""
+    return await import_manifest_yaml(
+        body.get("manifest_yaml") or "",
+        status=body.get("status", "draft"),
+    )
 
 
 @app.get("/agents/{agent_id}/export")
