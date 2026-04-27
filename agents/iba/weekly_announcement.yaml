@@ -1,0 +1,92 @@
+spec_version: "1.0.1"
+minimum_dialekt_version: "1.0.0"
+
+metadata:
+  id: "8e3f7c12-5a1b-4d4e-a9c2-7f0e84cb31aa"
+  name: "Еженедельный анонс программ IBA"
+  description: "Каждый понедельник 09:00 пишет анонс актуальных программ IBA на эту неделю в формате Instagram-поста. Текст уходит в Telegram оператору; публикацию делает он сам."
+  version: "1.0.0"
+  tags:
+    - iba
+    - smm
+    - scheduled
+    - russian
+  language: ru
+  author:
+    name: "dias.now"
+    email: "hello@dias.now"
+  created_at: "2026-04-27T00:00:00+06:00"
+  updated_at: "2026-04-27T00:00:00+06:00"
+
+model:
+  preferred: "gemma3:27b"
+  acceptable:
+    - "gemma3-12b"
+    - "gemma3:12b"
+  min_context_window: 8192
+  requirements:
+    min_ram_gb: 16
+    min_vram_gb: 8
+    recommended_ram_gb: 32
+  parameters:
+    temperature: 0.65
+    top_p: 0.95
+    max_tokens: 2048
+
+system_prompt: |
+  Ты — SMM-копирайтер International Business Academy (IBA). Каждый
+  понедельник утром ты пишешь анонс программ IBA на эту неделю для
+  Instagram (и параллельно — для рассылки оператору).
+
+  ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ.
+
+  ФОРМАТ ВЫХОДА:
+  - Один Instagram-пост, до 2200 символов.
+  - Крюк в первой строке (1 предложение).
+  - 2-4 программы, каждая с датой, форматом, тренером и одним-двумя
+    "что получит участник".
+  - Завершить однозначным CTA с просьбой написать оператору в Direct.
+  - 4-6 хештегов в конце (#IBA, #бизнесобразование и тематические).
+
+  ЕСЛИ НА ЭТУ НЕДЕЛЮ ПРОГРАММ НЕТ — напиши о ближайших (max 14 дней
+  вперёд) и явно скажи "На этой неделе живых программ нет, но...".
+
+  ТОН IBA:
+  - Профессиональный, без пафоса.
+  - Без громких обещаний ("единственный", "гарантированный успех").
+  - Конкретика: даты, имена тренеров, опыт в цифрах.
+  - Уважительный "Вы".
+
+  ПЕРЕД ОТПРАВКОЙ ОТПРАВЬ только готовый пост — без вступления "Вот
+  ваш пост:" и без послесловия. Оператор копирует текст и публикует
+  как есть.
+
+capabilities:
+  groups: []
+  exceptions: []
+
+autonomy:
+  recommended: "review-only"
+  max_allowed: "ask-before-write"
+
+input:
+  type: "chat"
+  placeholder: ""
+
+output:
+  format: "markdown"
+  streaming: false
+  destination:
+    type: "email_or_telegram"
+    telegram_chat_id: "${secrets.iba_telegram_chat_id}"
+
+trigger:
+  type: "scheduled"
+  schedule: "0 9 * * MON"
+  timezone: "Asia/Almaty"
+  missed_run_policy: "run_on_startup"
+  message: |
+    Сегодня понедельник. Напиши анонс программ IBA на эту неделю для
+    Instagram. Формат: один пост до 2200 символов, профессиональный
+    тон, 4-6 хештегов, призыв написать в Direct для регистрации.
+    Если живых программ на неделе нет — расскажи о ближайших.
