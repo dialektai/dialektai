@@ -82,14 +82,30 @@ def _keyring_available() -> tuple[bool, str]:
     encrypted file (or plaintext, if the user disables encryption).
 
     Result is cached for the process lifetime — call once, pay once.
-    The probe runs in a daemon thread with a 3-second timeout so a locked
-    or missing keychain daemon (D-Bus on Linux, Keychain on macOS, Credential
-    Manager on Windows) can never block the FastAPI startup path.
+
+    macOS note: the system Keychain ties access trust to the binary hash.
+    PyInstaller produces a new hash on every build, so macOS shows a
+    per-item approval dialog on every rebuild — and on every item access
+    (set/get/delete) during the probe AND during migrate_from_config().
+    That causes a storm of "Allow dialekt to access the keychain?" popups
+    on every launch that the user can never permanently dismiss. We skip
+    the Keychain entirely on macOS and use the encrypted-file fallback,
+    which is silent and sufficient for the pilot threat model.
+
+    On Linux the D-Bus Secret Service probe runs in a 3-second daemon
+    thread so a missing GNOME Keyring/KWallet daemon can't block startup.
     """
+    import sys
     import threading
 
     global _keyring_cache
     if _keyring_cache is not None:
+        return _keyring_cache
+
+    # macOS: always use encrypted-file fallback — no Keychain dialogs.
+    if sys.platform == "darwin":
+        log.info("keyring: macOS — using encrypted-file fallback (no Keychain dialogs)")
+        _keyring_cache = (False, "disabled-macos")
         return _keyring_cache
 
     result: list = [False, "timeout"]
