@@ -28,6 +28,9 @@ model:
     min_ram_gb: 16
     min_vram_gb: 6
     recommended_ram_gb: 32
+  # Advisory only — runtime reads temperature/max_tokens from global settings.
+  # Set temperature in Settings → Model on the operator's dialekt instance
+  # to ensure deterministic date computation. Recommended: 0.1 or 0.0.
   parameters:
     temperature: 0.1
     top_p: 0.95

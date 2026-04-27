@@ -4935,6 +4935,18 @@ def make_interpreter(
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
 
+    if manifest_dict:
+        _mp = (manifest_dict.get("model") or {}).get("parameters") or {}
+        _overridden = [k for k in ("temperature", "max_tokens") if k in _mp]
+        if _overridden:
+            log.warning(
+                "Agent %r manifest sets model.parameters %s but global settings "
+                "override these at runtime. Manifest values are advisory only — "
+                "use Settings → Model to control effective temperature/max_tokens.",
+                (agent or {}).get("name", "?"),
+                ", ".join(f"{k}={_mp[k]}" for k in _overridden),
+            )
+
     # Register dialekt's SQL executor so agents with a bound DB connection
     # can actually run the sql blocks they emit. The handler reads the
     # connection id + driver from the stashed attributes at execution time.
