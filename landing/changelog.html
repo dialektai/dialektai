@@ -43,6 +43,52 @@
         "cl.h.added":  "Added",
         "cl.h.changed":"Changed",
         "cl.h.fixed":  "Fixed",
+
+        "cl.26.sum":   "Brand becomes <strong style=\"color:var(--text)\">dias.now</strong>. MCP process resilience, macOS notarization, Windows ARM64 builds, onboarding hardening, institutional email redesign in EN + RU.",
+        "cl.26.add.1": "User-visible brand renamed to <strong style=\"color:var(--text)\">dias.now</strong> (working name <code>dialekt</code> stays internal — repo, package, CLI)",
+        "cl.26.add.2": "Email templates fully restyled (institutional Light theme, Source Serif 4 + Inter) and translated to RU; <code>welcome</code> mail wired into the verify-email flow",
+        "cl.26.add.3": "<code>tenants.locale</code> column — signup form picks the active landing language; defaults country-based (KZ/RU → ru)",
+        "cl.26.add.4": "macOS Developer ID code signing + Apple notarization for shipped builds",
+        "cl.26.add.5": "Windows ARM64 + macOS Intel build coverage in CI",
+        "cl.26.add.6": "Direct-download section on landing with OS auto-detect; trial → download flow wired end-to-end",
+        "cl.26.chg.1": "Ollama install picker now points at <code>ollama.com/download</code> (auto-detect) instead of fragile per-platform suffixes",
+        "cl.26.chg.2": "License screen: trial is the default path; &ldquo;I have a key&rdquo; is secondary",
+        "cl.26.chg.3": "Onboarding: <em>Skip</em> on Ollama install advances to the next step, not the main screen",
+        "cl.26.chg.4": "i18n coverage extended to pricing, docs, verify-email, security, changelog (EN ↔ RU)",
+        "cl.26.fix.1": "Onboarding no longer flashes MainScreen before routing resolves",
+        "cl.26.fix.2": "Buttons give instant feedback on async actions (no more &ldquo;did it click?&rdquo;)",
+        "cl.26.fix.3": "macOS Ollama detected via daemon probe + bundle paths instead of brittle PATH lookup",
+        "cl.26.fix.4": "MCP prompt now actually triggers tool calls; agents stop ignoring registered tools",
+        "cl.26.fix.5": "MCP process crashes are detected and surfaced to the UI, not silently swallowed",
+        "cl.26.fix.6": "Settings keychain values cached on load — fewer prompts on app start",
+        "cl.26.fix.7": "<code>build</code>: grpcio compile unblocked on Windows ARM64 (MAX_PATH C1083); <code>sqlite-vec</code> skipped on Windows ARM64 where no wheel exists",
+
+        "cl.25.sum":   "MCP audit dashboard — see what tools your agents call, when, and with what arguments. Plus an in-app update nag for pilot releases.",
+        "cl.25.add.1": "<code>GET /audit/log</code> backend — append-only audit trail of every MCP tool invocation",
+        "cl.25.add.2": "Settings → Admin → Usage tab — filterable timeline UI over the audit log",
+        "cl.25.add.3": "Update nag-banner — fetches latest GitHub Release and prompts download if behind",
+
+        "cl.24.sum":   "Approve-all consent batching for trusted sessions, plus GitHub MCP migrated to the official Go binary.",
+        "cl.24.add.1": "&ldquo;Approve all pending&rdquo; button + <code>Shift+Cmd/Ctrl+A</code> shortcut",
+        "cl.24.add.2": "<code>approved_all</code> WebSocket decision resolves a burst of pending consents in one round-trip",
+        "cl.24.chg.1": "GitHub MCP template migrated from the Node reference impl to the official Go binary (faster, fewer deps)",
+
+        "cl.23.sum":   "Multi-LLM provider system, cloud admin 2FA, full landing site, legal documents (Terms / Privacy / DPA / Public Offer / Cross-Border Consent in EN + RU).",
+        "cl.23.add.1": "Multi-provider LLM catalog: 18 cloud providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
+        "cl.23.add.2": "Ollama install streaming with live SSE log — SHA-256 verified script, fail-fast on bad checksum",
+        "cl.23.add.3": "Cloud admin 2FA — email + password + TOTP, argon2id-hashed backup codes, lockouts, session cookies. Break-glass via env key still supported",
+        "cl.23.add.4": "Email verification for self-serve signup — separate from invite flow, KZ ПДн §6 / GDPR Art. 7 compliant audit log",
+        "cl.23.add.5": "Admin security alerts — password change, TOTP enrollment, account locked, backup codes regenerated",
+        "cl.23.add.6": "Landing site: index, signup, pricing, docs, security, terms, privacy, public offer, DPA, cross-border consent — bilingual EN ↔ RU",
+        "cl.23.chg.1": "Desktop default <code>cloud_api_url</code> → <code>api.dias.now</code>",
+
+        "cl.22.sum":   "Per-tool MCP scoping — agents declare exactly which MCP tools they can call, with allow / deny modes.",
+        "cl.22.add.1": "<code>ToolPolicy</code> declared in agent manifest, wired into <code>ws_chat</code> runtime",
+        "cl.22.add.2": "<code>GET /mcp-servers/{id}/tools</code> endpoint with separate 60-second cache",
+        "cl.22.add.3": "Per-server tool checklist in the agent wizard — allow-list or deny-list mode",
+        "cl.22.add.4": "Tool inspector expander on server cards in Settings",
+        "cl.22.add.5": "<code>MCPToolNotAllowed</code> runtime enforcement — denied tools fail loud",
+
         "cl.21.sum":   "Cloud-LLM expansion: <strong style=\"color:var(--text)\">18 providers</strong> joined Ollama. New onboarding picker with search, categories, Linux auto-install. Self-serve trial signup launched.",
         "cl.21.add.1": "18 cloud LLM providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
         "cl.21.add.2": "33 curated Ollama models with category filters and RAM-fit indicators",
@@ -65,7 +111,7 @@
         "cl.19.add.2": "ComfyUI bridge — <code>POST /comfy/txt2img</code> with Flux Schnell, ~10s latency",
         "cl.19.add.3": "<code>founder_admin_log</code> audit trail for all admin actions",
         "cl.18.sum":   "Per-tenant licensing, invoice PDF generation, founder admin dashboard.",
-        "cl.18.add.1": "dialekt-cloud service launched — tenant CRUD, license validation, invite flow",
+        "cl.18.add.1": "dias.now-cloud service launched — tenant CRUD, license validation, invite flow",
         "cl.18.add.2": "KZT invoice PDF generation with seller details from env",
         "cl.18.add.3": "Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates",
         "cl.10.sum":   "First public beta. Local Ollama + 9 hardcoded models + permissions sandbox.",
@@ -85,6 +131,52 @@
         "cl.h.added":  "Добавлено",
         "cl.h.changed":"Изменено",
         "cl.h.fixed":  "Исправлено",
+
+        "cl.26.sum":   "Бренд становится <strong style=\"color:var(--text)\">dias.now</strong>. Устойчивость MCP-процессов, нотаризация macOS, сборки для Windows ARM64, надёжный онбординг, новый дизайн писем в EN + RU.",
+        "cl.26.add.1": "Видимый пользователю бренд переименован в <strong style=\"color:var(--text)\">dias.now</strong> (рабочее имя <code>dialekt</code> остаётся внутри — репозиторий, пакет, CLI)",
+        "cl.26.add.2": "Email-шаблоны полностью переоформлены (institutional Light, Source Serif 4 + Inter) и переведены на RU; письмо <code>welcome</code> вшито во flow подтверждения почты",
+        "cl.26.add.3": "Колонка <code>tenants.locale</code> — форма signup передаёт активный язык лендинга; по умолчанию определяется по стране (KZ/RU → ru)",
+        "cl.26.add.4": "macOS — подпись Developer ID + нотаризация Apple для финальных сборок",
+        "cl.26.add.5": "Windows ARM64 + macOS Intel в матрице сборки CI",
+        "cl.26.add.6": "Секция прямых загрузок на лендинге с авто-определением OS; сквозной flow trial → скачать",
+        "cl.26.chg.1": "Установщик Ollama теперь ведёт на <code>ollama.com/download</code> (авто-определение) вместо хрупких суффиксов по платформам",
+        "cl.26.chg.2": "Экран лицензии: пробный период — основной путь; &laquo;У меня есть ключ&raquo; — вторичная кнопка",
+        "cl.26.chg.3": "Онбординг: <em>Пропустить</em> на установке Ollama переводит к следующему шагу, а не на главный экран",
+        "cl.26.chg.4": "i18n покрывает pricing, docs, verify-email, security, changelog (EN ↔ RU)",
+        "cl.26.fix.1": "Онбординг больше не показывает MainScreen на долю секунды до резолва маршрута",
+        "cl.26.fix.2": "Кнопки дают мгновенный фидбек на асинхронные действия (больше нет &laquo;нажалось или нет?&raquo;)",
+        "cl.26.fix.3": "macOS Ollama определяется через зонд демона и пути в bundle вместо хрупкого PATH",
+        "cl.26.fix.4": "MCP-промпт теперь действительно триггерит вызовы инструментов; агенты больше не игнорируют зарегистрированные tools",
+        "cl.26.fix.5": "Падения MCP-процессов детектируются и пробрасываются в UI вместо тихого проглатывания",
+        "cl.26.fix.6": "Значения keychain в настройках кэшируются при загрузке — меньше системных запросов при старте",
+        "cl.26.fix.7": "<code>build</code>: разблокирована компиляция grpcio на Windows ARM64 (MAX_PATH C1083); <code>sqlite-vec</code> пропускается на Windows ARM64, где нет wheel",
+
+        "cl.25.sum":   "Дашборд аудита MCP — видно какие инструменты вызывают агенты, когда и с какими аргументами. Плюс in-app нотификация про обновления для пилотных релизов.",
+        "cl.25.add.1": "<code>GET /audit/log</code> на бэке — append-only аудит-трейл всех вызовов MCP-инструментов",
+        "cl.25.add.2": "Настройки → Admin → Usage — фильтруемая таймлайн-UI поверх аудит-лога",
+        "cl.25.add.3": "Update-баннер — тянет последний GitHub Release и предлагает скачать, если отстаёте",
+
+        "cl.24.sum":   "Пакетное согласие &laquo;approve all&raquo; для доверенных сессий, плюс GitHub MCP мигрирован на официальный Go-бинарник.",
+        "cl.24.add.1": "Кнопка &laquo;Approve all pending&raquo; + горячая клавиша <code>Shift+Cmd/Ctrl+A</code>",
+        "cl.24.add.2": "WebSocket-решение <code>approved_all</code> разруливает пачку отложенных согласований за один round-trip",
+        "cl.24.chg.1": "GitHub MCP-шаблон мигрирован с Node-референсной реализации на официальный Go-бинарник (быстрее, меньше зависимостей)",
+
+        "cl.23.sum":   "Multi-LLM провайдеры, 2FA для облачного админа, полноценный лендинг, юридические документы (Условия / Политика / DPA / Публичная оферта / Согласие на трансгран в EN + RU).",
+        "cl.23.add.1": "Каталог LLM-провайдеров: 18 облачных — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
+        "cl.23.add.2": "Стриминг установки Ollama с live SSE-логом — SHA-256 проверка скрипта, fail-fast при битой контрольной сумме",
+        "cl.23.add.3": "2FA для облачного админа — email + пароль + TOTP, argon2id-хешированные backup-коды, локауты, session cookies. Break-glass через env-ключ сохранён",
+        "cl.23.add.4": "Подтверждение email для самостоятельной регистрации — отдельно от инвайт-флоу, аудит соответствует РК «О ПДн» §6 / GDPR Ст. 7",
+        "cl.23.add.5": "Security-алерты администратору — смена пароля, регистрация TOTP, блокировка аккаунта, перевыпуск backup-кодов",
+        "cl.23.add.6": "Лендинг: index, signup, pricing, docs, security, terms, privacy, public offer, DPA, cross-border consent — двуязычно EN ↔ RU",
+        "cl.23.chg.1": "Десктоп: <code>cloud_api_url</code> по умолчанию → <code>api.dias.now</code>",
+
+        "cl.22.sum":   "Per-tool скоупинг MCP — агент явно объявляет какие именно инструменты MCP может вызывать, в режиме allow- или deny-списка.",
+        "cl.22.add.1": "<code>ToolPolicy</code> в манифесте агента, прокинут в рантайм <code>ws_chat</code>",
+        "cl.22.add.2": "Эндпоинт <code>GET /mcp-servers/{id}/tools</code> с отдельным 60-секундным кэшем",
+        "cl.22.add.3": "Чек-лист инструментов на сервере в визарде — режимы allow/deny",
+        "cl.22.add.4": "Раскрывашка инспектора инструментов на карточках серверов в Настройках",
+        "cl.22.add.5": "Рантайм-проверка <code>MCPToolNotAllowed</code> — запрещённые инструменты падают громко",
+
         "cl.21.sum":   "Расширение облачных LLM: <strong style=\"color:var(--text)\">18 провайдеров</strong> в дополнение к Ollama. Новый онбординг с поиском, категориями и авто-установкой на Linux. Самостоятельная регистрация на пробный период.",
         "cl.21.add.1": "18 провайдеров облачных LLM — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate",
         "cl.21.add.2": "33 кураторских Ollama-модели с фильтром по категориям и индикатором соответствия RAM",
@@ -107,7 +199,7 @@
         "cl.19.add.2": "Мост к ComfyUI — <code>POST /comfy/txt2img</code> с Flux Schnell, латентность ~10с",
         "cl.19.add.3": "<code>founder_admin_log</code> — аудит-трейл всех действий администратора",
         "cl.18.sum":   "Лицензирование по арендаторам, генерация PDF-счетов, founder-админка.",
-        "cl.18.add.1": "Запущен сервис dialekt-cloud — CRUD арендаторов, валидация лицензий, флоу инвайтов",
+        "cl.18.add.1": "Запущен сервис dias.now-cloud — CRUD арендаторов, валидация лицензий, флоу инвайтов",
         "cl.18.add.2": "Генерация PDF-счетов в тенге с реквизитами продавца из переменных окружения",
         "cl.18.add.3": "Админ-дашборд на <code>admin.dias.now</code> — Alpine.js + FastAPI-шаблоны",
         "cl.10.sum":   "Первая публичная бета. Локальный Ollama + 9 захардкоженных моделей + песочница разрешений.",
@@ -126,6 +218,115 @@
       <p class="text-muted" style="font-size:14px;line-height:1.6;max-width:580px;margin-bottom:48px">
         <span data-i18n="cl.intro.a">Every shipped version. Tagged for severity. Subscribe via </span><a href="/" style="color:var(--cyan)" data-i18n="cl.intro.tg">Telegram</a><span data-i18n="cl.intro.b"> for release pings.</span>
       </p>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.26<span class="major">.10</span></span>
+          <span class="release-date">27 APR 2026</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
+        </div>
+        <p class="release-summary" data-i18n-html="cl.26.sum">
+          Brand becomes <strong style="color:var(--text)">dias.now</strong>. MCP process resilience, macOS notarization, Windows ARM64 builds, onboarding hardening, institutional email redesign in EN + RU.
+        </p>
+        <h3 data-i18n="cl.h.added">Added</h3>
+        <ul>
+          <li data-i18n-html="cl.26.add.1">User-visible brand renamed to <strong style="color:var(--text)">dias.now</strong> (working name <code>dialekt</code> stays internal — repo, package, CLI)</li>
+          <li data-i18n-html="cl.26.add.2">Email templates fully restyled (institutional Light theme, Source Serif 4 + Inter) and translated to RU; <code>welcome</code> mail wired into the verify-email flow</li>
+          <li data-i18n-html="cl.26.add.3"><code>tenants.locale</code> column — signup form picks the active landing language; defaults country-based (KZ/RU → ru)</li>
+          <li data-i18n-html="cl.26.add.4">macOS Developer ID code signing + Apple notarization for shipped builds</li>
+          <li data-i18n-html="cl.26.add.5">Windows ARM64 + macOS Intel build coverage in CI</li>
+          <li data-i18n-html="cl.26.add.6">Direct-download section on landing with OS auto-detect; trial → download flow wired end-to-end</li>
+        </ul>
+        <h3 data-i18n="cl.h.changed">Changed</h3>
+        <ul>
+          <li data-i18n-html="cl.26.chg.1">Ollama install picker now points at <code>ollama.com/download</code> (auto-detect) instead of fragile per-platform suffixes</li>
+          <li data-i18n-html="cl.26.chg.2">License screen: trial is the default path; &ldquo;I have a key&rdquo; is secondary</li>
+          <li data-i18n-html="cl.26.chg.3">Onboarding: <em>Skip</em> on Ollama install advances to the next step, not the main screen</li>
+          <li data-i18n-html="cl.26.chg.4">i18n coverage extended to pricing, docs, verify-email, security, changelog (EN ↔ RU)</li>
+        </ul>
+        <h3 data-i18n="cl.h.fixed">Fixed</h3>
+        <ul>
+          <li data-i18n-html="cl.26.fix.1">Onboarding no longer flashes MainScreen before routing resolves</li>
+          <li data-i18n-html="cl.26.fix.2">Buttons give instant feedback on async actions (no more &ldquo;did it click?&rdquo;)</li>
+          <li data-i18n-html="cl.26.fix.3">macOS Ollama detected via daemon probe + bundle paths instead of brittle PATH lookup</li>
+          <li data-i18n-html="cl.26.fix.4">MCP prompt now actually triggers tool calls; agents stop ignoring registered tools</li>
+          <li data-i18n-html="cl.26.fix.5">MCP process crashes are detected and surfaced to the UI, not silently swallowed</li>
+          <li data-i18n-html="cl.26.fix.6">Settings keychain values cached on load — fewer prompts on app start</li>
+          <li data-i18n-html="cl.26.fix.7"><code>build</code>: grpcio compile unblocked on Windows ARM64 (MAX_PATH C1083); <code>sqlite-vec</code> skipped on Windows ARM64 where no wheel exists</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.25<span class="major">.0</span></span>
+          <span class="release-date">25 APR 2026</span>
+          <span class="release-tag minor" data-i18n="cl.tag.minor">MINOR</span>
+        </div>
+        <p class="release-summary" data-i18n-html="cl.25.sum">MCP audit dashboard — see what tools your agents call, when, and with what arguments. Plus an in-app update nag for pilot releases.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
+        <ul>
+          <li data-i18n-html="cl.25.add.1"><code>GET /audit/log</code> backend — append-only audit trail of every MCP tool invocation</li>
+          <li data-i18n-html="cl.25.add.2">Settings → Admin → Usage tab — filterable timeline UI over the audit log</li>
+          <li data-i18n-html="cl.25.add.3">Update nag-banner — fetches latest GitHub Release and prompts download if behind</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.24<span class="major">.0</span></span>
+          <span class="release-date">25 APR 2026</span>
+          <span class="release-tag minor" data-i18n="cl.tag.minor">MINOR</span>
+        </div>
+        <p class="release-summary" data-i18n-html="cl.24.sum">Approve-all consent batching for trusted sessions, plus GitHub MCP migrated to the official Go binary.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
+        <ul>
+          <li data-i18n-html="cl.24.add.1">&ldquo;Approve all pending&rdquo; button + <code>Shift+Cmd/Ctrl+A</code> shortcut</li>
+          <li data-i18n-html="cl.24.add.2"><code>approved_all</code> WebSocket decision resolves a burst of pending consents in one round-trip</li>
+        </ul>
+        <h3 data-i18n="cl.h.changed">Changed</h3>
+        <ul>
+          <li data-i18n-html="cl.24.chg.1">GitHub MCP template migrated from the Node reference impl to the official Go binary (faster, fewer deps)</li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.23<span class="major">.0</span></span>
+          <span class="release-date">25 APR 2026</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
+        </div>
+        <p class="release-summary" data-i18n-html="cl.23.sum">Multi-LLM provider system, cloud admin 2FA, full landing site, legal documents (Terms / Privacy / DPA / Public Offer / Cross-Border Consent in EN + RU).</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
+        <ul>
+          <li data-i18n-html="cl.23.add.1">Multi-provider LLM catalog: 18 cloud providers — Anthropic, OpenAI, Gemini, Vertex AI, AWS Bedrock, Azure OpenAI, NVIDIA NIM, Mistral, DeepSeek, xAI Grok, Cohere, Groq, Together AI, Fireworks AI, Perplexity, OpenRouter, Cerebras, Replicate</li>
+          <li data-i18n-html="cl.23.add.2">Ollama install streaming with live SSE log — SHA-256 verified script, fail-fast on bad checksum</li>
+          <li data-i18n-html="cl.23.add.3">Cloud admin 2FA — email + password + TOTP, argon2id-hashed backup codes, lockouts, session cookies. Break-glass via env key still supported</li>
+          <li data-i18n-html="cl.23.add.4">Email verification for self-serve signup — separate from invite flow, KZ ПДн §6 / GDPR Art. 7 compliant audit log</li>
+          <li data-i18n-html="cl.23.add.5">Admin security alerts — password change, TOTP enrollment, account locked, backup codes regenerated</li>
+          <li data-i18n-html="cl.23.add.6">Landing site: index, signup, pricing, docs, security, terms, privacy, public offer, DPA, cross-border consent — bilingual EN ↔ RU</li>
+        </ul>
+        <h3 data-i18n="cl.h.changed">Changed</h3>
+        <ul>
+          <li data-i18n-html="cl.23.chg.1">Desktop default <code>cloud_api_url</code> → <code>api.dias.now</code></li>
+        </ul>
+      </article>
+
+      <article class="release">
+        <div class="release-head">
+          <span class="release-version">v0.22<span class="major">.0</span></span>
+          <span class="release-date">25 APR 2026</span>
+          <span class="release-tag major" data-i18n="cl.tag.major">MAJOR</span>
+        </div>
+        <p class="release-summary" data-i18n-html="cl.22.sum">Per-tool MCP scoping — agents declare exactly which MCP tools they can call, with allow / deny modes.</p>
+        <h3 data-i18n="cl.h.added">Added</h3>
+        <ul>
+          <li data-i18n-html="cl.22.add.1"><code>ToolPolicy</code> declared in agent manifest, wired into <code>ws_chat</code> runtime</li>
+          <li data-i18n-html="cl.22.add.2"><code>GET /mcp-servers/{id}/tools</code> endpoint with separate 60-second cache</li>
+          <li data-i18n-html="cl.22.add.3">Per-server tool checklist in the agent wizard — allow-list or deny-list mode</li>
+          <li data-i18n-html="cl.22.add.4">Tool inspector expander on server cards in Settings</li>
+          <li data-i18n-html="cl.22.add.5"><code>MCPToolNotAllowed</code> runtime enforcement — denied tools fail loud</li>
+        </ul>
+      </article>
 
       <article class="release">
         <div class="release-head">
@@ -198,7 +399,7 @@
         <p class="release-summary" data-i18n="cl.18.sum">Per-tenant licensing, invoice PDF generation, founder admin dashboard.</p>
         <h3 data-i18n="cl.h.added">Added</h3>
         <ul>
-          <li data-i18n="cl.18.add.1">dialekt-cloud service launched — tenant CRUD, license validation, invite flow</li>
+          <li data-i18n="cl.18.add.1">dias.now-cloud service launched — tenant CRUD, license validation, invite flow</li>
           <li data-i18n="cl.18.add.2">KZT invoice PDF generation with seller details from env</li>
           <li data-i18n-html="cl.18.add.3">Admin dashboard at <code>admin.dias.now</code> — Alpine.js + FastAPI templates</li>
         </ul>
