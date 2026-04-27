@@ -329,7 +329,7 @@ async def signup(
             )
             raise HTTPException(
                 status_code=429,
-                detail=f"Too many signups from this network. Try again in {SIGNUP_IP_WINDOW_DAYS} days or contact hello@dialekt.ai.",
+                detail=f"Too many signups from this network. Try again in {SIGNUP_IP_WINDOW_DAYS} days or contact hello@dias.now.",
             )
 
         # Existing tenant lookup. Idempotency is window-bound: within an
@@ -360,7 +360,7 @@ async def signup(
                 )
                 raise HTTPException(
                     status_code=409,
-                    detail="An account with this email already had a trial. Contact hello@dialekt.ai for an extension.",
+                    detail="An account with this email already had a trial. Contact hello@dias.now for an extension.",
                 )
             # Active trial — resend verification email if not yet verified,
             # or just acknowledge.

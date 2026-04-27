@@ -262,7 +262,7 @@ class EmailService:
         from ..config import settings as _cfg
         return await self.send(
             to=to,
-            subject=f"[lead] {full_name} from {country} — dialekt.ai trial signup",
+            subject=f"[lead] {full_name} from {country} — dias.now trial signup",
             template="admin_signup_notification",
             locale=DEFAULT_LOCALE,
             from_addr=_cfg.SMTP_FROM_HELLO,
@@ -291,14 +291,14 @@ class EmailService:
         Sent FROM security@dias.now. Recipients can be a list (broadcast)."""
         from ..config import settings as _cfg
         subject_map = {
-            "password_changed":          "[security] Your dialekt.ai admin password was changed",
-            "backup_codes_regenerated":  "[security] Your dialekt.ai admin backup codes were regenerated",
-            "account_locked":            "[security] dialekt.ai admin account locked due to failed logins",
-            "totp_enrolled":             "[security] A new authenticator was enrolled on your dialekt.ai admin",
+            "password_changed":          "[security] Your dias.now admin password was changed",
+            "backup_codes_regenerated":  "[security] Your dias.now admin backup codes were regenerated",
+            "account_locked":            "[security] dias.now admin account locked due to failed logins",
+            "totp_enrolled":             "[security] A new authenticator was enrolled on your dias.now admin",
         }
         return await self.send(
             to=to,
-            subject=subject_map.get(kind, "[security] dialekt.ai admin event"),
+            subject=subject_map.get(kind, "[security] dias.now admin event"),
             template="admin_security_alert",
             locale=DEFAULT_LOCALE,
             from_addr=_cfg.SMTP_FROM_SECURITY,
