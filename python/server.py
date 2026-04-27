@@ -1753,6 +1753,102 @@ async def delete_agent_endpoint(agent_id: str):
     return {"ok": True}
 
 
+# ── Scheduled runs surface (v0.27 §3.2) ──────────────────────────────────────
+#
+# Reads off the scheduled_runs table populated by the scheduler runtime
+# and exposes the manual fire path. Settings → Agents → Scheduled
+# consumes everything here; agent CRUD elsewhere triggers reload().
+
+@app.get("/agents/{agent_id}/runs")
+async def list_agent_runs(agent_id: str, limit: int = 50):
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    n = max(1, min(int(limit), 200))
+    cur = await db.execute(
+        "SELECT id, agent_id, session_id, status, triggered_at, completed_at, "
+        "duration_ms, output, error, delivery_status, delivery_status_detail, "
+        "delivery_target FROM scheduled_runs WHERE agent_id=? "
+        "ORDER BY triggered_at DESC, id DESC LIMIT ?",
+        (agent_id, n),
+    )
+    rows = await cur.fetchall()
+    return {"rows": [dict(r) for r in rows]}
+
+
+@app.get("/agents/{agent_id}/runs/{run_id}")
+async def get_agent_run(agent_id: str, run_id: str):
+    cur = await db.execute(
+        "SELECT id, agent_id, session_id, status, triggered_at, completed_at, "
+        "duration_ms, output, error, delivery_status, delivery_status_detail, "
+        "delivery_target FROM scheduled_runs WHERE agent_id=? AND id=?",
+        (agent_id, run_id),
+    )
+    row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Run not found")
+    return dict(row)
+
+
+@app.delete("/agents/{agent_id}/runs/{run_id}", status_code=204)
+async def delete_agent_run(agent_id: str, run_id: str):
+    cur = await db.execute(
+        "DELETE FROM scheduled_runs WHERE agent_id=? AND id=?",
+        (agent_id, run_id),
+    )
+    await db.commit()
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Run not found")
+    return Response(status_code=204)
+
+
+@app.post("/agents/{agent_id}/run-now")
+async def run_agent_now(agent_id: str, body: dict | None = None):
+    """Manual fire path. Body is optional — when ``message`` is null
+    (or absent) the agent's manifest trigger.message is used; pass an
+    explicit string to override it for one-off testing.
+    """
+    if not await db_get_agent(agent_id):
+        raise HTTPException(404, "Agent not found")
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        raise HTTPException(503, "scheduler is not running on this server")
+    override = (body or {}).get("message")
+    if override is not None and not isinstance(override, str):
+        raise HTTPException(400, "message must be a string when provided")
+    try:
+        result = await sched.run_now(agent_id, override_message=override)
+    except RuntimeError as e:
+        raise HTTPException(404, str(e))
+    return {
+        "run_id": result.run_id,
+        "session_id": result.session_id,
+        "status": result.status,
+        "duration_ms": result.duration_ms,
+        "started": True,
+    }
+
+
+@app.get("/scheduler/status")
+async def scheduler_status():
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        return {"running": False, "jobs": [], "disabled": True}
+    return await sched.status()
+
+
+@app.post("/scheduler/reload")
+async def scheduler_reload():
+    """Re-sync APScheduler against the agents table. Useful after a
+    manifest edit when the auto-reload didn't fire (e.g. the agent
+    was edited directly through the DB, or the user reverted a YAML
+    file on disk and re-imported it).
+    """
+    sched = getattr(app.state, "scheduler", None)
+    if sched is None:
+        raise HTTPException(503, "scheduler is not running on this server")
+    return await sched.reload()
+
+
 @app.post("/agents/import")
 async def import_agent_endpoint(file: UploadFile = File(...)):
     from dialekt_manifest import ManifestValidator
