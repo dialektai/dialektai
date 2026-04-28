@@ -38,6 +38,7 @@ TOOL_CATEGORIES = (
     "bitrix",
     "instagram",
     "visual",
+    "web_crawl",
 )
 
 

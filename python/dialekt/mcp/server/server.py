@@ -105,6 +105,8 @@ class MCPServer:
             self._register_instagram_tools()
         if "visual" in enabled:
             self._register_visual_tools()
+        if "web_crawl" in enabled:
+            self._register_web_crawl_tools()
 
         log.info(
             "dialekt MCP server registered %d tool(s): %s",
@@ -182,6 +184,13 @@ class MCPServer:
         from dialekt.mcp.server.tools.visual import register_visual_tools
 
         names = register_visual_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_web_crawl_tools(self) -> None:
+        """Attach the Playwright-driven page crawler."""
+        from dialekt.mcp.server.tools.web_crawl import register_web_crawl_tools
+
+        names = register_web_crawl_tools(self)
         self._registered_tools.extend(names)
 
     # ── Accessors used by tools / tests ─────────────────────────────────
@@ -322,6 +331,7 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "list_templates": "visual",
     "render_template": "visual",
     "render_carousel": "visual",
+    "web_crawl": "web_crawl",
 }
 
 
