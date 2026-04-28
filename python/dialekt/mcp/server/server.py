@@ -272,6 +272,9 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "instagram_publish_feed": "instagram",
     "instagram_publish_story": "instagram",
     "instagram_publish_reel": "instagram",
+    "list_templates": "visual",
+    "render_template": "visual",
+    "render_carousel": "visual",
 }
 
 
