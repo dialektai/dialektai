@@ -2529,7 +2529,7 @@ function StepList({ current, completed }) {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-export default function AgentWizardScreen({ onNav }) {
+export default function AgentWizardScreen({ onNav, fromTemplate }) {
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(new Set());
   const [errors, setErrors] = useState({});
@@ -2603,6 +2603,93 @@ export default function AgentWizardScreen({ onNav }) {
     input_placeholder: 'Ask me anything...',
     streaming: true,
   });
+
+  // Pre-fill the wizard from a Library template when the user clicks
+  // "Customize…". The backend GET /library/{id} now returns a parsed
+  // ``manifest`` object alongside the raw YAML, so we map the fields
+  // we know how to render without shipping a YAML parser to the client.
+  // Fields the wizard doesn't surface (extensions, custom blocks) stay
+  // intact in the YAML — buildManifestYaml regenerates a fresh copy
+  // from the wizard state on save, so a perfect round-trip isn't a
+  // goal: customisation is the goal.
+  useEffect(() => {
+    if (!fromTemplate) return;
+    let alive = true;
+    fetch(`${API}/library/${encodeURIComponent(fromTemplate)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(payload => {
+        if (!alive || !payload) return;
+        const m = payload.manifest;
+        if (!m || typeof m !== 'object') {
+          // Bare-minimum fallback — at least give the user the name.
+          setData(d => ({
+            ...d,
+            name: payload.name || d.name,
+            description: payload.description || d.description,
+          }));
+          return;
+        }
+        const meta = m.metadata || {};
+        const author = meta.author || {};
+        const model = m.model || {};
+        const params = model.parameters || {};
+        const reqs = model.requirements || {};
+        const caps = (m.capabilities && m.capabilities.groups) || [];
+        const conn = (m.connections && Array.isArray(m.connections.required) && m.connections.required[0]) || null;
+        const trig = m.trigger || {};
+        const out = m.output || {};
+        const dest = out.destination || {};
+        const requiredSecrets = Array.isArray(m.secrets_required)
+          ? m.secrets_required.map(s => (typeof s === 'string' ? { name: s, value: '' } : { name: s?.name || '', value: '' })).filter(s => s.name)
+          : [];
+        const wd = (m.variables && m.variables.working_directory && m.variables.working_directory.default) || '';
+        setData(d => ({
+          ...d,
+          name: meta.name || payload.name || d.name,
+          description: meta.description || payload.description || d.description,
+          version: meta.version || d.version,
+          language: meta.language || d.language,
+          tags: Array.isArray(meta.tags) ? meta.tags.join(', ') : d.tags,
+          author_name: author.name || d.author_name,
+          author_email: author.email || d.author_email,
+          working_directory: wd,
+          model_preferred: model.preferred || d.model_preferred,
+          model_acceptable: Array.isArray(model.acceptable) ? model.acceptable.join('\n') : d.model_acceptable,
+          context_window: String(model.min_context_window || d.context_window),
+          temperature: String(params.temperature ?? d.temperature),
+          max_tokens: String(params.max_tokens ?? d.max_tokens),
+          min_ram_gb: String(reqs.min_ram_gb ?? d.min_ram_gb),
+          min_vram_gb: String(reqs.min_vram_gb ?? d.min_vram_gb),
+          recommended_ram_gb: String(reqs.recommended_ram_gb ?? d.recommended_ram_gb),
+          system_prompt: m.system_prompt || d.system_prompt,
+          capabilities: {
+            ...d.capabilities,
+            ...Object.fromEntries(caps.map(k => [k, true])),
+          },
+          connection_type: conn ? (conn.type || 'none') : d.connection_type,
+          connection_role: conn?.role || d.connection_role,
+          connection_purpose: conn?.purpose || d.connection_purpose,
+          secrets: requiredSecrets,
+          autonomy_recommended: m.autonomy?.recommended || d.autonomy_recommended,
+          autonomy_max: m.autonomy?.max_allowed || d.autonomy_max,
+          trigger_type: trig.type || d.trigger_type,
+          cron: trig.schedule || d.cron,
+          cron_timezone: trig.timezone || d.cron_timezone,
+          missed_run_policy: trig.missed_run_policy || d.missed_run_policy,
+          trigger_message: trig.message || d.trigger_message,
+          rss_feeds: Array.isArray(trig.rss_feeds) ? trig.rss_feeds.slice() : d.rss_feeds,
+          output_format: out.format || d.output_format,
+          streaming: typeof out.streaming === 'boolean' ? out.streaming : d.streaming,
+          visual_output_folder: dest.path || d.visual_output_folder,
+          input_placeholder: m.input?.placeholder || d.input_placeholder,
+        }));
+        addToast(`Loaded template: ${meta.name || payload.name || fromTemplate}`, 'info');
+      })
+      .catch(() => {
+        if (alive) addToast(`Failed to load template ${fromTemplate}`, 'error');
+      });
+    return () => { alive = false; };
+  }, [fromTemplate]);
 
   const validate = useCallback((stepIdx) => {
     const errs = {};

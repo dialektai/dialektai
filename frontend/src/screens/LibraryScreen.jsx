@@ -47,7 +47,7 @@ function CategoryChip({ active, label, count, onClick }) {
   );
 }
 
-function TemplateCard({ entry, installed, installing, onInstall }) {
+function TemplateCard({ entry, installed, installing, onInstall, onCustomize }) {
   return (
     <div style={{
       border: `1px solid ${T.border}`,
@@ -97,23 +97,44 @@ function TemplateCard({ entry, installed, installing, onInstall }) {
         ))}
       </div>
       <div style={{ flex: 1 }} />
-      <button
-        onClick={onInstall}
-        disabled={installing}
-        style={{
-          padding: '8px 14px',
-          background: installed ? 'transparent' : T.cyan,
-          color: installed ? T.green : T.bg0,
-          border: installed ? `1px solid ${T.green}` : 'none',
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: installing ? 'wait' : 'pointer',
-          letterSpacing: '.06em',
-          opacity: installing ? 0.6 : 1,
-        }}
-      >
-        {installing ? 'Installing…' : installed ? '✓ Installed' : 'Install'}
-      </button>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={onInstall}
+          disabled={installing}
+          style={{
+            padding: '8px 14px',
+            background: installed ? 'transparent' : T.cyan,
+            color: installed ? T.green : T.bg0,
+            border: installed ? `1px solid ${T.green}` : 'none',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: installing ? 'wait' : 'pointer',
+            letterSpacing: '.06em',
+            opacity: installing ? 0.6 : 1,
+            flex: 1,
+          }}
+        >
+          {installing ? 'Installing…' : installed ? '✓ Installed' : 'Install'}
+        </button>
+        <button
+          onClick={onCustomize}
+          disabled={installing}
+          style={{
+            padding: '8px 12px',
+            background: 'transparent',
+            color: T.muted,
+            border: `1px solid ${T.border}`,
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: installing ? 'wait' : 'pointer',
+            letterSpacing: '.06em',
+            opacity: installing ? 0.6 : 1,
+          }}
+          title="Open this template in the wizard so you can edit name, prompt, and capabilities before saving."
+        >
+          Customize…
+        </button>
+      </div>
     </div>
   );
 }
@@ -326,6 +347,7 @@ export default function LibraryScreen({ onNav }) {
                   installed={installedIds.has(entry.id)}
                   installing={installingId === entry.id}
                   onInstall={() => handleInstall(entry)}
+                  onCustomize={() => onNav('wizard', { fromTemplate: entry.id })}
                 />
               ))}
             </div>

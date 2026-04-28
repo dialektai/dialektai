@@ -2164,7 +2164,22 @@ async def get_library_template(template_id: str):
     row = await cursor.fetchone()
     if not row:
         raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
-    return _row_to_library_template(row)
+    payload = _row_to_library_template(row)
+    # Wizard "Customize…" pre-fill needs structured access to the
+    # manifest, not just the YAML string. We parse server-side so the
+    # frontend doesn't have to ship js-yaml. Failures surface as a
+    # null ``manifest`` — the wizard then falls back to the name +
+    # description fields.
+    try:
+        import yaml as _yaml
+        parsed = _yaml.safe_load(payload.get("manifest_yaml") or "")
+        if isinstance(parsed, dict):
+            payload["manifest"] = parsed
+        else:
+            payload["manifest"] = None
+    except Exception:
+        payload["manifest"] = None
+    return payload
 
 
 @app.post("/library/sync")
