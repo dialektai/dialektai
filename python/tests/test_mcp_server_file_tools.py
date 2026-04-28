@@ -16,6 +16,7 @@ from dialekt.mcp.server.tools.file import (
     PathAccessDenied,
     _resolve_safe,
     register_file_tools,
+    register_working_directory,
 )
 
 
@@ -223,6 +224,205 @@ def test_path_denied_emits_error_audit(tmp_path):
     errors = [e for e in events if e.get("result") == "error"]
     assert len(errors) == 1
     assert errors[0]["error_kind"] == "PathAccessDenied"
+
+
+# ---------------------------------------------------------------------------
+# dialekt_write_file.
+# ---------------------------------------------------------------------------
+
+
+def test_write_file_happy_path(tmp_path):
+    target = tmp_path / "out.md"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    out = tool(path=str(target), content="hello world\n")
+    assert out.get("error") is not True
+    assert target.read_text() == "hello world\n"
+    assert out["mode"] == "overwrite"
+    assert out["size_bytes"] > 0
+
+
+def test_write_file_overwrites_existing(tmp_path):
+    target = tmp_path / "out.md"
+    target.write_text("old")
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    tool(path=str(target), content="new")
+    assert target.read_text() == "new"
+
+
+def test_write_file_create_exclusive_refuses_existing(tmp_path):
+    target = tmp_path / "out.md"
+    target.write_text("old")
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    out = tool(path=str(target), content="new", mode="create_exclusive")
+    assert out["error"] is True
+    assert out["reason"] == "exists"
+    assert target.read_text() == "old"
+
+
+def test_write_file_creates_parent_dirs(tmp_path):
+    target = tmp_path / "deep" / "tree" / "file.md"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    tool(path=str(target), content="content")
+    assert target.exists()
+    assert target.read_text() == "content"
+
+
+def test_write_file_outside_root_raises(tmp_path):
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    with pytest.raises(PathAccessDenied):
+        tool(path="/tmp/escape.txt", content="x")
+
+
+def test_write_file_invalid_mode_returns_error(tmp_path):
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    out = tool(path=str(tmp_path / "f.txt"), content="x", mode="bogus")
+    assert out["error"] is True
+    assert out["reason"] == "invalid_mode"
+
+
+# ---------------------------------------------------------------------------
+# dialekt_append_file.
+# ---------------------------------------------------------------------------
+
+
+def test_append_file_happy_path(tmp_path):
+    target = tmp_path / "log.md"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_append_file"].fn
+    tool(path=str(target), content="line 1\n")
+    tool(path=str(target), content="line 2\n")
+    assert target.read_text() == "line 1\nline 2\n"
+
+
+def test_append_file_creates_missing_file(tmp_path):
+    target = tmp_path / "fresh.log"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_append_file"].fn
+    tool(path=str(target), content="first")
+    assert target.read_text() == "first"
+
+
+def test_append_file_outside_root_raises(tmp_path):
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_append_file"].fn
+    with pytest.raises(PathAccessDenied):
+        tool(path="/etc/passwd", content="x")
+
+
+# ---------------------------------------------------------------------------
+# dialekt_make_dir.
+# ---------------------------------------------------------------------------
+
+
+def test_make_dir_happy_path(tmp_path):
+    target = tmp_path / "new_dir"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_make_dir"].fn
+    out = tool(path=str(target))
+    assert out["created"] is True
+    assert out["already_exists"] is False
+    assert target.is_dir()
+
+
+def test_make_dir_idempotent(tmp_path):
+    target = tmp_path / "existing"
+    target.mkdir()
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_make_dir"].fn
+    out = tool(path=str(target))
+    assert out["created"] is False
+    assert out["already_exists"] is True
+
+
+def test_make_dir_creates_parents(tmp_path):
+    target = tmp_path / "a" / "b" / "c"
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_make_dir"].fn
+    tool(path=str(target))
+    assert target.is_dir()
+
+
+def test_make_dir_refuses_when_path_is_file(tmp_path):
+    target = tmp_path / "f.txt"
+    target.write_text("x")
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_make_dir"].fn
+    out = tool(path=str(target))
+    assert out["error"] is True
+    assert out["reason"] == "not_a_directory"
+
+
+def test_make_dir_outside_root_raises(tmp_path):
+    srv, _ = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_make_dir"].fn
+    with pytest.raises(PathAccessDenied):
+        tool(path="/tmp/escape_dir")
+
+
+# ---------------------------------------------------------------------------
+# register_working_directory — dynamic root injection.
+# ---------------------------------------------------------------------------
+
+
+def test_register_working_directory_widens_allow_list(tmp_path):
+    """Tool registered with empty roots should refuse — but after
+    register_working_directory adds a root, the same tool accepts
+    paths inside it without re-registration."""
+    srv, _ = _build_server([])
+    write = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+
+    target = tmp_path / "after.md"
+    with pytest.raises(PathAccessDenied):
+        write(path=str(target), content="x")
+
+    register_working_directory(srv, str(tmp_path))
+
+    out = write(path=str(target), content="ok")
+    assert out.get("error") is not True
+    assert target.read_text() == "ok"
+
+
+def test_register_working_directory_is_idempotent(tmp_path):
+    srv, _ = _build_server([])
+    register_working_directory(srv, str(tmp_path))
+    register_working_directory(srv, str(tmp_path))
+    register_working_directory(srv, str(tmp_path))
+    # Path normalised + deduped.
+    assert srv.config.allowed_file_roots.count(str(tmp_path)) == 1
+
+
+def test_register_working_directory_handles_none(tmp_path):
+    srv, _ = _build_server([str(tmp_path)])
+    before = list(srv.config.allowed_file_roots)
+    register_working_directory(srv, None)
+    register_working_directory(srv, "")
+    assert srv.config.allowed_file_roots == before
+
+
+def test_register_working_directory_expands_tilde(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    srv, _ = _build_server([])
+    register_working_directory(srv, "~/agent-files")
+    assert srv.config.allowed_file_roots == [str(tmp_path / "agent-files")]
+
+
+# ---------------------------------------------------------------------------
+# Audit emission for write tools.
+# ---------------------------------------------------------------------------
+
+
+def test_write_file_emits_audit(tmp_path):
+    srv, events = _build_server([str(tmp_path)])
+    tool = srv.fastmcp._tool_manager._tools["dialekt_write_file"].fn
+    tool(path=str(tmp_path / "f.md"), content="x")
+    success = [e for e in events if e.get("result") == "success"]
+    assert any(e["action"] == "dialekt_write_file" for e in success)
 
 
 def test_category_disabled_refuses_with_permission_denied(tmp_path):

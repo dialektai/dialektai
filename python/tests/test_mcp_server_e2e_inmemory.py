@@ -109,7 +109,9 @@ def _build_full_server(tmp_path) -> tuple[MCPServer, _FakePluginContext, list[di
 
 def test_client_lists_all_registered_tools(tmp_path):
     """A real MCP client over in-memory transport sees every tool we
-    registered — 5 DB + 2 file + 2 agent = 9 total."""
+    registered — 5 DB + 5 file + 2 agent + 3 http + 1 rss + 1 bitrix
+    + 3 instagram + 3 visual + 1 web_crawl + 1 calendar + 1 scheduling
+    + 1 cdn = 27 total."""
     async def run():
         server, _, _ = _build_full_server(tmp_path)
 
@@ -127,13 +129,40 @@ def test_client_lists_all_registered_tools(tmp_path):
             # File tools
             assert "dialekt_read_file" in names
             assert "dialekt_list_directory" in names
+            assert "dialekt_write_file" in names
+            assert "dialekt_append_file" in names
+            assert "dialekt_make_dir" in names
             # Agent tools
             assert "dialekt_list_agents" in names
             assert "dialekt_get_agent" in names
             # invoke_agent deliberately NOT in v0.20.0
             assert "dialekt_invoke_agent" not in names
+            # HTTP tools
+            assert "dialekt_http_get" in names
+            assert "dialekt_http_post" in names
+            assert "dialekt_http_put" in names
+            # RSS
+            assert "dialekt_rss_fetch" in names
+            # Bitrix
+            assert "dialekt_bitrix_call" in names
+            # Instagram
+            assert "dialekt_instagram_publish_feed" in names
+            assert "dialekt_instagram_publish_story" in names
+            assert "dialekt_instagram_publish_reel" in names
+            # Visual
+            assert "dialekt_list_templates" in names
+            assert "dialekt_render_template" in names
+            assert "dialekt_render_carousel" in names
+            # Web crawl
+            assert "dialekt_web_crawl" in names
+            # Calendar
+            assert "dialekt_kz_holidays" in names
+            # Scheduling
+            assert "dialekt_distribute_schedule" in names
+            # CDN
+            assert "dialekt_cdn_upload" in names
 
-            assert len(names) == 9
+            assert len(names) == 27
 
     asyncio.run(run())
 

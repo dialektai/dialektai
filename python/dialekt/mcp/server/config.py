@@ -29,7 +29,20 @@ DEFAULT_BACKEND_URL = "http://127.0.0.1:8765"
 DEFAULT_RATE_LIMIT = 120
 DEFAULT_LOG_LEVEL = "INFO"
 
-TOOL_CATEGORIES = ("database", "file", "agent")
+TOOL_CATEGORIES = (
+    "database",
+    "file",
+    "agent",
+    "http",
+    "rss",
+    "bitrix",
+    "instagram",
+    "visual",
+    "web_crawl",
+    "calendar",
+    "scheduling",
+    "cdn",
+)
 
 
 class ApiKey(BaseModel):

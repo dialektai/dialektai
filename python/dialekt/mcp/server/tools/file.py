@@ -1,16 +1,25 @@
 """File tools for the MCP server.
 
-Two tools, both gated by ``ServerConfig.allowed_file_roots``:
+Five tools, all gated by ``ServerConfig.allowed_file_roots``:
 
 - ``dialekt_read_file`` — read a UTF-8 text file.
 - ``dialekt_list_directory`` — list immediate children of a directory.
+- ``dialekt_write_file`` — write/overwrite a UTF-8 text file (creates
+  parent directories on demand).
+- ``dialekt_append_file`` — append UTF-8 text to a file.
+- ``dialekt_make_dir`` — create a directory (with parents).
 
-The allow-list default is empty (Decision 2 ruling) so these tools
-refuse everything until a pilot opts paths in via the config. The
-validation resolves symlinks on both the request path and each root
-before prefix-checking — this kills directory-traversal attacks AND
-symlink attacks where an attacker drops a symlink inside an allowed
-root pointing outside of it.
+The allow-list default is empty so these tools refuse everything until
+a pilot opts paths in via the config — or an agent registers its own
+``working_directory`` via :func:`register_working_directory` at load
+time. Validation resolves symlinks on both the request path and each
+root before prefix-checking, killing both directory-traversal attacks
+and symlink-escape attacks where an attacker drops a symlink inside an
+allowed root pointing outside of it.
+
+The roots list is read live from ``server.config.allowed_file_roots``
+on every call, so dynamic mutations done by
+:func:`register_working_directory` take effect immediately.
 """
 from __future__ import annotations
 
@@ -66,10 +75,37 @@ def _resolve_safe(
     )
 
 
+def register_working_directory(
+    server: "MCPServer",
+    working_directory: str | None,
+) -> None:
+    """Add an agent's ``working_directory`` to the live allow-list.
+
+    Called by the agent runtime when an agent with a manifest
+    ``variables.working_directory`` (or equivalent) is loaded. No-op
+    when ``working_directory`` is empty / ``None``.
+
+    The path is expanded + absolutised the same way
+    :class:`ServerConfig` normalises roots at config load, and is
+    deduplicated so repeated agent loads don't bloat the list.
+    """
+    if not working_directory:
+        return
+    expanded = os.path.expanduser(working_directory)
+    absolute = os.path.abspath(expanded)
+    roots = server.config.allowed_file_roots
+    if absolute not in roots:
+        roots.append(absolute)
+
+
 def register_file_tools(server: "MCPServer") -> list[str]:
-    """Attach the two file tools. Returns the registered names."""
+    """Attach the five file tools. Returns the registered names."""
     registered: list[str] = []
-    allowed_roots = list(server.config.allowed_file_roots)
+
+    def _live_roots() -> list[str]:
+        # Read fresh on every call so register_working_directory()
+        # additions take effect without re-registering tools.
+        return list(server.config.allowed_file_roots)
 
     @server.fastmcp.tool(
         description=(
@@ -77,12 +113,13 @@ def register_file_tools(server: "MCPServer") -> list[str]:
             "symlink resolution) to a location inside one of the "
             "server's allowed_file_roots — default empty, i.e. this "
             "tool does nothing until a pilot adds roots to "
-            "~/.dialekt/mcp-server.toml."
+            "~/.dialekt/mcp-server.toml or an agent registers its "
+            "working_directory."
         )
     )
     def dialekt_read_file(path: str) -> dict:
         def _handler() -> dict:
-            safe = _resolve_safe(path, allowed_roots)
+            safe = _resolve_safe(path, _live_roots())
             if not safe.exists():
                 return {"error": True, "reason": "not_found", "path": str(safe)}
             if not safe.is_file():
@@ -119,7 +156,7 @@ def register_file_tools(server: "MCPServer") -> list[str]:
     )
     def dialekt_list_directory(path: str) -> dict:
         def _handler() -> dict:
-            safe = _resolve_safe(path, allowed_roots)
+            safe = _resolve_safe(path, _live_roots())
             if not safe.exists():
                 return {"error": True, "reason": "not_found", "path": str(safe)}
             if not safe.is_dir():
@@ -151,5 +188,135 @@ def register_file_tools(server: "MCPServer") -> list[str]:
         )
 
     registered.append("dialekt_list_directory")
+
+    @server.fastmcp.tool(
+        description=(
+            "Write UTF-8 text to a file. Creates parent directories "
+            "as needed; existing files are overwritten unless "
+            "``mode='create_exclusive'`` is passed (returns a "
+            "structured ``exists`` error). Refuses paths outside the "
+            "allow-list."
+        )
+    )
+    def dialekt_write_file(
+        path: str,
+        content: str,
+        mode: str = "overwrite",
+    ) -> dict:
+        def _handler() -> dict:
+            if mode not in ("overwrite", "create_exclusive"):
+                return {
+                    "error": True,
+                    "reason": "invalid_mode",
+                    "detail": f"mode must be 'overwrite' or 'create_exclusive', got {mode!r}",
+                }
+            safe = _resolve_safe(path, _live_roots())
+            if mode == "create_exclusive" and safe.exists():
+                return {
+                    "error": True,
+                    "reason": "exists",
+                    "path": str(safe),
+                }
+            try:
+                safe.parent.mkdir(parents=True, exist_ok=True)
+                safe.write_text(content, encoding="utf-8")
+            except OSError as e:
+                return {
+                    "error": True,
+                    "reason": "write_failed",
+                    "path": str(safe),
+                    "detail": str(e),
+                }
+            return {
+                "path": str(safe),
+                "size_bytes": safe.stat().st_size,
+                "mode": mode,
+            }
+
+        return call_tool_wrapped(
+            server,
+            "dialekt_write_file",
+            _handler,
+            extra_audit={"requested_path": path, "mode": mode},
+        )
+
+    registered.append("dialekt_write_file")
+
+    @server.fastmcp.tool(
+        description=(
+            "Append UTF-8 text to a file. Creates parent directories "
+            "and the file itself if missing. Refuses paths outside "
+            "the allow-list."
+        )
+    )
+    def dialekt_append_file(path: str, content: str) -> dict:
+        def _handler() -> dict:
+            safe = _resolve_safe(path, _live_roots())
+            try:
+                safe.parent.mkdir(parents=True, exist_ok=True)
+                with safe.open("a", encoding="utf-8") as f:
+                    f.write(content)
+            except OSError as e:
+                return {
+                    "error": True,
+                    "reason": "append_failed",
+                    "path": str(safe),
+                    "detail": str(e),
+                }
+            return {
+                "path": str(safe),
+                "size_bytes": safe.stat().st_size,
+            }
+
+        return call_tool_wrapped(
+            server,
+            "dialekt_append_file",
+            _handler,
+            extra_audit={"requested_path": path},
+        )
+
+    registered.append("dialekt_append_file")
+
+    @server.fastmcp.tool(
+        description=(
+            "Create a directory (with parents) inside the allow-list. "
+            "Idempotent: existing directories return a structured "
+            "``already_exists`` payload rather than an error. Refuses "
+            "paths that already exist as files."
+        )
+    )
+    def dialekt_make_dir(path: str) -> dict:
+        def _handler() -> dict:
+            safe = _resolve_safe(path, _live_roots())
+            if safe.exists() and not safe.is_dir():
+                return {
+                    "error": True,
+                    "reason": "not_a_directory",
+                    "path": str(safe),
+                }
+            already = safe.exists()
+            try:
+                safe.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                return {
+                    "error": True,
+                    "reason": "mkdir_failed",
+                    "path": str(safe),
+                    "detail": str(e),
+                }
+            return {
+                "path": str(safe),
+                "created": not already,
+                "already_exists": already,
+            }
+
+        return call_tool_wrapped(
+            server,
+            "dialekt_make_dir",
+            _handler,
+            extra_audit={"requested_path": path},
+        )
+
+    registered.append("dialekt_make_dir")
 
     return registered

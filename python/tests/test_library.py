@@ -120,17 +120,58 @@ def test_list_library_search_substring(client):
 
 
 def test_get_library_template_returns_manifest(client):
+    _seed_one(client)
     r = client.get("/library/test-translator")
     assert r.status_code == 200
     body = r.json()
     assert body["id"] == "test-translator"
     assert "manifest_yaml" in body
     assert "RU/EN Translator" in body["manifest_yaml"]
+    # Wizard "Customize" needs requires_secrets to render badges and
+    # prompt the user to fill them.
+    assert "requires_secrets" in body
+    assert isinstance(body["requires_secrets"], list)
 
 
 def test_get_library_template_404(client):
     r = client.get("/library/does-not-exist")
     assert r.status_code == 404
+
+
+def test_library_list_includes_requires_secrets(client):
+    """Catalog response carries requires_secrets so the LibraryScreen
+    can render badges without fetching each manifest individually."""
+    secret_yaml = """\
+metadata:
+  name: "Needs creds"
+secrets_required:
+  - name: "bitrix_webhook_url"
+    description: "IBA Bitrix webhook"
+    required: true
+  - name: "instagram_access_token"
+    description: "IG long-lived token"
+output:
+  format: "markdown"
+"""
+    _seed_one(client, slug="creds-agent", manifest=secret_yaml)
+    r = client.get("/library")
+    entries = {e["id"]: e for e in r.json()["entries"]}
+    assert "creds-agent" in entries
+    assert entries["creds-agent"]["requires_secrets"] == [
+        "bitrix_webhook_url",
+        "instagram_access_token",
+    ]
+
+
+def test_library_get_tolerates_malformed_manifest(client):
+    """A library row with a broken manifest still returns 200 — just
+    with empty requires_secrets — rather than 500ing the whole
+    Library screen."""
+    _seed_one(client, slug="broken-manifest", manifest="not: valid: yaml: !!!")
+    r = client.get("/library/broken-manifest")
+    # Some YAML strings parse to None / non-dict; either way we tolerate.
+    assert r.status_code == 200
+    assert r.json()["requires_secrets"] == []
 
 
 def test_install_library_template_creates_agent_with_source_link(client):

@@ -30,6 +30,7 @@ def _scheduled_manifest(
     message: str | None = "Test trigger message.",
     destination: str = "notification",
     telegram_chat_id: str | None = None,
+    rss_feeds: list[str] | None = None,
 ) -> str:
     """Build a minimal manifest YAML the runner can parse. We don't run
     these through the strict ManifestValidator — the runner reads the
@@ -39,6 +40,10 @@ def _scheduled_manifest(
     dest_block = f'    type: "{destination}"'
     if telegram_chat_id:
         dest_block += f'\n    telegram_chat_id: "{telegram_chat_id}"'
+    feeds_block = ""
+    if rss_feeds:
+        feeds_lines = "\n".join(f'    - "{u}"' for u in rss_feeds)
+        feeds_block = f"\n  rss_feeds:\n{feeds_lines}"
     return f"""\
 metadata:
   name: "Test agent"
@@ -46,7 +51,7 @@ trigger:
   type: "scheduled"
   schedule: "{schedule}"
   timezone: "{tz}"
-  missed_run_policy: "{policy}"{msg_block}
+  missed_run_policy: "{policy}"{msg_block}{feeds_block}
 output:
   format: "markdown"
   streaming: false
@@ -536,6 +541,108 @@ def test_scheduler_reload_drops_removed_agent(tmp_path):
         diff = await sched.reload()
         assert diff["removed"] == 1
         assert sched._scheduler.get_jobs() == []
+        await db.close()
+
+    _run(run())
+
+
+def test_scheduler_prepends_rss_context_to_message(tmp_path, monkeypatch):
+    """When trigger.rss_feeds is set, the runner fetches each feed
+    via rss_poll and prepends a Markdown summary of new items to the
+    cron session's message."""
+    from dialekt.mcp.server.tools import rss as rss_tool
+
+    captured: list[str] = []
+
+    async def _capturing_chat_runner(interpreter, message: str) -> str:
+        captured.append(message)
+        return "ok"
+
+    def _stub_fetch_and_parse(url, *, headers=None, timeout=30.0, max_items=50):
+        return {
+            "feed_title": "Adilet",
+            "items": [
+                {
+                    "guid": f"{url}#1",
+                    "title": "New legal act",
+                    "link": "https://adilet.zan.kz/rus/docs/V123",
+                    "summary": "",
+                    "published": "2026-04-28T00:00:00Z",
+                    "author": None,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(rss_tool, "_fetch_and_parse", _stub_fetch_and_parse)
+
+    async def run():
+        db = await _setup_db(tmp_path / "t.db")
+        await _insert_agent(
+            db,
+            "rss-agent",
+            _scheduled_manifest(
+                message="Summarise new legal acts.",
+                rss_feeds=["https://adilet.zan.kz/rus/docs/rss"],
+            ),
+        )
+        from dialekt.scheduler.runner import DialektScheduler
+        from dialekt.scheduler.cron_session import CronSession
+
+        def factory(**kwargs):
+            return CronSession(
+                **kwargs,
+                interpreter_factory=_stub_interpreter,
+                chat_runner=_capturing_chat_runner,
+            )
+
+        sched = DialektScheduler(db, cron_session_factory=factory)
+        await sched.run_now("rss-agent")
+
+        assert captured, "chat runner was never called"
+        message = captured[0]
+        assert "RSS — new since last poll" in message
+        assert "New legal act" in message
+        # Original trigger.message must still be present, AFTER the RSS block.
+        assert "Summarise new legal acts." in message
+        rss_idx = message.index("RSS — new since last poll")
+        msg_idx = message.index("Summarise new legal acts.")
+        assert rss_idx < msg_idx
+
+        # State persisted so a second run sees no new items.
+        captured.clear()
+        await sched.run_now("rss-agent")
+        message2 = captured[0]
+        assert "RSS — new since last poll" not in message2
+        await db.close()
+
+    _run(run())
+
+
+def test_scheduler_no_rss_feeds_unchanged_behavior(tmp_path):
+    """Manifests without rss_feeds run exactly like before — message
+    is the trigger.message, no prepend."""
+    captured: list[str] = []
+
+    async def _capturing_chat_runner(interpreter, message: str) -> str:
+        captured.append(message)
+        return "ok"
+
+    async def run():
+        db = await _setup_db(tmp_path / "t.db")
+        await _insert_agent(db, "no-rss", _scheduled_manifest(message="Hi there"))
+        from dialekt.scheduler.runner import DialektScheduler
+        from dialekt.scheduler.cron_session import CronSession
+
+        def factory(**kwargs):
+            return CronSession(
+                **kwargs,
+                interpreter_factory=_stub_interpreter,
+                chat_runner=_capturing_chat_runner,
+            )
+
+        sched = DialektScheduler(db, cron_session_factory=factory)
+        await sched.run_now("no-rss")
+        assert captured == ["Hi there"]
         await db.close()
 
     _run(run())

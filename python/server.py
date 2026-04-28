@@ -539,6 +539,32 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Index of per-agent secret names. Values themselves live in the OS
+-- keychain under ``agent:{agent_id}:{secret_name}`` — this table only
+-- carries the names so the wizard / runtime can ask "which secrets
+-- does this agent declare?" without poking the keychain. Listing
+-- keys with a prefix isn't portable across backends; an index table
+-- keeps that surface stable.
+CREATE TABLE IF NOT EXISTS agent_secrets_index (
+    agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (agent_id, name)
+);
+
+-- Per-agent RSS poll state. The scheduler diffs each tick's fetch
+-- against this table so only NEW items get injected into the
+-- agent's prompt context. seen_guids is a JSON array of strings,
+-- oldest first, capped at 500 entries by the rss_poll module.
+CREATE TABLE IF NOT EXISTS agent_rss_state (
+    agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    url             TEXT NOT NULL,
+    seen_guids      TEXT NOT NULL,
+    last_polled_at  TEXT NOT NULL,
+    PRIMARY KEY (agent_id, url)
+);
+
 -- MCP protocol servers registered by the user via Settings UI.
 -- Unrelated to python/mcp_servers/ directory, which holds DB routers
 -- (postgres/mysql/clickhouse) with a legacy misnomer folder name.
@@ -733,6 +759,20 @@ async def lifespan(app: FastAPI):
     mysql_init_db(db)
     ch_init_db(db)
     log.info(f"SQLite ready at {DB_PATH}")
+    # First-run: copy bundled visual templates into the user's
+    # ~/.dialekt/visual/templates/ tree. Idempotent — existing
+    # template directories are skipped, so user edits survive
+    # restarts and only newly-shipped templates get added.
+    try:
+        from dialekt.tools.visual.installer import install_bundled_templates
+        report = install_bundled_templates()
+        if report["installed"]:
+            log.info(
+                "visual templates installed: %s (skipped existing: %s)",
+                report["installed"], report["skipped"],
+            )
+    except Exception as e:
+        log.error("visual template install skipped: %s", e)
     # Non-blocking: warn if embedding model isn't pulled yet
     from mcp_servers import schema_rag as _rag
     asyncio.create_task(_rag.check_model())
@@ -2071,24 +2111,63 @@ async def _sync_library_from_cloud() -> dict:
     return {"synced": synced}
 
 
-def _row_to_library_template(row) -> dict:
+def _extract_required_secrets(manifest_yaml: str) -> list[str]:
+    """Pull ``secrets_required[].name`` out of a manifest YAML.
+
+    Used by the Library + wizard surfaces so the frontend can render
+    "needs these secrets" badges and prompt the user to fill them
+    after install. Tolerant of malformed YAML — returns ``[]`` rather
+    than raising, so a single bad library entry doesn't break the
+    whole catalog response.
+    """
+    if not manifest_yaml:
+        return []
+    try:
+        import yaml as _yaml
+        data = _yaml.safe_load(manifest_yaml) or {}
+    except Exception:
+        return []
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("secrets_required")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for entry in raw:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+        elif isinstance(entry, str):
+            name = entry
+        else:
+            name = None
+        if isinstance(name, str) and name and name not in out:
+            out.append(name)
+    return out
+
+
+def _row_to_library_template(row, *, include_manifest: bool = True) -> dict:
     try:
         tags = json.loads(row[5]) if row[5] else []
     except Exception:
         tags = []
-    return {
+    manifest_yaml = row[1] or ""
+    payload = {
         "id": row[0],
-        "manifest_yaml": row[1],
+        "manifest_yaml": manifest_yaml if include_manifest else None,
         "name": row[2],
         "description": row[3],
         "category": row[4],
         "tags": tags,
         "requires_connection": bool(row[6]),
         "requires_mcp": bool(row[7]),
+        "requires_secrets": _extract_required_secrets(manifest_yaml),
         "version": row[8],
         "signature": row[9],
         "cached_at": row[10],
     }
+    if not include_manifest:
+        payload.pop("manifest_yaml", None)
+    return payload
 
 
 @app.get("/library")
@@ -2127,7 +2206,8 @@ async def list_library(category: str | None = None,
                 or any(q in str(t).lower() for t in e["tags"])
             ]
     # Manifest_yaml dropped from list response — frontend doesn't need
-    # it on the catalog screen, only on install.
+    # it on the catalog screen, only on install / customize. The
+    # parsed requires_secrets stays so badges render in the catalog.
     for e in entries:
         e.pop("manifest_yaml", None)
     return {"entries": entries}
@@ -2146,7 +2226,22 @@ async def get_library_template(template_id: str):
     row = await cursor.fetchone()
     if not row:
         raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
-    return _row_to_library_template(row)
+    payload = _row_to_library_template(row)
+    # Wizard "Customize…" pre-fill needs structured access to the
+    # manifest, not just the YAML string. We parse server-side so the
+    # frontend doesn't have to ship js-yaml. Failures surface as a
+    # null ``manifest`` — the wizard then falls back to the name +
+    # description fields.
+    try:
+        import yaml as _yaml
+        parsed = _yaml.safe_load(payload.get("manifest_yaml") or "")
+        if isinstance(parsed, dict):
+            payload["manifest"] = parsed
+        else:
+            payload["manifest"] = None
+    except Exception:
+        payload["manifest"] = None
+    return payload
 
 
 @app.post("/library/sync")
@@ -2299,6 +2394,120 @@ async def delete_agent_binding(agent_id: str):
     await db.execute("DELETE FROM agent_bindings WHERE agent_id = ?", (agent_id,))
     await db.commit()
     return {"ok": True}
+
+
+# ── Per-agent secrets ───────────────────────────────────────────────────────
+#
+# Wizard / Library install flows post credential maps here:
+#   POST /agents/{agent_id}/secrets {"secrets": {"bitrix_webhook_url": "...",
+#                                                "instagram_access_token": "..."}}
+# Values are written into the OS keychain under
+# ``agent:{agent_id}:{secret_name}``; the agent's MCP-tool calls read them
+# back via the same prefix at runtime. This endpoint NEVER returns secret
+# VALUES — only names. Listing the values would defeat the keychain.
+
+def _agent_secret_keychain_name(agent_id: str, name: str) -> str:
+    return f"agent:{agent_id}:{name}"
+
+
+def _is_valid_secret_name(name: str) -> bool:
+    """Names must be ASCII letters / digits / ``_-.`` only, 1..64 chars.
+    Tighter than keyring's own validation so we don't accidentally
+    accept values that round-trip badly across backends."""
+    if not isinstance(name, str) or not (1 <= len(name) <= 64):
+        return False
+    for ch in name:
+        if not (ch.isalnum() or ch in "_-."):
+            return False
+    return True
+
+
+@app.get("/agents/{agent_id}/secrets")
+async def list_agent_secrets(agent_id: str):
+    """Return the names of secrets declared for an agent. Values are
+    intentionally not exposed."""
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    cursor = await db.execute(
+        "SELECT name, created_at, updated_at FROM agent_secrets_index "
+        "WHERE agent_id = ? ORDER BY name",
+        (agent_id,),
+    )
+    rows = await cursor.fetchall()
+    return {
+        "agent_id": agent_id,
+        "secrets": [
+            {"name": r[0], "created_at": r[1], "updated_at": r[2]} for r in rows
+        ],
+    }
+
+
+@app.post("/agents/{agent_id}/secrets")
+async def set_agent_secrets(agent_id: str, body: dict):
+    """Bulk-upsert one or more secrets for an agent.
+
+    Body shape: ``{"secrets": {"<name>": "<value>", ...}}``. Empty
+    string and ``None`` values are rejected — pass ``DELETE`` to
+    remove. Returns the names that were written; values are never
+    echoed back.
+    """
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    secrets = body.get("secrets") if isinstance(body, dict) else None
+    if not isinstance(secrets, dict) or not secrets:
+        raise HTTPException(400, "Body must include non-empty 'secrets' object")
+
+    written: list[str] = []
+    for name, value in secrets.items():
+        if not _is_valid_secret_name(name):
+            raise HTTPException(400, f"Invalid secret name: {name!r}")
+        if not isinstance(value, str) or not value:
+            raise HTTPException(400, f"Secret {name!r} must be a non-empty string")
+        keychain_name = _agent_secret_keychain_name(agent_id, name)
+        try:
+            set_secret(keychain_name, value)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to store secret {name!r}: {e}")
+        written.append(name)
+
+    # Index mirrors the keychain entries. Idempotent upsert.
+    for name in written:
+        await db.execute(
+            """
+            INSERT INTO agent_secrets_index (agent_id, name, created_at, updated_at)
+            VALUES (?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(agent_id, name) DO UPDATE SET
+                updated_at = datetime('now')
+            """,
+            (agent_id, name),
+        )
+    await db.commit()
+    return {"agent_id": agent_id, "written": written}
+
+
+@app.delete("/agents/{agent_id}/secrets/{name}", status_code=204)
+async def delete_agent_secret(agent_id: str, name: str):
+    """Remove a single per-agent secret. Idempotent — deleting a
+    name that isn't there returns 204."""
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    if not _is_valid_secret_name(name):
+        raise HTTPException(400, f"Invalid secret name: {name!r}")
+    keychain_name = _agent_secret_keychain_name(agent_id, name)
+    try:
+        delete_secret(keychain_name)
+    except Exception:
+        # Best-effort — keyring backends differ on missing-key behaviour.
+        log.exception("agent secret delete: keychain remove failed for %s", keychain_name)
+    await db.execute(
+        "DELETE FROM agent_secrets_index WHERE agent_id = ? AND name = ?",
+        (agent_id, name),
+    )
+    await db.commit()
+    return None
 
 
 # ── Mode config endpoints ─────────────────────────────────────────────────────
@@ -3814,13 +4023,18 @@ COMFY_OUTPUT = Path(_comfy_output_env) if _comfy_output_env else _HOME / "projec
 @app.get("/files")
 async def serve_file(path: str):
     from fastapi.responses import FileResponse
+    # Source-of-truth: template_registry.VISUAL_ROOT is bound at
+    # module-import time from DIALEKT_VISUAL_ROOT. We MUST use the
+    # same module variable (not re-read the env) — otherwise tests
+    # that set DIALEKT_VISUAL_ROOT before importing server fail
+    # with 403 when the visual engine writes to the captured root
+    # but /files validates against a freshly-read env value.
+    from dialekt.tools.visual.template_registry import VISUAL_ROOT
     p = Path(path).resolve()
-    visual_root_env = os.environ.get("DIALEKT_VISUAL_ROOT")
-    visual_root = Path(visual_root_env) if visual_root_env else Path.home() / ".dialekt" / "visual"
     allowed = [
         COMFY_OUTPUT.resolve(),
         Path("/tmp/dialekt_files").resolve(),
-        (visual_root / "out").resolve(),
+        (VISUAL_ROOT / "out").resolve(),
     ]
     if not any(str(p).startswith(str(a)) for a in allowed):
         raise HTTPException(403, "path not allowed")
