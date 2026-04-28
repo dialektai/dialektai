@@ -741,17 +741,30 @@ function StepSystemPrompt({ data, setData, errors }) {
 
 // ── Step 3: Capabilities ──────────────────────────────────────────────────────
 
-// Keys here must match the manifest schema's CAPABILITY_GROUPS set
-// (dialekt_manifest/schema.py:11). Before this fix the wizard emitted
-// `filesystem`, `terminal`, `screen` which the validator rejects with
-// 422 on publish. Labels are user-facing and can stay friendly.
+// Keys here must match the manifest schema's CAPABILITY_GROUPS set —
+// the upstream validator's CAPABILITY_GROUPS plus
+// dialekt.manifest_capabilities.EXTRA_CAPABILITY_GROUPS. The wizard
+// once emitted `filesystem` / `terminal` / `screen` which the
+// validator rejected; the renaming fixed that, and the v1.1
+// expansion adds workflow-specific capabilities (web/RSS/Bitrix/
+// Instagram/visual workspace) so the same wizard surface can author
+// content + monitoring agents without bespoke screens.
 const CAP_META = {
-  filesystem_read: { label: 'Filesystem',    desc: 'Read and write local files and directories' },
-  network:         { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
-  browser:         { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
-  database_read:   { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
-  shell_execute:   { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
-  screen_capture:  { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
+  // v1.0 baseline
+  filesystem_read:          { label: 'Filesystem',     desc: 'Read and write local files and directories' },
+  network:                  { label: 'Network',        desc: 'Make HTTP requests and fetch remote resources' },
+  browser:                  { label: 'Browser',        desc: 'Control a headless browser, scrape pages, interact with web UIs' },
+  database_read:            { label: 'Database Read',  desc: 'Run read-only SELECT queries on connected databases' },
+  shell_execute:            { label: 'Terminal',       desc: 'Execute shell commands and scripts on this machine' },
+  screen_capture:           { label: 'Screen',         desc: 'Capture screenshots and observe the current display' },
+  // v1.1 — workflow-specific
+  web_search:               { label: 'Web Search',     desc: 'Search the live web (Tavily / Brave / DuckDuckGo)' },
+  web_crawl:                { label: 'Web Crawl',      desc: 'Fetch full page HTML and extract content for analysis' },
+  rss_read:                 { label: 'RSS Read',       desc: 'Subscribe to RSS / Atom feeds and process new items each tick' },
+  instagram_publish:        { label: 'Instagram',      desc: 'Publish feed posts, stories, and reels via the Graph API' },
+  bitrix_write:             { label: 'Bitrix',         desc: 'Call any Bitrix24 REST method through an incoming webhook' },
+  working_directory_read:   { label: 'Workspace Read', desc: 'Read files inside the agent\'s working directory' },
+  working_directory_write:  { label: 'Workspace Write',desc: 'Write files (reports, posts, generated images, carousels) into the agent\'s working directory' },
 };
 
 function StepCapabilities({ data, setData }) {
