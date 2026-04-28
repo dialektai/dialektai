@@ -17,6 +17,7 @@ const STEPS = [
   { label: 'Capabilities',  icon: 'shield'   },
   { label: 'MCP Tools',     icon: 'plug'     },
   { label: 'Connections',   icon: 'folder'   },
+  { label: 'Secrets',       icon: 'shield'   },
   { label: 'Variables',     icon: 'terminal' },
   { label: 'Autonomy',      icon: 'cog'      },
   { label: 'Trigger',       icon: 'screen'   },
@@ -312,12 +313,13 @@ function Field({ label, children }) {
   );
 }
 
-function TextInput({ value, onChange, placeholder, style }) {
+function TextInput({ value, onChange, placeholder, style, type }) {
   return (
     <input
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
+      type={type || 'text'}
       style={{ ...INPUT, ...style }}
     />
   );
@@ -1583,7 +1585,97 @@ function StepConnections({ data, setData }) {
   );
 }
 
-// ── Step 5: Variables ─────────────────────────────────────────────────────────
+// ── Step 7: Secrets ───────────────────────────────────────────────────────────
+
+// Per-agent credentials (Bitrix webhook URL, Instagram access token,
+// IG user id, etc.). On Publish they're POSTed to /agents/{id}/secrets
+// which stores them under ``agent:{id}:{name}`` in the OS keychain.
+// The manifest only carries the names, never the values.
+//
+// Names must match the keys the agent's MCP tools read by default
+// (e.g. ``bitrix_webhook_url``, ``instagram_access_token``,
+// ``instagram_ig_user_id``) or whatever the agent's system_prompt
+// references. The wizard doesn't enforce a fixed list — different
+// agents need different secrets.
+
+function StepSecrets({ data, setData }) {
+  const addSecret = () => setData(d => ({
+    ...d,
+    secrets: [...d.secrets, { name: '', value: '' }],
+  }));
+  const removeSecret = idx => setData(d => ({
+    ...d,
+    secrets: d.secrets.filter((_, i) => i !== idx),
+  }));
+  const updateSecret = (idx, field, value) => setData(d => ({
+    ...d,
+    secrets: d.secrets.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+  }));
+
+  return (
+    <div>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        SECRETS — per-agent credentials, stored in the OS keychain
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        Add the credentials this agent needs (Bitrix webhook URL, Instagram
+        access token, etc.). Values never appear in the manifest, in logs,
+        or in audit rows — only the names. The MCP tools that need them
+        read by name (e.g. <span style={{ color: T.cyan }}>bitrix_webhook_url</span>,{' '}
+        <span style={{ color: T.cyan }}>instagram_access_token</span>,{' '}
+        <span style={{ color: T.cyan }}>instagram_ig_user_id</span>).
+      </div>
+      {data.secrets.length === 0 ? (
+        <div style={{
+          padding: 16, fontFamily: T.mono, fontSize: 11, color: T.dim,
+          background: T.bg1, border: `1px dashed ${T.border}`, textAlign: 'center',
+        }}>
+          No secrets declared yet — click Add Secret if this agent needs credentials.
+        </div>
+      ) : (
+        data.secrets.map((s, idx) => (
+          <div key={idx} style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8,
+            marginBottom: 8, alignItems: 'center',
+          }}>
+            <TextInput
+              value={s.name}
+              onChange={v => updateSecret(idx, 'name', v)}
+              placeholder="bitrix_webhook_url"
+            />
+            <TextInput
+              value={s.value}
+              onChange={v => updateSecret(idx, 'value', v)}
+              placeholder="https://portal.bitrix24.kz/rest/1/abcd1234"
+              type="password"
+            />
+            <button
+              onClick={() => removeSecret(idx)}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '6px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 11, color: T.dim, borderColor: T.border,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ))
+      )}
+      <button
+        onClick={addSecret}
+        style={{
+          ...INPUT, cursor: 'pointer', padding: '8px 14px', marginTop: 12,
+          width: 'auto', fontFamily: T.mono, fontSize: 11, letterSpacing: '.04em',
+          color: T.cyan, borderColor: T.cyan,
+        }}
+      >
+        + ADD SECRET
+      </button>
+    </div>
+  );
+}
+
+// ── Step 8: Variables ─────────────────────────────────────────────────────────
 
 function StepVariables({ data, setData }) {
   const addVar = () => setData(d => ({
@@ -2099,6 +2191,11 @@ export default function AgentWizardScreen({ onNav }) {
     // can write reports / posts / generated images into it. Empty means
     // "no workspace" — the agent runs without filesystem-bound output.
     working_directory: '',
+    // v1.1: per-agent secrets. Names + values entered by the user; on
+    // Publish they get POSTed to /agents/{id}/secrets which stores them
+    // under ``agent:{id}:{name}`` in the OS keychain. The manifest only
+    // carries the names (in secrets_required[]) — never the values.
+    secrets: [],
     model_preferred: 'llama3.2:3b',
     model_acceptable: '',
     context_window: '32768',
@@ -2217,6 +2314,33 @@ export default function AgentWizardScreen({ onNav }) {
         }
       }
 
+      // Push per-agent secrets into the OS keychain via /agents/{id}/secrets.
+      // Manifest only carries the names (in secrets_required[]); values land
+      // here so the agent's MCP tools can read them by name at runtime.
+      if (created.id && Array.isArray(data.secrets) && data.secrets.length > 0) {
+        const filled = data.secrets.filter(s => s.name && s.value);
+        if (filled.length > 0) {
+          try {
+            const map = {};
+            for (const s of filled) map[s.name] = s.value;
+            const sr = await fetch(`${API}/agents/${created.id}/secrets`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ secrets: map }),
+            });
+            if (!sr.ok) {
+              const sb = await sr.json().catch(() => ({}));
+              addToast(
+                `Agent saved but secrets failed: ${sb.detail || sb.error || sr.status}`,
+                'warning',
+              );
+            }
+          } catch (secretErr) {
+            addToast('Agent saved but secrets push failed — fill them in Settings → Agents', 'warning');
+          }
+        }
+      }
+
       addToast(status === 'draft' ? 'Agent saved as draft' : 'Agent published successfully', 'success');
       setTimeout(() => onNav('settings'), 600);
     } catch (err) {
@@ -2240,10 +2364,11 @@ export default function AgentWizardScreen({ onNav }) {
       case 4:  return <StepCapabilities data={data} setData={setData} />;
       case 5:  return <StepMcpServers data={data} setData={setData} />;
       case 6:  return <StepConnections data={data} setData={setData} />;
-      case 7:  return <StepVariables data={data} setData={setData} />;
-      case 8:  return <StepAutonomy data={data} setData={setData} />;
-      case 9:  return <StepTrigger data={data} setData={setData} />;
-      case 10: return <StepPublish data={data} saving={saving} onSave={save} />;
+      case 7:  return <StepSecrets data={data} setData={setData} />;
+      case 8:  return <StepVariables data={data} setData={setData} />;
+      case 9:  return <StepAutonomy data={data} setData={setData} />;
+      case 10: return <StepTrigger data={data} setData={setData} />;
+      case 11: return <StepPublish data={data} saving={saving} onSave={save} />;
       default: return null;
     }
   };
