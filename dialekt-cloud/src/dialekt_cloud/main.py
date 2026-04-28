@@ -4,7 +4,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -177,6 +177,32 @@ async def root():
 async def admin_redirect():
     # convenience: /admin → /admin/ui/ (people will type the short form)
     return RedirectResponse("/admin/ui/", status_code=307)
+
+
+@app.post("/releases/refresh")
+async def releases_refresh(request: Request):
+    """Force-evict the in-memory cache for /releases/latest.
+
+    Called by the release.yml workflow as the last step of every tag
+    push, so the landing flips to the new version within seconds of the
+    GitHub Release being published. Without this, the 5-min cache TTL
+    is the lower bound on visibility — fine as a safety net, awful as
+    the primary update path.
+
+    Auth: same X-Admin-Key header used by /admin break-glass — we don't
+    mint a separate token because the only caller is our own CI and the
+    risk surface is "attacker forces our cache to refetch from GitHub",
+    which is not interesting.
+    """
+    if request.headers.get("X-Admin-Key", "") != settings.DIALEKT_ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    from .services.releases import get_latest_releases, releases_summary
+    data = await get_latest_releases(force=True)
+    return {
+        "tag": data.get("version", "latest"),
+        "downloads_count": len(releases_summary(data)),
+        "refreshed": True,
+    }
 
 
 @app.get("/releases/latest")

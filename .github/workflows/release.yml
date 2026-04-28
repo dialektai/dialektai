@@ -884,3 +884,29 @@ jobs:
           git add landing/changelog.html
           git commit -m "docs(changelog): auto-add ${{ github.ref_name }} from release pipeline [skip ci]"
           git push origin main
+
+  # ── 8. Force-refresh api.dias.now release cache ──────────────────────────
+  # The dialekt-cloud server caches GitHub's /releases/latest in-process for
+  # 5 min. After a tag publish we POST /releases/refresh so the landing flips
+  # within seconds instead of waiting out the TTL. Best-effort: a missed
+  # refresh just falls back to the TTL, no need to fail the pipeline.
+
+  refresh-landing-cache:
+    name: Force-refresh api.dias.now cache
+    needs: release
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    continue-on-error: true
+    steps:
+      - name: POST /releases/refresh
+        env:
+          ADMIN_KEY: ${{ secrets.DIALEKT_ADMIN_KEY }}
+        run: |
+          if [ -z "$ADMIN_KEY" ]; then
+            echo "DIALEKT_ADMIN_KEY secret not set — skipping cache refresh"
+            exit 0
+          fi
+          curl -fsS -X POST https://api.dias.now/releases/refresh \
+            -H "X-Admin-Key: $ADMIN_KEY" \
+            --max-time 30 \
+            | tee /dev/stderr
