@@ -45,7 +45,13 @@ for pkg in METADATA_PACKAGES:
 #   Same failure mode as the readchar one above — WS chat dies on first
 #   make_interpreter() call. Both bugs flushed out by smoke-testing the
 #   chat path post-bundle, not just import-server.
-DATA_FILE_PACKAGES = ["yaspin"]
+DATA_FILE_PACKAGES = [
+    "yaspin",   # data/spinners.json — read by yaspin.spinners on import
+    "litellm",  # litellm/model_prices_and_context_window_backup.json —
+                # read by litellm/__init__.py on import via the model
+                # cost map loader; failure surfaces the same way as
+                # yaspin (WS dies on first chat connect).
+]
 data_file_datas = []
 for pkg in DATA_FILE_PACKAGES:
     try:
@@ -141,6 +147,15 @@ a = Analysis(
         "jeepney",
         "jeepney.io.asyncio",
 
+        # tiktoken's encodings (cl100k_base etc.) are registered via the
+        # tiktoken_ext namespace through Python entry-points. PyInstaller
+        # doesn't traverse entry-point plugins, so the frozen binary
+        # raises "Unknown encoding cl100k_base" the first time litellm
+        # tokenises a prompt. Listing the public-encodings module forces
+        # PyInstaller to include it; tiktoken_ext is the parent namespace.
+        "tiktoken_ext",
+        "tiktoken_ext.openai_public",
+
         # Misc
         "httpx",
         "psutil",
@@ -151,9 +166,15 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Shrink binary: exclude things that aren't used on Linux
+        # Shrink binary: exclude things that aren't used on Linux.
+        # Note: `matplotlib` was previously here but open-interpreter's
+        # display.py calls lazy_import("matplotlib") at module load and
+        # raises ModuleNotFoundError when find_spec returns None, even
+        # though matplotlib itself is never used in our chat path.
+        # Removing the exclude lets PyInstaller bundle the package and
+        # silences the import-time check; the cost is ~30 MB on top of
+        # the 126 MB sidecar.
         "tkinter",
-        "matplotlib",
         "numpy.distutils",
         "scipy",
         "pandas",
