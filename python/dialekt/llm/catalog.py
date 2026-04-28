@@ -140,6 +140,27 @@ OLLAMA_MODELS: tuple[OllamaModel, ...] = (
 )
 
 
+def is_embedding_only(full_or_name: str) -> bool:
+    """True if `full_or_name` (e.g. 'nomic-embed-text:v1.5' or just
+    'nomic-embed-text') is an Ollama model whose only catalog category
+    is 'embedding' — i.e. it can't answer chat completions.
+
+    Used by the WS chat handler to refuse a user-set session default
+    that is embedding-only (otherwise litellm hits Ollama with a chat
+    request and the daemon returns "model does not support chat",
+    which surfaces as a generic APIConnectionError to the user).
+
+    Unknown models default to False so we don't accidentally block
+    chat models that aren't in our curated catalog.
+    """
+    name = full_or_name.split(":", 1)[0]
+    for m in OLLAMA_MODELS:
+        if m.name == name:
+            cats = m.categories
+            return bool(cats) and all(c == "embedding" for c in cats)
+    return False
+
+
 @dataclass(frozen=True)
 class ProviderModel:
     id: str

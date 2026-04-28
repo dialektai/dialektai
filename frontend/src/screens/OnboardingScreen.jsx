@@ -12,16 +12,30 @@ const STEPS = [
   { n: '05', t: 'First conversation' },
 ];
 
+// Onboarding chat picker — `embedding` is intentionally excluded.
+// Embedding-only models (nomic-embed, mxbai-embed, bge-m3) can't
+// answer chat completions and would crash the WS the moment the
+// user sent the first message ("model does not support chat" from
+// Ollama). They're still pulled separately by Settings → Models for
+// schema-RAG / few-shot memory under the hood.
 const OLLAMA_CATEGORIES = [
   { id: 'all', label: 'All' },
   { id: 'general', label: 'General' },
   { id: 'reasoning', label: 'Reasoning' },
   { id: 'coding', label: 'Coding' },
   { id: 'vision', label: 'Vision' },
-  { id: 'embedding', label: 'Embeddings' },
   { id: 'lightweight', label: 'Lightweight' },
   { id: 'frontier', label: 'Frontier' },
 ];
+
+// True if the model can ONLY do embeddings — keep these out of the
+// chat picker. A model marked both "embedding" and another category
+// (none currently in the catalog, but future-proofed) would still
+// show up because at least one category is chat-capable.
+function isEmbeddingOnly(model) {
+  const cats = model.categories || [];
+  return cats.length > 0 && cats.every(c => c === 'embedding');
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -477,11 +491,17 @@ export default function OnboardingScreen({ onNav }) {
   };
 
   // ── Filter Ollama models ────────────────────────────────────────────────
-  const ollamaAnnotated = useMemo(() => (catalog.ollama || []).map(m => ({
-    model: m,
-    installed: modelIsInstalled(m, installedTags),
-    fits: modelFits(m, ramTotalGB),
-  })), [catalog.ollama, installedTags, ramTotalGB]);
+  // Drop embedding-only models — they can't serve chat. See
+  // isEmbeddingOnly comment above; the drop happens here so every
+  // downstream consumer (counts, sorted list, default-pick) is
+  // already chat-only.
+  const ollamaAnnotated = useMemo(() => (catalog.ollama || [])
+    .filter(m => !isEmbeddingOnly(m))
+    .map(m => ({
+      model: m,
+      installed: modelIsInstalled(m, installedTags),
+      fits: modelFits(m, ramTotalGB),
+    })), [catalog.ollama, installedTags, ramTotalGB]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -168,7 +168,7 @@ log = logging.getLogger("dialekt")
 # lockstep with frontend/src-tauri/Cargo.toml + tauri.conf.json + the
 # git tag at every release. The /about endpoint and frontend (via
 # /about) both read this — never hardcode a literal in screens.
-DIALEKT_VERSION = "0.27.14"
+DIALEKT_VERSION = "0.27.15"
 
 DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
@@ -5000,6 +5000,29 @@ def make_interpreter(
 
     provider_id = s.get("model_provider") or "ollama"
     default_model = s.get("model", "gemma3:12b")
+
+    # Embedding-only guard: if the saved session default points at a
+    # model that can't answer chat (nomic-embed-text et al.), swap to
+    # the first installed chat-capable model and warn. Hitting litellm
+    # with an embedding model triggers a generic APIConnectionError
+    # that the user can't easily decode.
+    if provider_id == "ollama":
+        from dialekt.llm.catalog import is_embedding_only, OLLAMA_MODELS
+        if is_embedding_only(default_model):
+            installed = get_installed_ollama_models()
+            chat_capable = [
+                f"{m.name}:{m.tag}" for m in OLLAMA_MODELS
+                if not all(c == "embedding" for c in m.categories)
+                and any(t.startswith(m.name + ":") for t in installed)
+            ]
+            replacement = chat_capable[0] if chat_capable else "gemma3:12b"
+            log.warning(
+                "session default %r is embedding-only; falling back to %r. "
+                "Update Settings → Models to pick a chat-capable model.",
+                default_model, replacement,
+            )
+            default_model = replacement
+
     manifest_dict: dict | None = None
     if agent and agent.get("manifest_yaml"):
         try:
