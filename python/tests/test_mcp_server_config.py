@@ -54,6 +54,7 @@ def test_enabled_categories_default_is_full_set():
         "web_crawl",
         "calendar",
         "scheduling",
+        "cdn",
     }
 
 

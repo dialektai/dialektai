@@ -41,6 +41,7 @@ TOOL_CATEGORIES = (
     "web_crawl",
     "calendar",
     "scheduling",
+    "cdn",
 )
 
 
