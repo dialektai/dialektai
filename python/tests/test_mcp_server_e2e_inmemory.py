@@ -127,13 +127,16 @@ def test_client_lists_all_registered_tools(tmp_path):
             # File tools
             assert "dialekt_read_file" in names
             assert "dialekt_list_directory" in names
+            assert "dialekt_write_file" in names
+            assert "dialekt_append_file" in names
+            assert "dialekt_make_dir" in names
             # Agent tools
             assert "dialekt_list_agents" in names
             assert "dialekt_get_agent" in names
             # invoke_agent deliberately NOT in v0.20.0
             assert "dialekt_invoke_agent" not in names
 
-            assert len(names) == 9
+            assert len(names) == 12
 
     asyncio.run(run())
 

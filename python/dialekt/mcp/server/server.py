@@ -259,6 +259,9 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "search_schema": "database",
     "read_file": "file",
     "list_directory": "file",
+    "write_file": "file",
+    "append_file": "file",
+    "make_dir": "file",
     "list_agents": "agent",
     "get_agent": "agent",
 }
