@@ -39,6 +39,7 @@ TOOL_CATEGORIES = (
     "instagram",
     "visual",
     "web_crawl",
+    "calendar",
 )
 
 

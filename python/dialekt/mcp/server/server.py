@@ -107,6 +107,8 @@ class MCPServer:
             self._register_visual_tools()
         if "web_crawl" in enabled:
             self._register_web_crawl_tools()
+        if "calendar" in enabled:
+            self._register_calendar_tools()
 
         log.info(
             "dialekt MCP server registered %d tool(s): %s",
@@ -191,6 +193,13 @@ class MCPServer:
         from dialekt.mcp.server.tools.web_crawl import register_web_crawl_tools
 
         names = register_web_crawl_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_calendar_tools(self) -> None:
+        """Attach the KZ holiday calendar tool."""
+        from dialekt.mcp.server.tools.calendar import register_calendar_tools
+
+        names = register_calendar_tools(self)
         self._registered_tools.extend(names)
 
     # ── Accessors used by tools / tests ─────────────────────────────────
@@ -332,6 +341,7 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "render_template": "visual",
     "render_carousel": "visual",
     "web_crawl": "web_crawl",
+    "kz_holidays": "calendar",
 }
 
 
