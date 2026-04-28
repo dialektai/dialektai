@@ -164,6 +164,12 @@ import uvicorn
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("dialekt")
 
+# Single source of truth for the user-visible version string. Bumped in
+# lockstep with frontend/src-tauri/Cargo.toml + tauri.conf.json + the
+# git tag at every release. The /about endpoint and frontend (via
+# /about) both read this — never hardcode a literal in screens.
+DIALEKT_VERSION = "0.27.11"
+
 DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
 _active_interpreters: dict = {}  # ws_id → interpreter instance
@@ -978,7 +984,7 @@ async def system_stats():
 async def about():
     import platform
     return {
-        "version": "0.8.2",
+        "version": DIALEKT_VERSION,
         "username": _USERNAME,
         "home": str(_HOME),
         "platform": platform.system(),
