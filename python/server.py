@@ -2049,24 +2049,63 @@ async def _sync_library_from_cloud() -> dict:
     return {"synced": synced}
 
 
-def _row_to_library_template(row) -> dict:
+def _extract_required_secrets(manifest_yaml: str) -> list[str]:
+    """Pull ``secrets_required[].name`` out of a manifest YAML.
+
+    Used by the Library + wizard surfaces so the frontend can render
+    "needs these secrets" badges and prompt the user to fill them
+    after install. Tolerant of malformed YAML — returns ``[]`` rather
+    than raising, so a single bad library entry doesn't break the
+    whole catalog response.
+    """
+    if not manifest_yaml:
+        return []
+    try:
+        import yaml as _yaml
+        data = _yaml.safe_load(manifest_yaml) or {}
+    except Exception:
+        return []
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("secrets_required")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for entry in raw:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+        elif isinstance(entry, str):
+            name = entry
+        else:
+            name = None
+        if isinstance(name, str) and name and name not in out:
+            out.append(name)
+    return out
+
+
+def _row_to_library_template(row, *, include_manifest: bool = True) -> dict:
     try:
         tags = json.loads(row[5]) if row[5] else []
     except Exception:
         tags = []
-    return {
+    manifest_yaml = row[1] or ""
+    payload = {
         "id": row[0],
-        "manifest_yaml": row[1],
+        "manifest_yaml": manifest_yaml if include_manifest else None,
         "name": row[2],
         "description": row[3],
         "category": row[4],
         "tags": tags,
         "requires_connection": bool(row[6]),
         "requires_mcp": bool(row[7]),
+        "requires_secrets": _extract_required_secrets(manifest_yaml),
         "version": row[8],
         "signature": row[9],
         "cached_at": row[10],
     }
+    if not include_manifest:
+        payload.pop("manifest_yaml", None)
+    return payload
 
 
 @app.get("/library")
@@ -2105,7 +2144,8 @@ async def list_library(category: str | None = None,
                 or any(q in str(t).lower() for t in e["tags"])
             ]
     # Manifest_yaml dropped from list response — frontend doesn't need
-    # it on the catalog screen, only on install.
+    # it on the catalog screen, only on install / customize. The
+    # parsed requires_secrets stays so badges render in the catalog.
     for e in entries:
         e.pop("manifest_yaml", None)
     return {"entries": entries}
