@@ -12,13 +12,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Build context is the monorepo root (set in docker-compose.yml).
+# Paths below reference dialekt-cloud/* explicitly to address that.
 # Order matters for editable installs: the src/ package must exist
 # at pip-install time or hatchling refuses to build the wheel.
-COPY pyproject.toml ./
-COPY src/ ./src/
+COPY dialekt-cloud/pyproject.toml ./
+COPY dialekt-cloud/src/ ./src/
 RUN pip install --no-cache-dir -e ".[test]"
 
-COPY tests/ ./tests/
+COPY dialekt-cloud/tests/ ./tests/
+
+# Bundle the IBA agent manifests so library_seed._load_iba() can
+# ship them as installable templates. ``parents[4]`` in the seeder
+# resolves to ``/`` inside the container, so we drop the directory
+# at /agents/iba/ to match. Local dev keeps reading them from the
+# monorepo's ``agents/iba/`` via the same parents[4] math.
+COPY agents/iba/ /agents/iba/
 
 ENV INVOICES_DIR=/app/invoices
 RUN mkdir -p /app/invoices

@@ -1,0 +1,35 @@
+# Build context for dialekt-cloud Dockerfile is now the monorepo root
+# (so agents/iba/*.yaml ships into the image). We keep only what the
+# Dockerfile's COPY lines need and exclude the multi-gigabyte trees:
+# frontend node_modules, python venv, build artifacts, OS junk.
+
+# Everything excluded by default; whitelist what we need.
+*
+
+# What the Dockerfile actually copies:
+!dialekt-cloud/pyproject.toml
+!dialekt-cloud/src/
+!dialekt-cloud/tests/
+!agents/iba/
+
+# Inside the whitelisted dirs, prune big / generated stuff:
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/venv/
+**/.venv/
+**/node_modules/
+**/.git/
+**/dist/
+**/build/
+**/.coverage
+**/*.egg-info/
+
+# OS / editor junk
+.DS_Store
+**/.DS_Store
+**/Thumbs.db
+.idea/
+.vscode/

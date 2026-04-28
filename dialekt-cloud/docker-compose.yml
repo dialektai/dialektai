@@ -18,7 +18,13 @@ services:
       - internal
 
   api:
-    build: .
+    # Build context is the monorepo root so the image can pull
+    # agents/iba/*.yaml — required by library_seed._load_iba() to
+    # ship the IBA template set. Dockerfile path is relative to
+    # the new context.
+    build:
+      context: ..
+      dockerfile: dialekt-cloud/Dockerfile
     container_name: dialekt-api
     depends_on:
       db:
