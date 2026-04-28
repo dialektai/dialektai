@@ -1882,6 +1882,171 @@ function triggerSupported(triggerType) {
   return !!opt && !opt.comingSoon;
 }
 
+// Common cron presets the wizard offers as one-click options. Users
+// who need finer control can edit the cron string directly.
+const CRON_PRESETS = [
+  { label: 'Every weekday 9:00',  cron: '0 9 * * MON-FRI' },
+  { label: 'Every Monday 9:00',   cron: '0 9 * * MON' },
+  { label: 'Daily 18:00',         cron: '0 18 * * *' },
+  { label: 'Every Friday 18:00',  cron: '0 18 * * FRI' },
+  { label: '1st of month 10:00',  cron: '0 10 1 * *' },
+];
+
+// IANA timezone defaults that cover the common KZ + neighbouring pilots.
+// Users can type any IANA name into the field — this list is just for
+// quick selection.
+const TZ_PRESETS = [
+  'Asia/Almaty', 'Asia/Astana', 'Asia/Tashkent', 'Asia/Bishkek',
+  'Europe/Moscow', 'Europe/London', 'America/New_York', 'UTC',
+];
+
+function ScheduleSubStep({ data, setData }) {
+  const updateRss = (idx, value) => setData(d => ({
+    ...d,
+    rss_feeds: d.rss_feeds.map((u, i) => (i === idx ? value : u)),
+  }));
+  const removeRss = idx => setData(d => ({
+    ...d,
+    rss_feeds: d.rss_feeds.filter((_, i) => i !== idx),
+  }));
+  const addRss = () => setData(d => ({
+    ...d,
+    rss_feeds: [...d.rss_feeds, ''],
+  }));
+
+  return (
+    <div style={{
+      marginTop: 4, marginBottom: 12,
+      padding: 14, background: T.bg1, border: `1px solid ${T.cyan}55`,
+    }}>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, marginBottom: 12, letterSpacing: '.06em' }}>
+        SCHEDULE
+      </div>
+
+      <Field label="Cron expression">
+        <TextInput
+          value={data.cron}
+          onChange={v => setData(d => ({ ...d, cron: v }))}
+          placeholder="0 9 * * MON"
+        />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {CRON_PRESETS.map(p => (
+            <button
+              key={p.cron}
+              onClick={() => setData(d => ({ ...d, cron: p.cron }))}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '4px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 10, color: T.dim, borderColor: T.border,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+          POSIX cron — minute hour day month weekday. The scheduler reads
+          this verbatim; presets above are just shortcuts.
+        </div>
+      </Field>
+
+      <Field label="Timezone (IANA)">
+        <TextInput
+          value={data.cron_timezone}
+          onChange={v => setData(d => ({ ...d, cron_timezone: v }))}
+          placeholder="Asia/Almaty"
+        />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {TZ_PRESETS.map(tz => (
+            <button
+              key={tz}
+              onClick={() => setData(d => ({ ...d, cron_timezone: tz }))}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '4px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 10, color: T.dim, borderColor: T.border,
+              }}
+            >
+              {tz}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="If a tick was missed (computer off)">
+        <Select
+          variant="full"
+          value={data.missed_run_policy}
+          onChange={v => setData(d => ({ ...d, missed_run_policy: v }))}
+          options={[
+            { v: 'run_on_startup', l: 'Run on startup (recommended)' },
+            { v: 'skip',           l: 'Skip — wait for next scheduled tick' },
+          ]}
+        />
+      </Field>
+
+      <Field label="Default trigger message (optional)">
+        <textarea
+          value={data.trigger_message}
+          onChange={e => setData(d => ({ ...d, trigger_message: e.target.value }))}
+          placeholder="What should the agent do on each tick? (e.g. 'Build today's law-update digest.')"
+          rows={3}
+          style={{ ...INPUT, resize: 'vertical', fontFamily: 'inherit' }}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Sent to the agent on each cron tick. RSS items (if any) are
+          prepended automatically before this message reaches the LLM.
+        </div>
+      </Field>
+
+      <Field label="RSS / Atom feeds (optional)">
+        {data.rss_feeds.length === 0 ? (
+          <div style={{
+            padding: 12, fontFamily: T.mono, fontSize: 11, color: T.dim,
+            background: T.bg0, border: `1px dashed ${T.border}`, textAlign: 'center',
+          }}>
+            No feeds — the agent runs on the cron schedule alone.
+          </div>
+        ) : (
+          data.rss_feeds.map((url, idx) => (
+            <div key={idx} style={{
+              display: 'grid', gridTemplateColumns: '1fr auto', gap: 8,
+              marginBottom: 8, alignItems: 'center',
+            }}>
+              <TextInput
+                value={url}
+                onChange={v => updateRss(idx, v)}
+                placeholder="https://adilet.zan.kz/rus/docs/rss"
+              />
+              <button
+                onClick={() => removeRss(idx)}
+                style={{
+                  ...INPUT, cursor: 'pointer', padding: '6px 10px', width: 'auto',
+                  fontFamily: T.mono, fontSize: 11, color: T.dim, borderColor: T.border,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          onClick={addRss}
+          style={{
+            ...INPUT, cursor: 'pointer', padding: '6px 12px', marginTop: 8,
+            width: 'auto', fontFamily: T.mono, fontSize: 11,
+            color: T.cyan, borderColor: T.cyan,
+          }}
+        >
+          + ADD RSS FEED
+        </button>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 8, lineHeight: 1.6 }}>
+          On each tick, new items (by guid) are diffed against the last poll
+          and added as a Markdown block before the trigger message.
+        </div>
+      </Field>
+    </div>
+  );
+}
+
 function StepTrigger({ data, setData }) {
   const selectedOpt = TRIGGER_OPTS.find(o => o.value === data.trigger_type);
   const selectedUnavailable = selectedOpt && selectedOpt.comingSoon;
@@ -1948,6 +2113,10 @@ function StepTrigger({ data, setData }) {
           <span style={{ color: T.cyan }}>hello@dias.now</span> for early access.
           Publish is disabled until you switch to Interactive.
         </div>
+      )}
+
+      {data.trigger_type === 'scheduled' && (
+        <ScheduleSubStep data={data} setData={setData} />
       )}
 
       <Field label="Input Placeholder">
@@ -2226,6 +2395,15 @@ export default function AgentWizardScreen({ onNav }) {
     autonomy_recommended: 'ask-before-write',
     autonomy_max: 'ask-before-write',
     trigger_type: 'interactive',
+    // v1.1: scheduled-trigger fields, rendered inline in StepTrigger
+    // when trigger_type === 'scheduled'. The wizard YAML only emits
+    // these when the type matches, so existing interactive-only agents
+    // keep their slim manifests.
+    cron: '0 9 * * MON',
+    cron_timezone: 'Asia/Almaty',
+    missed_run_policy: 'run_on_startup',
+    trigger_message: '',
+    rss_feeds: [],
     input_placeholder: 'Ask me anything...',
     streaming: true,
   });
