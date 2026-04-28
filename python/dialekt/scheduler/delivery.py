@@ -1,22 +1,25 @@
 """Route a scheduled run's output to the manifest-declared destination.
 
 Manifests carry an ``output.destination`` block; this module turns
-that declarative spec into a concrete delivery action. Three kinds:
+that declarative spec into a concrete delivery action. Four kinds:
 
 - ``notification`` — write a row into ``notifications`` so the next
   app open shows it as an unread item. Useful for "the digest is
   ready, look at it when you have time" flows.
-- ``email_or_telegram`` — send to a Telegram chat through the
-  ``telegram_chat_id`` field (resolved through ``dialekt.secrets`` if
-  it's a ``${secrets.*}`` reference). Email path is a stub for now —
-  pilots use Telegram first; SMTP is the v0.28 follow-up.
+- ``email_or_telegram`` / ``telegram`` — send to a Telegram chat
+  through ``telegram_chat_id`` + ``telegram_bot_token`` (both
+  resolvable via ``${secrets.*}`` refs).
+- ``email`` — send via SMTP using aiosmtplib. Credentials come from
+  ``${secrets.*}`` refs in the destination block (smtp_host,
+  smtp_port, smtp_user, smtp_password, smtp_from). Recipients
+  carried in ``email_to`` (string or list of strings).
 - ``filesystem`` — write the output to a path under the user's home,
   expanding ``{{date}}`` / ``{{time}}`` / ``{{agent_id}}`` placeholders.
 
 Failure isolation: every delivery branch swallows its own exception
 and returns a ``DeliveryResult(status="failed", ...)``. The scheduler
-must not crash because Telegram is rate-limited or the disk is full —
-the run history shows the failure and the user can retry by hand.
+must not crash because Telegram is rate-limited or the SMTP server
+is down — the run history shows the failure and the user can retry.
 """
 from __future__ import annotations
 
@@ -70,8 +73,10 @@ async def deliver(
     try:
         if kind == "notification":
             return await _deliver_notification(db, agent, run_id, output)
-        if kind == "email_or_telegram":
+        if kind in ("email_or_telegram", "telegram"):
             return await _deliver_telegram(destination, agent, output)
+        if kind == "email":
+            return await _deliver_email(destination, agent, output, triggered_at)
         if kind == "filesystem":
             return await _deliver_filesystem(destination, agent, run_id, output, triggered_at)
         return DeliveryResult("failed", f"unknown destination.type {kind!r}", None)
@@ -133,6 +138,93 @@ async def _deliver_telegram(destination: dict, agent: dict, output: str) -> Deli
                     str(chat_id),
                 )
     return DeliveryResult("sent", f"{len(chunks)} message(s)", str(chat_id))
+
+
+async def _deliver_email(
+    destination: dict, agent: dict, output: str, triggered_at: datetime,
+) -> DeliveryResult:
+    """Send the run's output as an email via SMTP.
+
+    Required destination fields (each may be a literal or
+    ``${secrets.<name>}`` reference):
+    - smtp_host, smtp_port (int — default 587 for STARTTLS)
+    - smtp_user, smtp_password
+    - smtp_from — From: header
+    - email_to — single string OR list of strings
+    Optional:
+    - smtp_use_tls — "ssl" / "starttls" / "none" (default starttls)
+    - subject — plain string; supports {{agent_name}} / {{date}} expansion
+    """
+    host = _resolve_secret(destination.get("smtp_host"))
+    port_raw = _resolve_secret(destination.get("smtp_port") or "587")
+    user = _resolve_secret(destination.get("smtp_user"))
+    password = _resolve_secret(destination.get("smtp_password"))
+    sender = _resolve_secret(destination.get("smtp_from") or destination.get("from"))
+    raw_to = destination.get("email_to") or destination.get("to")
+    use_tls_mode = (
+        _resolve_secret(destination.get("smtp_use_tls") or "starttls") or "starttls"
+    ).lower()
+
+    if not host or not user or not password or not sender:
+        return DeliveryResult(
+            "failed",
+            "smtp credentials missing (smtp_host/user/password/from)",
+            None,
+        )
+    try:
+        port = int(port_raw)
+    except (TypeError, ValueError):
+        return DeliveryResult("failed", f"invalid smtp_port: {port_raw!r}", None)
+
+    recipients: list[str] = []
+    if isinstance(raw_to, str):
+        recipients = [r.strip() for r in raw_to.split(",") if r.strip()]
+    elif isinstance(raw_to, list):
+        recipients = [str(r).strip() for r in raw_to if str(r).strip()]
+    if not recipients:
+        return DeliveryResult("failed", "email_to has no recipients", None)
+
+    subject_template = destination.get("subject") or "Scheduled run: {{agent_name}}"
+    subject = (
+        str(subject_template)
+        .replace("{{agent_name}}", str(agent.get("name") or agent.get("id") or "agent"))
+        .replace("{{date}}", triggered_at.strftime("%Y-%m-%d"))
+    )
+
+    from email.message import EmailMessage
+
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = ", ".join(recipients)
+    message["Subject"] = subject
+    message.set_content(output)
+
+    import aiosmtplib
+
+    use_ssl = use_tls_mode == "ssl"
+    start_tls = use_tls_mode == "starttls"
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=host,
+            port=port,
+            username=user,
+            password=password,
+            use_tls=use_ssl,
+            start_tls=start_tls if not use_ssl else False,
+            timeout=30,
+        )
+    except Exception as e:
+        return DeliveryResult(
+            "failed",
+            f"smtp send failed: {type(e).__name__}: {e}",
+            ", ".join(recipients),
+        )
+    return DeliveryResult(
+        "sent",
+        f"smtp delivered to {len(recipients)} recipient(s)",
+        ", ".join(recipients),
+    )
 
 
 async def _deliver_filesystem(
