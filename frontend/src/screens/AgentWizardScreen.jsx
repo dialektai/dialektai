@@ -1656,12 +1656,13 @@ function StepAutonomy({ data, setData }) {
 // ── Step 7: Trigger ───────────────────────────────────────────────────────────
 
 // `comingSoon` flags trigger types that the schema either doesn't accept
-// at all (webhook / event) or can't drive end-to-end yet (scheduled —
-// no scheduler process exists in the backend). They still render in
-// the list so the roadmap signal is visible, but Publish is gated.
+// at all (webhook / event) or can't drive end-to-end yet. ``scheduled``
+// shipped end-to-end in v0.27 (DialektScheduler + APScheduler + missed-
+// run policy + delivery + RSS poll integration), so it's no longer
+// gated. Webhook + event remain on the roadmap.
 const TRIGGER_OPTS = [
   { value: 'interactive', label: 'Interactive',  desc: 'User types a message to start the agent. Standard chat mode.' },
-  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.', comingSoon: true },
+  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input. Optional RSS feeds get diffed each tick.' },
   { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.', comingSoon: true },
   { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).', comingSoon: true },
 ];
