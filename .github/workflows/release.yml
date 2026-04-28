@@ -159,13 +159,31 @@ jobs:
           python/venv/bin/python - <<'PY'
           import asyncio, json
           import websockets
+          # ws_chat sends an unsolicited {type:"model_ok", model:...} on
+          # connect (server.py ~5566) before processing any client
+          # message. The smoke test must drain those before asserting
+          # pong — receiving a single message and checking ``type ==
+          # "pong"`` races against the connect-time announcement and
+          # fails non-deterministically. Loop until we see the pong (or
+          # a hard timeout) so the test stays robust to future
+          # unsolicited init messages too.
           async def go():
               async with websockets.connect("ws://127.0.0.1:8765/ws", open_timeout=5) as ws:
                   await ws.send(json.dumps({"type": "ping"}))
-                  resp = await asyncio.wait_for(ws.recv(), timeout=5)
-                  data = json.loads(resp)
-                  assert data.get("type") == "pong", f"expected pong, got {data}"
-                  print("ws ping/pong OK:", data)
+                  deadline = asyncio.get_event_loop().time() + 10
+                  saw_pong = False
+                  while asyncio.get_event_loop().time() < deadline:
+                      remaining = deadline - asyncio.get_event_loop().time()
+                      if remaining <= 0:
+                          break
+                      resp = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                      data = json.loads(resp)
+                      print("ws msg:", data)
+                      if data.get("type") == "pong":
+                          saw_pong = True
+                          break
+                  assert saw_pong, "ws never received pong within 10s"
+                  print("ws ping/pong OK")
           asyncio.run(go())
           PY
           # Scan log for any ASGI exception — passing the WS open is
