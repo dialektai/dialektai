@@ -8,6 +8,7 @@ Public API:
   and even distribution across windows.
 """
 
+from .catalog import CatalogLoadError, load_catalog, to_dicts
 from .constraint_solver import (
     DistributionResult,
     ProgramSpec,
@@ -16,8 +17,11 @@ from .constraint_solver import (
 )
 
 __all__ = [
+    "CatalogLoadError",
     "DistributionResult",
     "ProgramSpec",
     "ScheduleConstraintError",
     "distribute_schedule",
+    "load_catalog",
+    "to_dicts",
 ]

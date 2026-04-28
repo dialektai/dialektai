@@ -1,0 +1,57 @@
+# Example IBA program catalog — copy to {workspace}/programs.yaml
+# and grow to ~300 programs. The program_scheduler agent loads
+# this file at run time and feeds it into dialekt_distribute_schedule.
+#
+# Required fields: id, name
+# Optional fields: block, duration_days, format, category, description
+#
+# ``block`` drives the constraint solver's anti-clustering check —
+# programs in the same block won't share more than block_max_per_day
+# (default 3) dates. Group by faculty / area: leadership, finance,
+# hr, marketing, compliance, operations, etc.
+#
+# ``duration_days`` informs the SMM Manager but doesn't yet affect
+# scheduling — every program gets 1 calendar slot per assigned date
+# regardless of length (the operator manually shifts kickoff dates
+# for multi-day programs that would clash on day 2).
+
+programs:
+  - id: "leadership-strategy-1"
+    name: "Стратегическое лидерство для топ-менеджмента"
+    block: "leadership"
+    duration_days: 3
+    format: "in_person"
+    category: "executive"
+    description: "Развитие стратегического мышления у CEO и членов правления."
+
+  - id: "finance-tax-2026"
+    name: "Налоговое планирование 2026"
+    block: "finance"
+    duration_days: 2
+    format: "online"
+    category: "tax"
+    description: "Изменения НК РК на 2026 год + кейсы."
+
+  - id: "hr-okr-1"
+    name: "OKR + KPI: метрики результата"
+    block: "hr"
+    duration_days: 2
+    format: "in_person"
+    category: "performance"
+    description: "Постановка целей, каскадирование, замер."
+
+  - id: "marketing-digital-1"
+    name: "Цифровой маркетинг для B2B"
+    block: "marketing"
+    duration_days: 3
+    format: "online"
+    category: "digital"
+    description: "Контент-стратегия + воронка для B2B-продаж."
+
+  - id: "compliance-aml-1"
+    name: "AML/KYC: текущая практика РК"
+    block: "compliance"
+    duration_days: 1
+    format: "in_person"
+    category: "regulatory"
+    description: "Антиотмывочные требования AFM РК + KYC-процедуры."
