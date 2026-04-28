@@ -1900,6 +1900,98 @@ const TZ_PRESETS = [
   'Europe/Moscow', 'Europe/London', 'America/New_York', 'UTC',
 ];
 
+function VisualSubStep({ data, setData }) {
+  const [templates, setTemplates] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      fetch(`${API}/visual/templates`).then(r => r.ok ? r.json() : { templates: [] }).catch(() => ({ templates: [] })),
+      fetch(`${API}/branding`).then(r => r.ok ? r.json() : { brands: [] }).catch(() => ({ brands: [] })),
+    ]).then(([t, b]) => {
+      if (!alive) return;
+      const tList = Array.isArray(t?.templates) ? t.templates : (Array.isArray(t) ? t : []);
+      const bList = Array.isArray(b?.brands) ? b.brands : (Array.isArray(b) ? b : []);
+      setTemplates(tList);
+      setBrands(bList);
+      setLoaded(true);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <div style={{
+      marginTop: 12, marginBottom: 12,
+      padding: 14, background: T.bg1, border: `1px solid ${T.cyan}55`,
+    }}>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, marginBottom: 12, letterSpacing: '.06em' }}>
+        VISUAL OUTPUT
+      </div>
+
+      <Field label="Template">
+        <Select
+          variant="full"
+          value={data.visual_template_id}
+          onChange={v => setData(d => ({ ...d, visual_template_id: v }))}
+          options={[
+            { v: '', l: loaded ? (templates.length ? '— pick a template —' : '— no templates installed —') : '— loading… —' },
+            ...templates.map(t => ({
+              v: t.id,
+              l: `${t.id} (${t.width}×${t.height})`,
+            })),
+          ]}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Templates live in ~/.dialekt/visual/templates/. Bundled set is
+          installed on first server boot — see Settings → Branding to
+          parameterise with a brand profile.
+        </div>
+      </Field>
+
+      <Field label="Brand profile (optional)">
+        <Select
+          variant="full"
+          value={data.visual_brand_id}
+          onChange={v => setData(d => ({ ...d, visual_brand_id: v }))}
+          options={[
+            { v: '', l: '— no brand —' },
+            ...brands.map(b => ({ v: b.id || b, l: b.name || b.id || b })),
+          ]}
+        />
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <Field label="Carousel slides">
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={data.visual_carousel_count}
+            onChange={e => setData(d => ({ ...d, visual_carousel_count: Math.max(1, Math.min(10, Number(e.target.value) || 1)) }))}
+            style={INPUT}
+          />
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+            1 = single image. 2-10 = carousel rendered into the output folder
+            as slide_NN.png.
+          </div>
+        </Field>
+        <Field label="Output folder pattern">
+          <TextInput
+            value={data.visual_output_folder}
+            onChange={v => setData(d => ({ ...d, visual_output_folder: v }))}
+            placeholder="{workspace}/media/{date}-{name}"
+          />
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+            Placeholders: {'{workspace}'}, {'{date}'}, {'{datetime}'}, {'{name}'}.
+          </div>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
 function ScheduleSubStep({ data, setData }) {
   const updateRss = (idx, value) => setData(d => ({
     ...d,
@@ -2129,6 +2221,29 @@ function StepTrigger({ data, setData }) {
           Shown in the chat input box when the agent is selected
         </div>
       </Field>
+
+      <Field label="Output Format">
+        <Select
+          variant="full"
+          value={data.output_format}
+          onChange={v => setData(d => ({ ...d, output_format: v }))}
+          options={[
+            { v: 'markdown', l: 'Markdown — text replies (default)' },
+            { v: 'json',     l: 'JSON — structured output' },
+            { v: 'table',    l: 'Table — tabular result' },
+            { v: 'file',     l: 'File — saved into the workspace' },
+            { v: 'image',    l: 'Image — rendered via visual templates' },
+          ]}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Drives the OUTPUT FORMAT block in the system prompt and the
+          destination of generated artifacts.
+        </div>
+      </Field>
+
+      {data.output_format === 'image' && (
+        <VisualSubStep data={data} setData={setData} />
+      )}
 
       <Field label="Response Streaming">
         <div
@@ -2404,6 +2519,13 @@ export default function AgentWizardScreen({ onNav }) {
     missed_run_policy: 'run_on_startup',
     trigger_message: '',
     rss_feeds: [],
+    // v1.1: output format. 'image' unlocks the visual sub-step
+    // (template + brand + carousel slide count + output folder).
+    output_format: 'markdown',
+    visual_template_id: '',
+    visual_brand_id: '',
+    visual_carousel_count: 1,
+    visual_output_folder: '{workspace}/media/{date}-{name}',
     input_placeholder: 'Ask me anything...',
     streaming: true,
   });
