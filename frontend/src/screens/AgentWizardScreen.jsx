@@ -132,7 +132,8 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
   // We filter out rows with an empty key so an abandoned "Add variable"
   // click doesn't write `: {...}` into the manifest.
   const namedVars = (data.variables || []).filter(v => v.key && v.key.trim());
-  if (namedVars.length > 0) {
+  const hasWorkspace = !!(data.working_directory && data.working_directory.trim());
+  if (namedVars.length > 0 || hasWorkspace) {
     yaml += `\nvariables:\n`;
     namedVars.forEach(v => {
       const key = v.key.trim();
@@ -142,6 +143,13 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
       yaml += `    required: ${v.required ? 'true' : 'false'}\n`;
       yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
     });
+    if (hasWorkspace) {
+      yaml += `  working_directory:\n`;
+      yaml += `    type: "string"\n`;
+      yaml += `    required: false\n`;
+      yaml += `    default: "${escapeYaml(data.working_directory.trim())}"\n`;
+      yaml += `    description: "Per-agent workspace; runtime adds to allowed_file_roots"\n`;
+    }
   }
 
   // Emit mcp_servers block when the user selected any on step 4 AND
@@ -232,13 +240,79 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
     yaml += `\nconnections:\n  required:\n    - type: "${data.connection_type}"\n      role: "${role}"\n      purpose: "${purpose}"\n`;
   }
 
+  // Per-agent secrets — only the NAMES go into the manifest under
+  // secrets_required[]. Values get POSTed to /agents/{id}/secrets after
+  // import. Empty rows are dropped; duplicates are deduped.
+  const secretNames = Array.from(new Set(
+    (data.secrets || [])
+      .map(s => (s.name || '').trim())
+      .filter(Boolean)
+  ));
+  if (secretNames.length > 0) {
+    yaml += `\nsecrets_required:\n`;
+    secretNames.forEach(name => {
+      yaml += `  - name: "${escapeYaml(name)}"\n`;
+      yaml += `    description: "Per-agent credential — set via wizard or POST /agents/{id}/secrets"\n`;
+      yaml += `    required: true\n`;
+    });
+  }
+
   yaml += `\nautonomy:\n  recommended: "${data.autonomy_recommended}"\n  max_allowed: "${data.autonomy_max}"\n`;
 
   yaml += `\ninput:\n  type: "chat"\n  placeholder: "${(data.input_placeholder || 'Ask me anything...').replace(/"/g, '\\"')}"\n`;
 
-  yaml += `\noutput:\n  format: "${data.output_format || 'markdown'}"\n  streaming: ${data.streaming ? 'true' : 'false'}\n  destination:\n    type: "notification"\n`;
+  // Output destination. Three branches:
+  // 1. format = 'image' OR 'file' AND user picked a workspace →
+  //    filesystem destination, path templated with {workspace}/{date}/...
+  // 2. format = 'image' but no workspace → notification (visual tools
+  //    will refuse to write outside allow-list, surfacing a clean error
+  //    rather than a YAML-shape mismatch).
+  // 3. otherwise → notification (chat / markdown reply).
+  const outFormat = data.output_format || 'markdown';
+  const wantsFileDest = (outFormat === 'image' || outFormat === 'file') && hasWorkspace;
+  yaml += `\noutput:\n  format: "${outFormat}"\n  streaming: ${data.streaming ? 'true' : 'false'}\n  destination:\n`;
+  if (wantsFileDest) {
+    let path = (data.visual_output_folder || '{workspace}/media/{date}-{name}').trim();
+    // Replace {name} with the agent name slug (manifest authors expect
+    // a sane default; advanced users can override the pattern in the
+    // wizard). All other placeholders ({workspace}, {date}, {datetime},
+    // {agent_id}) are resolved by the runtime, not us.
+    const slug = (data.name || 'agent')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'agent';
+    path = path.replace(/\{name\}/g, slug);
+    yaml += `    type: "filesystem"\n`;
+    yaml += `    path: "${escapeYaml(path)}"\n`;
+    yaml += `    overwrite: false\n`;
+  } else {
+    yaml += `    type: "notification"\n`;
+  }
 
+  // Trigger block. Scheduled triggers get the v0.27 schedule fields +
+  // the v1.1 rss_feeds[] list when the user added any. Interactive /
+  // webhook / event triggers stay slim.
   yaml += `\ntrigger:\n  type: "${data.trigger_type}"\n`;
+  if (data.trigger_type === 'scheduled') {
+    yaml += `  schedule: "${escapeYaml(data.cron || '0 9 * * MON')}"\n`;
+    yaml += `  timezone: "${escapeYaml(data.cron_timezone || 'Asia/Almaty')}"\n`;
+    yaml += `  missed_run_policy: "${data.missed_run_policy || 'run_on_startup'}"\n`;
+    if (data.trigger_message && data.trigger_message.trim()) {
+      yaml += `  message: |\n`;
+      data.trigger_message.split('\n').forEach(l => {
+        yaml += `    ${l}\n`;
+      });
+    }
+    const feeds = (data.rss_feeds || [])
+      .map(u => (u || '').trim())
+      .filter(Boolean);
+    if (feeds.length > 0) {
+      yaml += `  rss_feeds:\n`;
+      feeds.forEach(u => {
+        yaml += `    - "${escapeYaml(u)}"\n`;
+      });
+    }
+  }
 
   return yaml;
 }
