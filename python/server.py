@@ -168,7 +168,7 @@ log = logging.getLogger("dialekt")
 # lockstep with frontend/src-tauri/Cargo.toml + tauri.conf.json + the
 # git tag at every release. The /about endpoint and frontend (via
 # /about) both read this — never hardcode a literal in screens.
-DIALEKT_VERSION = "0.27.16"
+DIALEKT_VERSION = "0.27.17"
 
 DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
@@ -2011,6 +2011,51 @@ async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
     except Exception:
         # Don't block install on the auto-patch — validator below
         # will surface the actual schema error if YAML is malformed.
+        pass
+
+    # Iterative strip of `extra_field` errors. New cloud templates
+    # sometimes ship fields the current validator doesn't recognise
+    # (e.g. trigger.scheduled.rss_feeds, output…telegram_chat_id from
+    # the IBA monitor template). Without a strip the install 422s
+    # entirely, leaving the user with no path forward. The runtime
+    # consumes the validator's structured manifest object — it would
+    # ignore these fields anyway — so the strip is correctness-neutral
+    # for the chat path, with the trade-off that scheduler-side
+    # features depending on those fields won't activate until the
+    # validator catches up. Caps iteration at 5 attempts to dodge a
+    # pathological loop.
+    try:
+        import yaml as _yml2
+        def _delete_dotpath(d, path):
+            parts = path.split(".")
+            cur = d
+            for p in parts[:-1]:
+                if isinstance(cur, dict) and p in cur:
+                    cur = cur[p]
+                else:
+                    return False
+            if isinstance(cur, dict) and parts[-1] in cur:
+                del cur[parts[-1]]
+                return True
+            return False
+        for _attempt in range(5):
+            _r = ManifestValidator().validate_string(yaml_str)
+            if _r.valid:
+                break
+            _extras = [
+                e.message.split(":", 1)[0].strip()
+                for e in _r.errors
+                if getattr(e.code, "value", "") == "schema.extra_field"
+            ]
+            if not _extras:
+                break
+            _p2 = _yml2.safe_load(yaml_str) or {}
+            _changed = any(_delete_dotpath(_p2, path) for path in _extras)
+            if not _changed:
+                break
+            yaml_str = _yml2.safe_dump(_p2, sort_keys=False, allow_unicode=True)
+            log.info("import_manifest_yaml: stripped extra fields: %s", _extras)
+    except Exception:
         pass
 
     result = ManifestValidator().validate_string(yaml_str)
