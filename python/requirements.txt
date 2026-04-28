@@ -55,6 +55,10 @@ sse-starlette<3
 playwright>=1.50,<2
 Pillow>=10.0
 
+# RSS / Atom feed parser used by the MCP rss tool and the scheduler's
+# rss-poll integration. Lightweight, pure-Python, no native deps.
+feedparser>=6.0,<7
+
 # Dev / test only
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
