@@ -533,6 +533,18 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Per-agent RSS poll state. The scheduler diffs each tick's fetch
+-- against this table so only NEW items get injected into the
+-- agent's prompt context. seen_guids is a JSON array of strings,
+-- oldest first, capped at 500 entries by the rss_poll module.
+CREATE TABLE IF NOT EXISTS agent_rss_state (
+    agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    url             TEXT NOT NULL,
+    seen_guids      TEXT NOT NULL,
+    last_polled_at  TEXT NOT NULL,
+    PRIMARY KEY (agent_id, url)
+);
+
 -- MCP protocol servers registered by the user via Settings UI.
 -- Unrelated to python/mcp_servers/ directory, which holds DB routers
 -- (postgres/mysql/clickhouse) with a legacy misnomer folder name.
