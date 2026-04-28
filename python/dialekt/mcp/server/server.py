@@ -269,6 +269,9 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "http_put": "http",
     "rss_fetch": "rss",
     "bitrix_call": "bitrix",
+    "instagram_publish_feed": "instagram",
+    "instagram_publish_story": "instagram",
+    "instagram_publish_reel": "instagram",
 }
 
 
