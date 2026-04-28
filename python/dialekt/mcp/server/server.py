@@ -267,6 +267,7 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "http_get": "http",
     "http_post": "http",
     "http_put": "http",
+    "rss_fetch": "rss",
 }
 
 
