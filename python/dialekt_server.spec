@@ -15,7 +15,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 
 BINARY_NAME = "dialekt-server"
 HERE = Path(os.path.abspath(SPECPATH))
@@ -37,6 +37,22 @@ for pkg in METADATA_PACKAGES:
         # PackageNotFoundError, surfacing the regression in tests.
         pass
 
+# Packages that ship data files alongside Python sources (JSON, YAML,
+# templates) and reach for them at import time via pkgutil.get_data
+# or pkg_resources. PyInstaller's analyser misses these unless told.
+# - `yaspin` reads data/spinners.json on `import yaspin.spinners`
+#   (transitive: interpreter → terminal_interface → scan_code → yaspin).
+#   Same failure mode as the readchar one above — WS chat dies on first
+#   make_interpreter() call. Both bugs flushed out by smoke-testing the
+#   chat path post-bundle, not just import-server.
+DATA_FILE_PACKAGES = ["yaspin"]
+data_file_datas = []
+for pkg in DATA_FILE_PACKAGES:
+    try:
+        data_file_datas += collect_data_files(pkg)
+    except Exception:
+        pass
+
 # sqlite_vec is skipped on windows-arm64 (no wheel + sdist requires py<3.12).
 # Probe whether it's actually installed before listing it as a hidden import,
 # otherwise PyInstaller emits a hard error on missing modules in some configs.
@@ -56,6 +72,7 @@ a = Analysis(
         # (dialekt_manifest_validator ships its schema inside the wheel, so
         #  PyInstaller collects it automatically via collect_data_files.)
         *metadata_datas,
+        *data_file_datas,
     ],
     hiddenimports=[
         # FastAPI + starlette + uvicorn stack

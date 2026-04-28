@@ -168,7 +168,7 @@ log = logging.getLogger("dialekt")
 # lockstep with frontend/src-tauri/Cargo.toml + tauri.conf.json + the
 # git tag at every release. The /about endpoint and frontend (via
 # /about) both read this — never hardcode a literal in screens.
-DIALEKT_VERSION = "0.27.12"
+DIALEKT_VERSION = "0.27.13"
 
 DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
