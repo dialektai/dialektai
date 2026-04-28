@@ -11,6 +11,7 @@ const API = 'http://localhost:8765';
 
 const STEPS = [
   { label: 'Identity',      icon: 'diamond'  },
+  { label: 'Workspace',     icon: 'folder'   },
   { label: 'Model',         icon: 'sparkle'  },
   { label: 'System Prompt', icon: 'chat'     },
   { label: 'Capabilities',  icon: 'shield'   },
@@ -566,7 +567,109 @@ function StepIdentity({ data, setData, errors }) {
   );
 }
 
-// ── Step 1: Model ─────────────────────────────────────────────────────────────
+// ── Step 1: Workspace ─────────────────────────────────────────────────────────
+
+// Per-agent working directory the user picks on their own disk. Optional —
+// agents that don't need filesystem output can leave it blank. When set,
+// runtime injects it into MCPServer.config.allowed_file_roots and
+// {workspace} in output.destination.path resolves to this value.
+//
+// The Tauri dialog plugin isn't a hard dep — we dynamic-import on click
+// and fall back to the text field if it's not installed (e.g. running
+// in a plain browser dev shell). Path validation happens server-side
+// when the file/visual tools actually try to write.
+
+function StepWorkspace({ data, setData }) {
+  const [browseError, setBrowseError] = useState('');
+  const [browsing, setBrowsing] = useState(false);
+
+  const onBrowse = async () => {
+    setBrowsing(true);
+    setBrowseError('');
+    try {
+      // The @tauri-apps/plugin-dialog package is optional — it lands
+      // when the Rust side adds the dialog plugin. Until then this
+      // dynamic import fails at runtime and the user types the path
+      // manually. The /* @vite-ignore */ keeps Rolldown from trying
+      // to resolve the module at build time.
+      const moduleName = '@tauri-apps/plugin-dialog';
+      const mod = await import(/* @vite-ignore */ moduleName);
+      const picked = await mod.open({
+        directory: true,
+        multiple: false,
+        title: 'Pick the agent workspace folder',
+      });
+      if (typeof picked === 'string' && picked) {
+        setData(d => ({ ...d, working_directory: picked }));
+      }
+    } catch (e) {
+      // Plugin not installed in this build — user can still type the
+      // path manually. Surface a one-line hint, not a stack trace.
+      setBrowseError('Native picker unavailable — paste the path manually');
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        WORKING DIRECTORY — where the agent reads inputs and writes outputs
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        Optional. Pick a folder on your disk and the agent will be allowed to
+        read / write inside it (resumes, programs, .md reports, generated
+        images, carousels in <span style={{ color: T.cyan }}>media/</span>).
+        Leave empty if your agent doesn't need filesystem output.
+      </div>
+      <Field label="Workspace path">
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <TextInput
+            value={data.working_directory}
+            onChange={v => setData(d => ({ ...d, working_directory: v }))}
+            placeholder="/home/user/iba-content"
+          />
+          <button
+            onClick={onBrowse}
+            disabled={browsing}
+            style={{
+              ...INPUT,
+              cursor: browsing ? 'wait' : 'pointer',
+              padding: '6px 14px', width: 'auto',
+              fontFamily: T.mono, fontSize: 11, letterSpacing: '.04em',
+              color: T.cyan, borderColor: T.cyan,
+            }}
+          >
+            {browsing ? '…' : 'BROWSE'}
+          </button>
+        </div>
+        {browseError ? (
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+            {browseError}
+          </div>
+        ) : null}
+      </Field>
+      <div style={{
+        marginTop: 12, padding: 12,
+        background: T.bg1, border: `1px solid ${T.border}`,
+        fontFamily: T.mono, fontSize: 10, color: T.dim, lineHeight: 1.6,
+      }}>
+        <div style={{ color: T.cyan, marginBottom: 6 }}>EXPECTED LAYOUT</div>
+        <div>{'{workspace}/'}</div>
+        <div>&nbsp;&nbsp;reports/&nbsp;&nbsp;&nbsp;&nbsp;# .md reports</div>
+        <div>&nbsp;&nbsp;resumes/&nbsp;&nbsp;&nbsp;&nbsp;# trainer bios</div>
+        <div>&nbsp;&nbsp;programs/&nbsp;&nbsp;&nbsp;# course / training pages</div>
+        <div>&nbsp;&nbsp;media/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# rendered images</div>
+        <div>&nbsp;&nbsp;media/carousel/{'{date}-{name}/slide_NN.png'}</div>
+        <div style={{ marginTop: 6 }}>
+          Subfolders are created automatically on first write.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2: Model ─────────────────────────────────────────────────────────────
 
 function StepModel({ data, setData }) {
   const [installed, setInstalled] = useState([]);   // [{ id, label, kind, hint, installed }]
@@ -1991,6 +2094,11 @@ export default function AgentWizardScreen({ onNav }) {
     tags: '',
     author_name: '',
     author_email: '',
+    // v1.1: per-agent working directory. User picks a path on their disk;
+    // runtime injects it into MCP allowed_file_roots so file/visual tools
+    // can write reports / posts / generated images into it. Empty means
+    // "no workspace" — the agent runs without filesystem-bound output.
+    working_directory: '',
     model_preferred: 'llama3.2:3b',
     model_acceptable: '',
     context_window: '32768',
@@ -2034,7 +2142,9 @@ export default function AgentWizardScreen({ onNav }) {
       if (!email) errs.author_email = 'Author email is required';
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.author_email = 'Invalid email format';
     }
-    if (stepIdx === 2) {
+    // System Prompt step shifted to index 3 in v1.1 after the
+    // Workspace step landed at index 1.
+    if (stepIdx === 3) {
       if (data.system_prompt.trim().length < 20)
         errs.system_prompt = 'System prompt must be at least 20 characters';
     }
@@ -2123,16 +2233,17 @@ export default function AgentWizardScreen({ onNav }) {
 
   const renderStep = () => {
     switch (step) {
-      case 0: return <StepIdentity data={data} setData={setData} errors={errors} />;
-      case 1: return <StepModel data={data} setData={setData} />;
-      case 2: return <StepSystemPrompt data={data} setData={setData} errors={errors} />;
-      case 3: return <StepCapabilities data={data} setData={setData} />;
-      case 4: return <StepMcpServers data={data} setData={setData} />;
-      case 5: return <StepConnections data={data} setData={setData} />;
-      case 6: return <StepVariables data={data} setData={setData} />;
-      case 7: return <StepAutonomy data={data} setData={setData} />;
-      case 8: return <StepTrigger data={data} setData={setData} />;
-      case 9: return <StepPublish data={data} saving={saving} onSave={save} />;
+      case 0:  return <StepIdentity data={data} setData={setData} errors={errors} />;
+      case 1:  return <StepWorkspace data={data} setData={setData} />;
+      case 2:  return <StepModel data={data} setData={setData} />;
+      case 3:  return <StepSystemPrompt data={data} setData={setData} errors={errors} />;
+      case 4:  return <StepCapabilities data={data} setData={setData} />;
+      case 5:  return <StepMcpServers data={data} setData={setData} />;
+      case 6:  return <StepConnections data={data} setData={setData} />;
+      case 7:  return <StepVariables data={data} setData={setData} />;
+      case 8:  return <StepAutonomy data={data} setData={setData} />;
+      case 9:  return <StepTrigger data={data} setData={setData} />;
+      case 10: return <StepPublish data={data} saving={saving} onSave={save} />;
       default: return null;
     }
   };
