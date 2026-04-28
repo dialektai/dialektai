@@ -24,7 +24,11 @@ GITHUB_REPO = _os.environ.get("DIALEKT_GITHUB_REPO", "dialektai/dialektai")
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
-_CACHE_TTL_SECONDS = 3600  # 1h
+_CACHE_TTL_SECONDS = 300  # 5 min — release pipeline force-refreshes via
+                          # POST /releases/refresh after publish, so this TTL
+                          # only matters when the webhook misses (network
+                          # blip, deploy mid-release). 5 min is the worst-case
+                          # delay; previously was 1h and visibly painful.
 _cache: dict = {"at": 0, "data": None}
 _lock = asyncio.Lock()
 

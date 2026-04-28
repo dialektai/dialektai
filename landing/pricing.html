@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pricing — dias.now</title>
-  <meta name="description" content="Transparent per-seat pricing. Trial free for 30 days. Starter $25, Professional $55, Enterprise $95+ per seat per month.">
+  <meta name="description" content="$55 per seat per month. Minimum 5 seats. Up to 3 agents per user. Billed annually. One plan, no usage-based surprises.">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/_shared.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -39,202 +39,86 @@
   <script>
     window.__I18N_PAGE__ = {
       en: {
-        "pr.kicker":         "PRICING · PER SEAT · PER MONTH",
-        "pr.h1.a":           "Pay for the team,",
-        "pr.h1.b":           "not for the hype.",
-        "pr.sub":            "Per-seat pricing. No usage-based billing. No \"tokens metered\" surprise charges. Local Ollama is unlimited; cloud LLM providers bill you directly.",
+        "pr.kicker":         "PRICING · ONE PLAN · ANNUAL",
+        "pr.h1.a":           "One plan.",
+        "pr.h1.b":           "Pay for the team.",
+        "pr.sub":            "$55 per seat per month, minimum 5 seats, up to 3 agents per user, billed annually. That's $3,300/year minimum. No usage-based surprises. Local Ollama is unlimited; cloud LLM providers bill you directly.",
 
-        "pr.t.trial":        "Trial",
-        "pr.t.trial.blurb":  "30 days free. No credit card. Verify your email and you're in.",
-        "pr.t.trial.cta":    "START FREE TRIAL",
-        "pr.t.trial.f1":     "30 days, all features",
-        "pr.t.trial.f2":     "3 seats included",
-        "pr.t.trial.f3":     "All 18 cloud providers",
-        "pr.t.trial.f4":     "Local Ollama (33 models)",
-        "pr.t.trial.f5":     "Email support",
-        "pr.t.trial.f6":     "Dedicated SLA",
-        "pr.t.trial.f7":     "SSO / SAML",
-
-        "pr.t.starter":      "Starter",
-        "pr.t.starter.per":  "/seat · mo",
-        "pr.t.starter.blurb":"Minimum 3 seats. Teams up to 15 people, individual developers.",
+        "pr.t.pro":          "dias.now",
+        "pr.t.pro.per":      "/seat · mo · billed annually",
+        "pr.t.pro.blurb":    "Minimum 5 seats. Up to 3 agents per user. Annual billing. One plan, no tier games.",
         "pr.t.cta":          "CONTACT SALES",
-        "pr.t.starter.f1":   "From 3 seats",
-        "pr.t.starter.f2":   "Local Ollama (full catalog)",
-        "pr.t.starter.f3":   "All 18 cloud providers (own keys)",
-        "pr.t.starter.f4":   "Email support · 48h SLA",
-        "pr.t.starter.f5":   "Audit log · 90 days",
-        "pr.t.starter.f6":   "Priority support",
-        "pr.t.starter.f7":   "SSO / SAML",
+        "pr.t.pro.f1":       "From 5 seats · annual",
+        "pr.t.pro.fagents":  "Up to 3 agents per user",
+        "pr.t.pro.f2":       "Local Ollama (full catalog)",
+        "pr.t.pro.f3":       "All 18 cloud providers (own keys)",
+        "pr.t.pro.f4":       "Priority support · 4h SLA",
+        "pr.t.pro.f5":       "Audit log · unlimited retention",
+        "pr.t.pro.f6":       "Regulated mode (KZ ПДн)",
+        "pr.t.pro.f7":       "Custom MCP servers · onboarding",
 
-        "pr.t.pro.badge":    "PRIMARY",
-        "pr.t.pro":          "Professional",
-        "pr.t.pro.blurb":    "Minimum 5 seats. SMB 50–300 staff.",
-        "pr.t.pro.f1":       "From 5 seats",
-        "pr.t.pro.f2":       "Everything in Starter",
-        "pr.t.pro.f3":       "Priority support · 4h SLA",
-        "pr.t.pro.f4":       "Audit log · unlimited retention",
-        "pr.t.pro.f5":       "Regulated mode (KZ ПДн)",
-        "pr.t.pro.f6":       "Custom MCP servers · onboarding",
-        "pr.t.pro.f7":       "Quarterly check-ins",
-
-        "pr.t.ent":          "Enterprise",
-        "pr.t.ent.per":      "+ /seat · mo",
-        "pr.t.ent.blurb":    "Minimum 10 seats. SSO, SLA, dedicated support.",
-        "pr.t.ent.f1":       "From 10 seats",
-        "pr.t.ent.f2":       "Everything in Professional",
-        "pr.t.ent.f3":       "SSO (SAML / OIDC)",
-        "pr.t.ent.f4":       "Dedicated CSM",
-        "pr.t.ent.f5":       "Custom SLA (1h, 99.9% uptime)",
-        "pr.t.ent.f6":       "On-prem dialekt-cloud option",
-        "pr.t.ent.f7":       "Custom contract & invoicing",
-
-        "pr.fineprint":      "Prices shown in USD. Billed monthly or annually (-15%). KZT/RUB invoicing available for KZ/RU customers. Cloud LLM provider costs (OpenAI, Anthropic, etc.) are billed by them directly — dialekt does not mark up.",
-
-        "pr.cmp.feature":    "Feature",
-        "pr.cmp.row.ollama": "Local Ollama (33 models)",
-        "pr.cmp.row.cloud":  "All 18 cloud LLM providers",
-        "pr.cmp.row.mcp":    "MCP servers",
-        "pr.cmp.row.agent":  "Agent manifests / wizard",
-        "pr.cmp.row.seats":  "Minimum seats",
-        "pr.cmp.row.audit":  "Audit log retention",
-        "pr.cmp.row.sup":    "Support",
-        "pr.cmp.row.reg":    "Regulated mode (KZ ПДн)",
-        "pr.cmp.row.sso":    "SSO (SAML / OIDC)",
-        "pr.cmp.row.sla":    "SLA",
-        "pr.cmp.row.onprem": "On-prem dialekt-cloud",
-        "pr.cmp.row.invoice":"Custom contract & invoicing",
-        "pr.cmp.audit.90":   "90 days",
-        "pr.cmp.audit.un":   "unlimited",
-        "pr.cmp.sup.email":  "email",
-        "pr.cmp.sup.email48":"email · 48h",
-        "pr.cmp.sup.pri":    "priority · 4h",
-        "pr.cmp.sup.csm":    "dedicated CSM",
-        "pr.cmp.sla.4h":     "4h response",
-        "pr.cmp.sla.cust":   "custom (1h)",
+        "pr.fineprint":      "$55 × 5 seats × 12 months = $3,300/year minimum. Prices in USD. KZT/RUB invoicing available for KZ/RU customers. Cloud LLM provider costs (OpenAI, Anthropic, etc.) are billed by them directly — dialekt does not mark up.",
 
         "pr.faq.h":          "Pricing FAQ",
         "pr.faq.q1":         "Do I pay for tokens / API calls?",
         "pr.faq.a1":         "No. Per-seat pricing only. If you connect a cloud LLM provider (OpenAI, Anthropic, etc.), they bill you directly with their own metering. dialekt does not see your prompts or responses for cloud providers, and we do not mark up.",
-        "pr.faq.q2":         "What happens after my 30-day trial expires?",
-        "pr.faq.a2":         "Your data stays for 12 months. The license stops validating, but you can email hello@dias.now to extend or convert to paid. Local Ollama keeps working — only the cloud-license features deactivate.",
-        "pr.faq.q3":         "Can I get a longer free trial?",
-        "pr.faq.a3":         "Yes — for design partners, regulated-market pilots, and educators we sometimes grant up to 12 months free. Email hello@dias.now with your use case.",
+        "pr.faq.q2":         "Why annual billing only?",
+        "pr.faq.a2":         "Predictable revenue lets us focus on shipping product instead of chasing month-to-month churn. The minimum commitment is one year, $3,300, paid upfront.",
+        "pr.faq.q3":         "Why minimum 5 seats?",
+        "pr.faq.a3":         "dialekt is built for teams. Below 5 seats the per-customer support and onboarding cost outweighs the revenue. Solo developers and pre-team founders should wait until they're 5-strong.",
         "pr.faq.q4":         "Do you support KZT / RUB invoices?",
         "pr.faq.a4":         "Yes. KZ-registered customers get KZT invoices through Caspian Bank settlement; RU customers get RUB invoices via Tochka. International customers pay in USD via SWIFT or invoice-then-card.",
-        "pr.faq.q5":         "Can I switch tiers mid-cycle?",
-        "pr.faq.a5":         "Yes. Upgrade is instant and prorated. Downgrade applies at the next billing cycle.",
-        "pr.faq.q6":         "What's \"regulated mode\"?",
-        "pr.faq.a6":         "A toggle that hides all cloud LLM providers in the desktop app. Required for some KZ pilots subject to ПДн §16 cross-border rules. All LLM inference stays on local Ollama.",
-        "pr.faq.q7":         "Is there a discount for annual billing?",
-        "pr.faq.a7":         "Yes — 15% off when paid annually. Email us for the annual quote.",
-        "pr.faq.q8":         "Do you have a free / open-source tier?",
-        "pr.faq.a8":         "Yes — the 30-day trial gives you all features for free. After expiry, you can request an extension via email if you're an indie developer, student, or open-source maintainer. Sustainable pricing for everyone else funds the work.",
-        "pr.faq.q9":         "Why do I need to sign up to download?",
-        "pr.faq.a9":         "So we know who's running dialekt and can help when something breaks. Trial signup is 30 seconds, no credit card. The desktop app itself is local-first — your prompts never leave your machine after install.",
+        "pr.faq.q5":         "What's \"regulated mode\"?",
+        "pr.faq.a5":         "A toggle that hides all cloud LLM providers in the desktop app. Required for some KZ pilots subject to ПДн §16 cross-border rules. All LLM inference stays on local Ollama.",
+        "pr.faq.q6":         "Can I evaluate before committing?",
+        "pr.faq.a6":         "Yes — email hello@dias.now and we'll set up a hands-on pilot. Design partners and regulated-market customers can get extended evaluation terms.",
+        "pr.faq.q7":         "What's an \"agent\"? Why up to 3 per user?",
+        "pr.faq.a7":         "An agent is a configured workflow with its own system prompt, tools, MCP server bindings, and model preferences — think \"SQL analyst\", \"compliance reviewer\", \"sales assistant\". Three per user covers the common SMB pattern (one daily-driver + one or two specialised). Need more? Tell us in the pilot — we'll size the right plan.",
 
         "pr.cta.h":          "Ready to ship faster?",
-        "pr.cta.p":          "Start your 30-day trial. No credit card.",
-        "pr.cta.btn":        "START FREE TRIAL →",
+        "pr.cta.p":          "Email hello@dias.now to start.",
+        "pr.cta.btn":        "CONTACT SALES →",
       },
       ru: {
-        "pr.kicker":         "ТАРИФЫ · ЗА МЕСТО · В МЕСЯЦ",
-        "pr.h1.a":           "Платите за команду,",
-        "pr.h1.b":           "не за хайп.",
-        "pr.sub":            "Цена за рабочее место. Никакой биллинг по использованию. Никаких сюрпризов «по токенам». Локальный Ollama — без лимитов; облачные LLM-провайдеры выставляют счёт напрямую.",
+        "pr.kicker":         "ТАРИФ · ОДИН ПЛАН · ОПЛАТА ЗА ГОД",
+        "pr.h1.a":           "Один тариф.",
+        "pr.h1.b":           "Платите за команду.",
+        "pr.sub":            "$55 за место в месяц, минимум 5 мест, до 3 агентов на пользователя, оплата за год вперёд. Итого минимум $3 300/год. Никаких сюрпризов «по токенам». Локальный Ollama — без лимитов; облачные LLM-провайдеры выставляют счёт напрямую.",
 
-        "pr.t.trial":        "Пробный",
-        "pr.t.trial.blurb":  "30 дней бесплатно. Без карты. Подтвердите email — и работаете.",
-        "pr.t.trial.cta":    "НАЧАТЬ ПРОБНЫЙ ПЕРИОД",
-        "pr.t.trial.f1":     "30 дней, все функции",
-        "pr.t.trial.f2":     "3 рабочих места включены",
-        "pr.t.trial.f3":     "Все 18 облачных провайдеров",
-        "pr.t.trial.f4":     "Локальный Ollama (33 модели)",
-        "pr.t.trial.f5":     "Поддержка по email",
-        "pr.t.trial.f6":     "Выделенный SLA",
-        "pr.t.trial.f7":     "SSO / SAML",
-
-        "pr.t.starter":      "Starter",
-        "pr.t.starter.per":  "/место · мес",
-        "pr.t.starter.blurb":"Минимум 3 места. Команды до 15 человек, индивидуальные разработчики.",
+        "pr.t.pro":          "dias.now",
+        "pr.t.pro.per":      "/место · мес · оплата за год",
+        "pr.t.pro.blurb":    "Минимум 5 мест. До 3 агентов на пользователя. Оплата за год. Один тариф, без игр в уровни.",
         "pr.t.cta":          "СВЯЗАТЬСЯ С ОТДЕЛОМ ПРОДАЖ",
-        "pr.t.starter.f1":   "От 3 мест",
-        "pr.t.starter.f2":   "Локальный Ollama (полный каталог)",
-        "pr.t.starter.f3":   "Все 18 облачных провайдеров (свои ключи)",
-        "pr.t.starter.f4":   "Email-поддержка · SLA 48 часов",
-        "pr.t.starter.f5":   "Аудит-лог · 90 дней",
-        "pr.t.starter.f6":   "Приоритетная поддержка",
-        "pr.t.starter.f7":   "SSO / SAML",
+        "pr.t.pro.f1":       "От 5 мест · годовая оплата",
+        "pr.t.pro.fagents":  "До 3 агентов на пользователя",
+        "pr.t.pro.f2":       "Локальный Ollama (полный каталог)",
+        "pr.t.pro.f3":       "Все 18 облачных провайдеров (свои ключи)",
+        "pr.t.pro.f4":       "Приоритетная поддержка · SLA 4 часа",
+        "pr.t.pro.f5":       "Аудит-лог · хранение без ограничений",
+        "pr.t.pro.f6":       "Регулируемый режим (закон РК «О ПДн»)",
+        "pr.t.pro.f7":       "Кастомные MCP-серверы · онбординг",
 
-        "pr.t.pro.badge":    "ОСНОВНОЙ",
-        "pr.t.pro":          "Professional",
-        "pr.t.pro.blurb":    "Минимум 5 мест. SMB 50–300 сотрудников.",
-        "pr.t.pro.f1":       "От 5 мест",
-        "pr.t.pro.f2":       "Всё из Starter",
-        "pr.t.pro.f3":       "Приоритетная поддержка · SLA 4 часа",
-        "pr.t.pro.f4":       "Аудит-лог · хранение без ограничений",
-        "pr.t.pro.f5":       "Регулируемый режим (закон РК «О ПДн»)",
-        "pr.t.pro.f6":       "Кастомные MCP-серверы · онбординг",
-        "pr.t.pro.f7":       "Ежеквартальные проверки",
+        "pr.fineprint":      "$55 × 5 мест × 12 месяцев = минимум $3 300/год. Цены в USD. Доступны счета в KZT/RUB для клиентов из РК и РФ. Расходы на облачных LLM-провайдеров (OpenAI, Anthropic и т.д.) выставляются ими напрямую — dialekt не накручивает.",
 
-        "pr.t.ent":          "Enterprise",
-        "pr.t.ent.per":      "+ /место · мес",
-        "pr.t.ent.blurb":    "Минимум 10 мест. SSO, SLA, выделенная поддержка.",
-        "pr.t.ent.f1":       "От 10 мест",
-        "pr.t.ent.f2":       "Всё из Professional",
-        "pr.t.ent.f3":       "SSO (SAML / OIDC)",
-        "pr.t.ent.f4":       "Выделенный CSM",
-        "pr.t.ent.f5":       "Кастомный SLA (1 час, аптайм 99.9%)",
-        "pr.t.ent.f6":       "Опция on-prem dialekt-cloud",
-        "pr.t.ent.f7":       "Кастомный договор и счета",
-
-        "pr.fineprint":      "Цены в USD. Биллинг помесячно или на год (-15%). Доступны счета в KZT/RUB для клиентов из РК и РФ. Расходы на облачных LLM-провайдеров (OpenAI, Anthropic и т.д.) выставляются ими напрямую — dialekt не накручивает.",
-
-        "pr.cmp.feature":    "Функция",
-        "pr.cmp.row.ollama": "Локальный Ollama (33 модели)",
-        "pr.cmp.row.cloud":  "Все 18 облачных LLM-провайдеров",
-        "pr.cmp.row.mcp":    "MCP-серверы",
-        "pr.cmp.row.agent":  "Манифесты агентов / мастер",
-        "pr.cmp.row.seats":  "Минимум мест",
-        "pr.cmp.row.audit":  "Хранение аудит-лога",
-        "pr.cmp.row.sup":    "Поддержка",
-        "pr.cmp.row.reg":    "Регулируемый режим (РК ПДн)",
-        "pr.cmp.row.sso":    "SSO (SAML / OIDC)",
-        "pr.cmp.row.sla":    "SLA",
-        "pr.cmp.row.onprem": "On-prem dialekt-cloud",
-        "pr.cmp.row.invoice":"Кастомный договор и счета",
-        "pr.cmp.audit.90":   "90 дней",
-        "pr.cmp.audit.un":   "без ограничений",
-        "pr.cmp.sup.email":  "email",
-        "pr.cmp.sup.email48":"email · 48 ч",
-        "pr.cmp.sup.pri":    "приоритет · 4 ч",
-        "pr.cmp.sup.csm":    "выделенный CSM",
-        "pr.cmp.sla.4h":     "ответ за 4 ч",
-        "pr.cmp.sla.cust":   "кастом (1 ч)",
-
-        "pr.faq.h":          "Вопросы по тарифам",
+        "pr.faq.h":          "Вопросы по тарифу",
         "pr.faq.q1":         "Я плачу за токены / API-вызовы?",
         "pr.faq.a1":         "Нет. Только за рабочие места. Если подключаете облачного LLM-провайдера (OpenAI, Anthropic и т.д.), они выставляют вам счёт по своим тарифам. dialekt не видит ваши промпты и ответы для облачных провайдеров и наценку не делает.",
-        "pr.faq.q2":         "Что произойдёт после окончания 30-дневного пробного периода?",
-        "pr.faq.a2":         "Ваши данные хранятся 12 месяцев. Лицензия перестаёт проходить валидацию, но вы можете написать на hello@dias.now для продления или перехода на платный тариф. Локальный Ollama продолжит работать — отключатся только функции облачной лицензии.",
-        "pr.faq.q3":         "Можно ли получить более длинный пробный период?",
-        "pr.faq.a3":         "Да — для design-партнёров, пилотов на регулируемых рынках и для образовательных проектов мы иногда выдаём до 12 месяцев бесплатно. Напишите на hello@dias.now с описанием сценария.",
+        "pr.faq.q2":         "Почему только годовая оплата?",
+        "pr.faq.a2":         "Предсказуемая выручка позволяет нам сосредоточиться на продукте, а не на ежемесячном churn'е. Минимальный коммит — один год, $3 300, оплата вперёд.",
+        "pr.faq.q3":         "Почему минимум 5 мест?",
+        "pr.faq.a3":         "dialekt сделан для команд. На меньшем числе мест стоимость поддержки и онбординга превышает выручку. Соло-разработчикам и про-команде до 5 человек — лучше подождать.",
         "pr.faq.q4":         "Поддерживаете счета в KZT / RUB?",
         "pr.faq.a4":         "Да. Клиентам, зарегистрированным в РК, — счета в KZT через Caspian Bank; клиентам в РФ — счета в RUB через Точку. Международные клиенты платят в USD через SWIFT или invoice-then-card.",
-        "pr.faq.q5":         "Можно ли менять тариф в середине цикла?",
-        "pr.faq.a5":         "Да. Апгрейд мгновенный и пропорциональный. Даунгрейд применяется со следующего биллингового цикла.",
-        "pr.faq.q6":         "Что такое «регулируемый режим»?",
-        "pr.faq.a6":         "Переключатель, скрывающий всех облачных LLM-провайдеров в десктоп-приложении. Требуется для некоторых пилотов в РК, попадающих под §16 трансграничных правил «О ПДн». Весь LLM-инференс остаётся на локальной Ollama.",
-        "pr.faq.q7":         "Есть скидка за оплату на год?",
-        "pr.faq.a7":         "Да — 15% при годовой оплате. Напишите нам для расчёта.",
-        "pr.faq.q8":         "Есть бесплатный / open-source тариф?",
-        "pr.faq.a8":         "Да — 30-дневный пробный период даёт все функции бесплатно. После окончания вы можете запросить продление по email, если вы инди-разработчик, студент или мейнтейнер open-source проекта. Устойчивые цены для остальных финансируют работу.",
-        "pr.faq.q9":         "Зачем регистрироваться, чтобы скачать?",
-        "pr.faq.a9":         "Чтобы знать, кто пользуется dialekt, и помочь при поломке. Регистрация на пробный период — 30 секунд, без карты. Само десктоп-приложение local-first — ваши промпты не покидают машину после установки.",
+        "pr.faq.q5":         "Что такое «регулируемый режим»?",
+        "pr.faq.a5":         "Переключатель, скрывающий всех облачных LLM-провайдеров в десктоп-приложении. Требуется для некоторых пилотов в РК, попадающих под §16 трансграничных правил «О ПДн». Весь LLM-инференс остаётся на локальной Ollama.",
+        "pr.faq.q6":         "Можно посмотреть до коммита?",
+        "pr.faq.a6":         "Да — напишите на hello@dias.now, и мы организуем демо-пилот. Design-партнёрам и клиентам с регулируемых рынков можем предоставить расширенные условия evaluation.",
+        "pr.faq.q7":         "Что такое «агент»? Почему до 3 на пользователя?",
+        "pr.faq.a7":         "Агент — это настроенный workflow со своим system prompt, инструментами, привязками к MCP-серверам и предпочтениями моделей. Например: «SQL-аналитик», «комплаенс-ревьюер», «продажный ассистент». Три на пользователя покрывают типовой паттерн SMB: один daily driver + один-два специализированных. Нужно больше — обсудим на пилоте, подберём подходящий план.",
 
         "pr.cta.h":          "Готовы поставлять быстрее?",
-        "pr.cta.p":          "Начните 30-дневный пробный период. Без карты.",
-        "pr.cta.btn":        "НАЧАТЬ ПРОБНЫЙ ПЕРИОД →",
+        "pr.cta.p":          "Напишите на hello@dias.now чтобы начать.",
+        "pr.cta.btn":        "СВЯЗАТЬСЯ С ОТДЕЛОМ ПРОДАЖ →",
       },
     };
   </script>
@@ -247,73 +131,21 @@
       <p data-i18n="pr.sub">Per-seat pricing. No usage-based billing. No "tokens metered" surprise charges. Local Ollama is unlimited; cloud LLM providers bill you directly.</p>
     </div>
 
-    <div class="pricing-grid">
-      <!-- Trial -->
-      <div class="tier">
-        <div class="tier-name" data-i18n="pr.t.trial">Trial</div>
-        <div class="tier-price">$0</div>
-        <div class="tier-blurb" data-i18n="pr.t.trial.blurb">30 days free. No credit card. Verify your email and you're in.</div>
-        <a href="/signup.html" class="btn full" data-i18n="pr.t.trial.cta">START FREE TRIAL</a>
+    <div class="pricing-grid" style="display:flex;justify-content:center;max-width:480px;margin:0 auto">
+      <div class="tier primary" style="width:100%">
+        <div class="tier-name" data-i18n="pr.t.pro">dias.now</div>
+        <div class="tier-price"><span class="currency">$</span>55<span class="per" data-i18n="pr.t.pro.per">/seat · mo · billed annually</span></div>
+        <div class="tier-blurb" data-i18n="pr.t.pro.blurb">Minimum 5 seats. Annual billing. One plan, no tier games.</div>
+        <a href="mailto:hello@dias.now?subject=dias.now%20plan%20request" class="btn primary full" data-i18n="pr.t.cta">CONTACT SALES</a>
         <ul class="tier-features mt-24">
-          <li data-i18n="pr.t.trial.f1">30 days, all features</li>
-          <li data-i18n="pr.t.trial.f2">3 seats included</li>
-          <li data-i18n="pr.t.trial.f3">All 18 cloud providers</li>
-          <li data-i18n="pr.t.trial.f4">Local Ollama (33 models)</li>
-          <li data-i18n="pr.t.trial.f5">Email support</li>
-          <li class="muted" data-i18n="pr.t.trial.f6">Dedicated SLA</li>
-          <li class="muted" data-i18n="pr.t.trial.f7">SSO / SAML</li>
-        </ul>
-      </div>
-
-      <!-- Starter -->
-      <div class="tier">
-        <div class="tier-name" data-i18n="pr.t.starter">Starter</div>
-        <div class="tier-price"><span class="currency">$</span>25<span class="per" data-i18n="pr.t.starter.per">/seat · mo</span></div>
-        <div class="tier-blurb" data-i18n="pr.t.starter.blurb">Minimum 3 seats. Teams up to 15 people, individual developers.</div>
-        <a href="mailto:hello@dias.now?subject=Starter%20plan%20request" class="btn full" data-i18n="pr.t.cta">CONTACT SALES</a>
-        <ul class="tier-features mt-24">
-          <li data-i18n="pr.t.starter.f1">From 3 seats</li>
-          <li data-i18n="pr.t.starter.f2">Local Ollama (full catalog)</li>
-          <li data-i18n="pr.t.starter.f3">All 18 cloud providers (own keys)</li>
-          <li data-i18n="pr.t.starter.f4">Email support · 48h SLA</li>
-          <li data-i18n="pr.t.starter.f5">Audit log · 90 days</li>
-          <li class="muted" data-i18n="pr.t.starter.f6">Priority support</li>
-          <li class="muted" data-i18n="pr.t.starter.f7">SSO / SAML</li>
-        </ul>
-      </div>
-
-      <!-- Professional (PRIMARY) -->
-      <div class="tier primary">
-        <div class="tier-badge" data-i18n="pr.t.pro.badge">PRIMARY</div>
-        <div class="tier-name" data-i18n="pr.t.pro">Professional</div>
-        <div class="tier-price"><span class="currency">$</span>55<span class="per" data-i18n="pr.t.starter.per">/seat · mo</span></div>
-        <div class="tier-blurb" data-i18n="pr.t.pro.blurb">Minimum 5 seats. SMB 50–300 staff.</div>
-        <a href="mailto:hello@dias.now?subject=Professional%20plan%20request" class="btn primary full" data-i18n="pr.t.cta">CONTACT SALES</a>
-        <ul class="tier-features mt-24">
-          <li data-i18n="pr.t.pro.f1">From 5 seats</li>
-          <li data-i18n="pr.t.pro.f2">Everything in Starter</li>
-          <li data-i18n="pr.t.pro.f3">Priority support · 4h SLA</li>
-          <li data-i18n="pr.t.pro.f4">Audit log · unlimited retention</li>
-          <li data-i18n="pr.t.pro.f5">Regulated mode (KZ ПДн)</li>
-          <li data-i18n="pr.t.pro.f6">Custom MCP servers · onboarding</li>
-          <li data-i18n="pr.t.pro.f7">Quarterly check-ins</li>
-        </ul>
-      </div>
-
-      <!-- Enterprise -->
-      <div class="tier">
-        <div class="tier-name" data-i18n="pr.t.ent">Enterprise</div>
-        <div class="tier-price"><span class="currency">$</span>95<span class="per" data-i18n="pr.t.ent.per">+ /seat · mo</span></div>
-        <div class="tier-blurb" data-i18n="pr.t.ent.blurb">Minimum 10 seats. SSO, SLA, dedicated support.</div>
-        <a href="mailto:hello@dias.now?subject=Enterprise%20plan%20request" class="btn full" data-i18n="pr.t.cta">CONTACT SALES</a>
-        <ul class="tier-features mt-24">
-          <li data-i18n="pr.t.ent.f1">From 10 seats</li>
-          <li data-i18n="pr.t.ent.f2">Everything in Professional</li>
-          <li data-i18n="pr.t.ent.f3">SSO (SAML / OIDC)</li>
-          <li data-i18n="pr.t.ent.f4">Dedicated CSM</li>
-          <li data-i18n="pr.t.ent.f5">Custom SLA (1h, 99.9% uptime)</li>
-          <li data-i18n="pr.t.ent.f6">On-prem dialekt-cloud option</li>
-          <li data-i18n="pr.t.ent.f7">Custom contract & invoicing</li>
+          <li data-i18n="pr.t.pro.f1">From 5 seats · annual</li>
+          <li data-i18n="pr.t.pro.fagents">Up to 3 agents per user</li>
+          <li data-i18n="pr.t.pro.f2">Local Ollama (full catalog)</li>
+          <li data-i18n="pr.t.pro.f3">All 18 cloud providers (own keys)</li>
+          <li data-i18n="pr.t.pro.f4">Priority support · 4h SLA</li>
+          <li data-i18n="pr.t.pro.f5">Audit log · unlimited retention</li>
+          <li data-i18n="pr.t.pro.f6">Regulated mode (KZ ПДн)</li>
+          <li data-i18n="pr.t.pro.f7">Custom MCP servers · onboarding</li>
         </ul>
       </div>
     </div>
@@ -323,35 +155,6 @@
       Cloud LLM provider costs (OpenAI, Anthropic, etc.) are billed by them directly — dialekt does not mark up.
     </p>
 
-    <!-- Compare -->
-    <div class="compare-table">
-      <table>
-        <thead>
-          <tr>
-            <th data-i18n="pr.cmp.feature">Feature</th>
-            <th data-i18n="pr.t.trial">Trial</th>
-            <th data-i18n="pr.t.starter">Starter</th>
-            <th>Pro</th>
-            <th data-i18n="pr.t.ent">Enterprise</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td class="feature" data-i18n="pr.cmp.row.ollama">Local Ollama (33 models)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.cloud">All 18 cloud LLM providers</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.mcp">MCP servers</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.agent">Agent manifests / wizard</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.seats">Minimum seats</td><td>3</td><td>3</td><td>5</td><td>10</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.audit">Audit log retention</td><td data-i18n="pr.cmp.audit.90">90 days</td><td data-i18n="pr.cmp.audit.90">90 days</td><td data-i18n="pr.cmp.audit.un">unlimited</td><td data-i18n="pr.cmp.audit.un">unlimited</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.sup">Support</td><td data-i18n="pr.cmp.sup.email">email</td><td data-i18n="pr.cmp.sup.email48">email · 48h</td><td data-i18n="pr.cmp.sup.pri">priority · 4h</td><td data-i18n="pr.cmp.sup.csm">dedicated CSM</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.reg">Regulated mode (KZ ПДн)</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.sso">SSO (SAML / OIDC)</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.sla">SLA</td><td class="no">—</td><td class="no">—</td><td data-i18n="pr.cmp.sla.4h">4h response</td><td data-i18n="pr.cmp.sla.cust">custom (1h)</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.onprem">On-prem dialekt-cloud</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-          <tr><td class="feature" data-i18n="pr.cmp.row.invoice">Custom contract & invoicing</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-        </tbody>
-      </table>
-    </div>
-
     <!-- FAQ -->
     <div class="faq">
       <h2 data-i18n="pr.faq.h">Pricing FAQ</h2>
@@ -360,43 +163,35 @@
         <p data-i18n="pr.faq.a1">No. Per-seat pricing only. If you connect a cloud LLM provider (OpenAI, Anthropic, etc.), they bill you directly with their own metering. dialekt does not see your prompts or responses for cloud providers, and we do not mark up.</p>
       </details>
       <details>
-        <summary data-i18n="pr.faq.q2">What happens after my 30-day trial expires?</summary>
-        <p data-i18n="pr.faq.a2">Your data stays for 12 months. The license stops validating, but you can email hello@dias.now to extend or convert to paid. Local Ollama keeps working — only the cloud-license features deactivate.</p>
+        <summary data-i18n="pr.faq.q2">Why annual billing only?</summary>
+        <p data-i18n="pr.faq.a2">Predictable revenue lets us focus on shipping product instead of chasing month-to-month churn. The minimum commitment is one year, $3,300, paid upfront.</p>
       </details>
       <details>
-        <summary data-i18n="pr.faq.q3">Can I get a longer free trial?</summary>
-        <p data-i18n="pr.faq.a3">Yes — for design partners, regulated-market pilots, and educators we sometimes grant up to 12 months free. Email hello@dias.now with your use case.</p>
+        <summary data-i18n="pr.faq.q3">Why minimum 5 seats?</summary>
+        <p data-i18n="pr.faq.a3">dialekt is built for teams. Below 5 seats the per-customer support and onboarding cost outweighs the revenue. Solo developers and pre-team founders should wait until they're 5-strong.</p>
       </details>
       <details>
         <summary data-i18n="pr.faq.q4">Do you support KZT / RUB invoices?</summary>
         <p data-i18n="pr.faq.a4">Yes. KZ-registered customers get KZT invoices through Caspian Bank settlement; RU customers get RUB invoices via Tochka. International customers pay in USD via SWIFT or invoice-then-card.</p>
       </details>
       <details>
-        <summary data-i18n="pr.faq.q5">Can I switch tiers mid-cycle?</summary>
-        <p data-i18n="pr.faq.a5">Yes. Upgrade is instant and prorated. Downgrade applies at the next billing cycle.</p>
+        <summary data-i18n="pr.faq.q5">What's "regulated mode"?</summary>
+        <p data-i18n="pr.faq.a5">A toggle that hides all cloud LLM providers in the desktop app. Required for some KZ pilots subject to ПДн §16 cross-border rules. All LLM inference stays on local Ollama.</p>
       </details>
       <details>
-        <summary data-i18n="pr.faq.q6">What's "regulated mode"?</summary>
-        <p data-i18n="pr.faq.a6">A toggle that hides all cloud LLM providers in the desktop app. Required for some KZ pilots subject to ПДн §16 cross-border rules. All LLM inference stays on local Ollama.</p>
+        <summary data-i18n="pr.faq.q6">Can I evaluate before committing?</summary>
+        <p data-i18n="pr.faq.a6">Yes — email hello@dias.now and we'll set up a hands-on pilot. Design partners and regulated-market customers can get extended evaluation terms.</p>
       </details>
       <details>
-        <summary data-i18n="pr.faq.q7">Is there a discount for annual billing?</summary>
-        <p data-i18n="pr.faq.a7">Yes — 15% off when paid annually. Email us for the annual quote.</p>
-      </details>
-      <details>
-        <summary data-i18n="pr.faq.q8">Do you have a free / open-source tier?</summary>
-        <p data-i18n="pr.faq.a8">Yes — the 30-day trial gives you all features for free. After expiry, you can request an extension via email if you're an indie developer, student, or open-source maintainer. Sustainable pricing for everyone else funds the work.</p>
-      </details>
-      <details>
-        <summary data-i18n="pr.faq.q9">Why do I need to sign up to download?</summary>
-        <p data-i18n="pr.faq.a9">So we know who's running dialekt and can help when something breaks. Trial signup is 30 seconds, no credit card. The desktop app itself is local-first — your prompts never leave your machine after install.</p>
+        <summary data-i18n="pr.faq.q7">What's an "agent"? Why up to 3 per user?</summary>
+        <p data-i18n="pr.faq.a7">An agent is a configured workflow with its own system prompt, tools, MCP server bindings, and model preferences — think "SQL analyst", "compliance reviewer", "sales assistant". Three per user covers the common SMB pattern (one daily-driver + one or two specialised). Need more? Tell us in the pilot — we'll size the right plan.</p>
       </details>
     </div>
 
     <div class="text-center mt-32" style="padding-bottom:80px">
       <h2 style="font-size:clamp(22px,4vw,32px);margin-bottom:14px" data-i18n="pr.cta.h">Ready to ship faster?</h2>
-      <p class="text-muted" style="margin-bottom:24px" data-i18n="pr.cta.p">Start your 30-day trial. No credit card.</p>
-      <a href="/signup.html" class="btn primary lg" data-i18n="pr.cta.btn">START FREE TRIAL →</a>
+      <p class="text-muted" style="margin-bottom:24px" data-i18n="pr.cta.p">Email hello@dias.now to start.</p>
+      <a href="mailto:hello@dias.now?subject=dias.now%20plan%20request" class="btn primary lg" data-i18n="pr.cta.btn">CONTACT SALES →</a>
     </div>
   </div>
 

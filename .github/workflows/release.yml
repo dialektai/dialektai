@@ -127,6 +127,59 @@ jobs:
           done
           ls -la
 
+      # Post-bundle smoke. Catches PyInstaller-bundle-only bugs that
+      # the venv-based pytest job misses entirely — every recent
+      # readchar/yaspin/matplotlib/litellm/tiktoken_ext failure was a
+      # frozen-only import that exploded on first WS open and shipped
+      # green CI. Smoke runs the bundled sidecar, hits /health, opens
+      # WS (which triggers make_interpreter and all heavy imports),
+      # and asserts no ASGI exception. Doesn't need Ollama running —
+      # /health returns ollama:false but the imports still execute.
+      - name: Post-bundle smoke (frozen sidecar imports + WS open)
+        run: |
+          BIN="frontend/src-tauri/binaries/dialekt-server-x86_64-unknown-linux-gnu"
+          chmod +x "$BIN"
+          "$BIN" > /tmp/sidecar-smoke.log 2>&1 &
+          PID=$!
+          # Wait up to 30s for /health
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/health > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          if ! curl -fsS http://127.0.0.1:8765/health > /dev/null 2>&1; then
+            echo "::error::sidecar /health never responded"
+            tail -50 /tmp/sidecar-smoke.log
+            kill $PID 2>/dev/null || true
+            exit 1
+          fi
+          # Open WS — this is what triggers make_interpreter() and the
+          # full litellm/interpreter import chain. Use the build venv's
+          # python so the websockets lib (transitive of uvicorn) is on
+          # the path without an extra install step.
+          python/venv/bin/python - <<'PY'
+          import asyncio, json
+          import websockets
+          async def go():
+              async with websockets.connect("ws://127.0.0.1:8765/ws", open_timeout=5) as ws:
+                  await ws.send(json.dumps({"type": "ping"}))
+                  resp = await asyncio.wait_for(ws.recv(), timeout=5)
+                  data = json.loads(resp)
+                  assert data.get("type") == "pong", f"expected pong, got {data}"
+                  print("ws ping/pong OK:", data)
+          asyncio.run(go())
+          PY
+          # Scan log for any ASGI exception — passing the WS open is
+          # the goal but a late-init traceback would still be a regression.
+          if grep -E "ERROR:.*Exception in ASGI|ModuleNotFoundError|FileNotFoundError|PackageNotFoundError" /tmp/sidecar-smoke.log; then
+            echo "::error::sidecar log contains ASGI/import failures"
+            tail -100 /tmp/sidecar-smoke.log
+            kill $PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "✓ smoke OK"
+          kill $PID 2>/dev/null || true
+          wait $PID 2>/dev/null || true
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -884,3 +937,29 @@ jobs:
           git add landing/changelog.html
           git commit -m "docs(changelog): auto-add ${{ github.ref_name }} from release pipeline [skip ci]"
           git push origin main
+
+  # ── 8. Force-refresh api.dias.now release cache ──────────────────────────
+  # The dialekt-cloud server caches GitHub's /releases/latest in-process for
+  # 5 min. After a tag publish we POST /releases/refresh so the landing flips
+  # within seconds instead of waiting out the TTL. Best-effort: a missed
+  # refresh just falls back to the TTL, no need to fail the pipeline.
+
+  refresh-landing-cache:
+    name: Force-refresh api.dias.now cache
+    needs: release
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    continue-on-error: true
+    steps:
+      - name: POST /releases/refresh
+        env:
+          ADMIN_KEY: ${{ secrets.DIALEKT_ADMIN_KEY }}
+        run: |
+          if [ -z "$ADMIN_KEY" ]; then
+            echo "DIALEKT_ADMIN_KEY secret not set — skipping cache refresh"
+            exit 0
+          fi
+          curl -fsS -X POST https://api.dias.now/releases/refresh \
+            -H "X-Admin-Key: $ADMIN_KEY" \
+            --max-time 30 \
+            | tee /dev/stderr

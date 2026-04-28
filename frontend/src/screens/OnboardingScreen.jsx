@@ -12,16 +12,30 @@ const STEPS = [
   { n: '05', t: 'First conversation' },
 ];
 
+// Onboarding chat picker — `embedding` is intentionally excluded.
+// Embedding-only models (nomic-embed, mxbai-embed, bge-m3) can't
+// answer chat completions and would crash the WS the moment the
+// user sent the first message ("model does not support chat" from
+// Ollama). They're still pulled separately by Settings → Models for
+// schema-RAG / few-shot memory under the hood.
 const OLLAMA_CATEGORIES = [
   { id: 'all', label: 'All' },
   { id: 'general', label: 'General' },
   { id: 'reasoning', label: 'Reasoning' },
   { id: 'coding', label: 'Coding' },
   { id: 'vision', label: 'Vision' },
-  { id: 'embedding', label: 'Embeddings' },
   { id: 'lightweight', label: 'Lightweight' },
   { id: 'frontier', label: 'Frontier' },
 ];
+
+// True if the model can ONLY do embeddings — keep these out of the
+// chat picker. A model marked both "embedding" and another category
+// (none currently in the catalog, but future-proofed) would still
+// show up because at least one category is chat-capable.
+function isEmbeddingOnly(model) {
+  const cats = model.categories || [];
+  return cats.length > 0 && cats.every(c => c === 'embedding');
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -420,6 +434,7 @@ export default function OnboardingScreen({ onNav }) {
   const [catalog, setCatalog] = useState({ ollama: [], providers: [], regulated_mode: false });
   const [providersStatus, setProvidersStatus] = useState([]); // [{ id, configured }]
   const [installedTags, setInstalledTags] = useState(() => new Set());
+  const [ollamaReachable, setOllamaReachable] = useState(null); // null=unknown, true/false once /ollama/tags answers
   const [ramTotalGB, setRamTotalGB] = useState(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -445,14 +460,17 @@ export default function OnboardingScreen({ onNav }) {
       Promise.allSettled([
         fetch(`${API}/llm/catalog`).then(r => r.json()),
         fetch(`${API}/llm/providers`).then(r => r.json()),
-        fetch(`${API}/ollama/tags`).then(r => r.ok ? r.json() : { models: [] }),
+        fetch(`${API}/ollama/tags`).then(r => r.ok ? r.json() : { models: [], reachable: false }),
         fetch(`${API}/system`).then(r => r.ok ? r.json() : null),
       ]).then(([cat, prov, tags, sys]) => {
         if (cancelled) return;
         const catOk = cat.status === 'fulfilled' && (cat.value?.ollama?.length > 0 || cat.value?.providers?.length > 0);
         if (catOk) { setCatalog(cat.value); setCatalogLoaded(true); }
         if (prov.status === 'fulfilled') setProvidersStatus(prov.value?.providers || []);
-        if (tags.status === 'fulfilled') setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
+        if (tags.status === 'fulfilled') {
+          setInstalledTags(new Set((tags.value?.models || []).map(m => m.name)));
+          setOllamaReachable(tags.value?.reachable === true);
+        }
         if (sys.status === 'fulfilled' && sys.value && typeof sys.value.ram_total_gb === 'number') {
           setRamTotalGB(sys.value.ram_total_gb);
         }
@@ -473,11 +491,17 @@ export default function OnboardingScreen({ onNav }) {
   };
 
   // ── Filter Ollama models ────────────────────────────────────────────────
-  const ollamaAnnotated = useMemo(() => (catalog.ollama || []).map(m => ({
-    model: m,
-    installed: modelIsInstalled(m, installedTags),
-    fits: modelFits(m, ramTotalGB),
-  })), [catalog.ollama, installedTags, ramTotalGB]);
+  // Drop embedding-only models — they can't serve chat. See
+  // isEmbeddingOnly comment above; the drop happens here so every
+  // downstream consumer (counts, sorted list, default-pick) is
+  // already chat-only.
+  const ollamaAnnotated = useMemo(() => (catalog.ollama || [])
+    .filter(m => !isEmbeddingOnly(m))
+    .map(m => ({
+      model: m,
+      installed: modelIsInstalled(m, installedTags),
+      fits: modelFits(m, ramTotalGB),
+    })), [catalog.ollama, installedTags, ramTotalGB]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -601,7 +625,15 @@ export default function OnboardingScreen({ onNav }) {
             <div className="upper" style={{ color: T.dim, marginBottom: 8 }}>Your machine</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} className="mono">
               <Row k="RAM"  v={ramTotalGB ? `${ramTotalGB} GB` : '—'} />
-              <Row k="OLLAMA" v={installedTags.size > 0 ? `${installedTags.size} models` : 'not running'} />
+              <Row k="OLLAMA" v={
+                installedTags.size > 0
+                  ? `${installedTags.size} models`
+                  : ollamaReachable === true
+                    ? 'running · 0 models'
+                    : ollamaReachable === false
+                      ? 'not running'
+                      : '—'
+              } />
             </div>
             {tab === 'local' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 10 }}>

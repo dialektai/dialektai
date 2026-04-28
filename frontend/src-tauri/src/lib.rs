@@ -34,9 +34,24 @@ fn spawn_python_server(app: &tauri::AppHandle) {
         Ok(c) => c.env("DIALEKT_SIGNED", SIGNED_BUILD),
         Err(_) => {
             eprintln!("[dialekt] Sidecar 'dialekt-server' not bundled. Start python/server.py manually.");
+            // Dev mode: do NOT kill anything on :8765 — that's the user's
+            // hand-started `python server.py`. Bundled mode below resets
+            // the port before spawning to recover from leaked sidecars.
             return;
         }
     };
+
+    // Reset port :8765 before spawning. Previous Tauri crashes / force-quits
+    // leak the python child (start_new_session=True keeps it alive past
+    // parent death), so the next launch hits EADDRINUSE on bind, the new
+    // sidecar exits, and the FE talks to a stale daemon — or worse, no
+    // daemon at all if it's also dead. Reaching for `lsof | kill -9` here
+    // gives every cold start a clean port. Same uid as the user, no
+    // privilege escalation involved.
+    let _ = std::process::Command::new("/bin/sh")
+        .arg("-c")
+        .arg("PIDS=$(lsof -ti :8765 2>/dev/null); [ -n \"$PIDS\" ] && kill -9 $PIDS; sleep 0.3")
+        .status();
 
     let (mut rx, child) = match cmd.spawn() {
         Ok(pair) => pair,

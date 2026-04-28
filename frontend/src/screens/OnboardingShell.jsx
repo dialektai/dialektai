@@ -1,5 +1,6 @@
 import { T } from '../tokens.js';
 import { AppFrame, Logo } from '../components/Shell.jsx';
+import { APP_VERSION } from '../version.js';
 
 const steps = [
   { n: '01', t: 'License & privacy' },
@@ -18,7 +19,7 @@ export default function OnboardingShell({ step, title, blurb, cta = 'Continue', 
             <Logo />
             <div>
               <div style={{ fontSize: 15, fontWeight: 600 }}>dialekt<span style={{ color: T.cyan }}>.ai</span></div>
-              <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.1em' }}>LOCAL-FIRST · v0.8.2</div>
+              <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.1em' }}>LOCAL-FIRST · v{APP_VERSION}</div>
             </div>
           </div>
           <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em', marginBottom: 10 }}>

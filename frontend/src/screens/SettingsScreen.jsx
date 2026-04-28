@@ -5,6 +5,7 @@ import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
 import { getCloudApi } from '../lib/cloud.js';
 import McpTemplateModal from '../components/McpTemplateModal.jsx';
+import { APP_VERSION } from '../version.js';
 import McpBulkImportModal from '../components/McpBulkImportModal.jsx';
 import McpToolList from '../components/McpToolList.jsx';
 import MCPAuditDashboard from '../components/MCPAuditDashboard.jsx';
@@ -3134,7 +3135,7 @@ function AboutSection() {
     fetch(`${API}/about`).then(r => r.json()).then(setAbout).catch(() => {});
   }, []);
   const rows = [
-    { k: 'Version',     v: about?.version ? `v${about.version}` : 'v0.8.2' },
+    { k: 'Version',     v: about?.version ? `v${about.version}` : `v${APP_VERSION}` },
     { k: 'Frontend',    v: 'Vite 8 + React 19' },
     { k: 'Backend',     v: 'FastAPI + Open Interpreter 0.4.3' },
     { k: 'LLM runtime', v: 'Ollama (localhost:11434)' },

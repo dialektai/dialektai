@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { T } from '../tokens.js';
 import Icon from './Icon.jsx';
 import { Logo, Meter } from './Shell.jsx';
+import { APP_VERSION } from '../version.js';
 
 const API = 'http://localhost:8765';
 
@@ -220,7 +221,7 @@ export default function LeftPanel({
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em' }}>
             dialekt<span style={{ color: T.cyan }}>.ai</span>
           </div>
-          <div className="mono" style={{ fontSize: 9, color: T.dim, letterSpacing: '.1em' }}>v0.8.2 · LOCAL</div>
+          <div className="mono" style={{ fontSize: 9, color: T.dim, letterSpacing: '.1em' }}>v{APP_VERSION} · LOCAL</div>
         </div>
         <button
           className="dlk-btn ghost"

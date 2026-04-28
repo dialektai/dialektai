@@ -20,6 +20,12 @@ export function useChat() {
   const wsRef = useRef(null);
   const streamingMsgRef = useRef(null);
   const sessionIdRef = useRef(null);  // sync ref for use inside WS callbacks
+  // Debounce ollamaOnline flips: a single failed /health (transient
+  // sidecar latency, Ollama loading a model, macOS WebKit jitter) used
+  // to flip the indicator and trigger a MainScreen→OfflineScreen→empty
+  // bounce loop. Require 2 consecutive misses before going offline; any
+  // success resets the counter and flips back to online immediately.
+  const healthFailRef = useRef(0);
 
   // Keep ref in sync
   useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
@@ -86,7 +92,13 @@ export function useChat() {
     try {
       const r = await fetch(`${API_URL}/health`);
       const d = await r.json();
-      setOllamaOnline(d.ollama);
+      if (d.ollama) {
+        healthFailRef.current = 0;
+        setOllamaOnline(true);
+      } else {
+        healthFailRef.current += 1;
+        if (healthFailRef.current >= 2) setOllamaOnline(false);
+      }
       const list = Array.isArray(d.models) ? d.models : [];
       if (list.length) setModels(list);
       // Self-heal the active model. If the currently selected model isn't
@@ -102,7 +114,8 @@ export function useChat() {
       });
       return d;
     } catch {
-      setOllamaOnline(false);
+      healthFailRef.current += 1;
+      if (healthFailRef.current >= 2) setOllamaOnline(false);
       return { ollama: false };
     }
   }, []);
@@ -193,15 +206,31 @@ export function useChat() {
   useEffect(() => {
     let ws;
     let dead = false;
+    let pingTimer = null;
 
     const connect = () => {
       if (dead) return;
       ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
-      ws.onopen = () => setConnected(true);
+      ws.onopen = () => {
+        setConnected(true);
+        // Application-level keepalive. macOS closes idle TCP after a few
+        // minutes (lid sleep / network change kills it sooner) and the
+        // sidecar's WS handler has no native ping, so without this the
+        // connection silently dies and the user sees a "backend offline"
+        // badge until the 3s reconnect kicks in. 20s cadence is well
+        // under any common idle-close threshold.
+        if (pingTimer) clearInterval(pingTimer);
+        pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try { ws.send(JSON.stringify({ type: 'ping' })); } catch {}
+          }
+        }, 20_000);
+      };
       ws.onclose = () => {
         setConnected(false);
+        if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
         if (!dead) setTimeout(connect, 3000);
       };
       ws.onerror = () => ws.close();
@@ -223,6 +252,8 @@ export function useChat() {
           fetchSessions();  // refresh list after AI reply saved
         } else if (chunk.type === 'joined') {
           // session join ack
+        } else if (chunk.type === 'pong') {
+          // keepalive ack — nothing to do, presence alone is the signal
         } else if (chunk.type === 'autonomy_ok') {
           setAutonomy(chunk.level);
         } else if (chunk.type === 'mcp_consent_request') {
@@ -249,7 +280,7 @@ export function useChat() {
     };
 
     connect();
-    return () => { dead = true; ws?.close(); };
+    return () => { dead = true; if (pingTimer) clearInterval(pingTimer); ws?.close(); };
   }, [applyChunk, fetchSessions]);
 
   // ── Send ──────────────────────────────────────────────────────────

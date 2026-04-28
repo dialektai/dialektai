@@ -60,7 +60,10 @@ def test_about_endpoint(client):
     required = ("version", "username", "home", "platform", "db", "config")
     for field in required:
         assert field in body, f"/about missing field: {field}"
-    assert body["version"] == "0.8.2"
+    # Version is bumped at every release — assert shape (semver-ish)
+    # rather than a fixed string so the test doesn't fight bumps.
+    import re
+    assert re.match(r"^\d+\.\d+\.\d+", body["version"]), f"unexpected version: {body['version']}"
     assert isinstance(body["username"], str) and len(body["username"]) > 0
     # DB path must be inside .dialekt dir (may be temp dir in test)
     assert "dialekt.db" in body["db"]

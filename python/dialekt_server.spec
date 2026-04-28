@@ -15,8 +15,49 @@ import sys
 import importlib.util
 from pathlib import Path
 
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
+
 BINARY_NAME = "dialekt-server"
 HERE = Path(os.path.abspath(SPECPATH))
+
+# Packages that introspect their own version via importlib.metadata at
+# import time. PyInstaller doesn't bundle *.dist-info by default, so the
+# frozen binary raises PackageNotFoundError on the first import — for
+# `readchar` (transitive: interpreter → inquirer → readchar) this only
+# fires when a chat WS opens, which manifested as endless WS-reconnect
+# and a "backend offline" badge on macOS bundle builds.
+METADATA_PACKAGES = ["readchar"]
+metadata_datas = []
+for pkg in METADATA_PACKAGES:
+    try:
+        metadata_datas += copy_metadata(pkg)
+    except Exception:
+        # Best-effort: if a future refactor drops the dep, don't block
+        # the build. The runtime import will still raise the same
+        # PackageNotFoundError, surfacing the regression in tests.
+        pass
+
+# Packages that ship data files alongside Python sources (JSON, YAML,
+# templates) and reach for them at import time via pkgutil.get_data
+# or pkg_resources. PyInstaller's analyser misses these unless told.
+# - `yaspin` reads data/spinners.json on `import yaspin.spinners`
+#   (transitive: interpreter → terminal_interface → scan_code → yaspin).
+#   Same failure mode as the readchar one above — WS chat dies on first
+#   make_interpreter() call. Both bugs flushed out by smoke-testing the
+#   chat path post-bundle, not just import-server.
+DATA_FILE_PACKAGES = [
+    "yaspin",   # data/spinners.json — read by yaspin.spinners on import
+    "litellm",  # litellm/model_prices_and_context_window_backup.json —
+                # read by litellm/__init__.py on import via the model
+                # cost map loader; failure surfaces the same way as
+                # yaspin (WS dies on first chat connect).
+]
+data_file_datas = []
+for pkg in DATA_FILE_PACKAGES:
+    try:
+        data_file_datas += collect_data_files(pkg)
+    except Exception:
+        pass
 
 # sqlite_vec is skipped on windows-arm64 (no wheel + sdist requires py<3.12).
 # Probe whether it's actually installed before listing it as a hidden import,
@@ -36,6 +77,8 @@ a = Analysis(
         # without reading external files at runtime.
         # (dialekt_manifest_validator ships its schema inside the wheel, so
         #  PyInstaller collects it automatically via collect_data_files.)
+        *metadata_datas,
+        *data_file_datas,
     ],
     hiddenimports=[
         # FastAPI + starlette + uvicorn stack
@@ -104,6 +147,15 @@ a = Analysis(
         "jeepney",
         "jeepney.io.asyncio",
 
+        # tiktoken's encodings (cl100k_base etc.) are registered via the
+        # tiktoken_ext namespace through Python entry-points. PyInstaller
+        # doesn't traverse entry-point plugins, so the frozen binary
+        # raises "Unknown encoding cl100k_base" the first time litellm
+        # tokenises a prompt. Listing the public-encodings module forces
+        # PyInstaller to include it; tiktoken_ext is the parent namespace.
+        "tiktoken_ext",
+        "tiktoken_ext.openai_public",
+
         # Misc
         "httpx",
         "psutil",
@@ -114,9 +166,15 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Shrink binary: exclude things that aren't used on Linux
+        # Shrink binary: exclude things that aren't used on Linux.
+        # Note: `matplotlib` was previously here but open-interpreter's
+        # display.py calls lazy_import("matplotlib") at module load and
+        # raises ModuleNotFoundError when find_spec returns None, even
+        # though matplotlib itself is never used in our chat path.
+        # Removing the exclude lets PyInstaller bundle the package and
+        # silences the import-time check; the cost is ~30 MB on top of
+        # the 126 MB sidecar.
         "tkinter",
-        "matplotlib",
         "numpy.distutils",
         "scipy",
         "pandas",
