@@ -264,6 +264,9 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "make_dir": "file",
     "list_agents": "agent",
     "get_agent": "agent",
+    "http_get": "http",
+    "http_post": "http",
+    "http_put": "http",
 }
 
 

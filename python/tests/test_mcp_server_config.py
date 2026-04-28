@@ -40,9 +40,18 @@ def test_defaults_when_file_missing(tmp_path, monkeypatch):
     assert config.transport.http.enabled is False
 
 
-def test_enabled_categories_default_is_all_three():
+def test_enabled_categories_default_is_full_set():
     config = ServerConfig()
-    assert set(config.enabled_categories) == {"database", "file", "agent"}
+    assert set(config.enabled_categories) == {
+        "database",
+        "file",
+        "agent",
+        "http",
+        "rss",
+        "bitrix",
+        "instagram",
+        "visual",
+    }
 
 
 def test_unknown_category_rejected():
