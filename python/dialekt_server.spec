@@ -15,8 +15,27 @@ import sys
 import importlib.util
 from pathlib import Path
 
+from PyInstaller.utils.hooks import copy_metadata
+
 BINARY_NAME = "dialekt-server"
 HERE = Path(os.path.abspath(SPECPATH))
+
+# Packages that introspect their own version via importlib.metadata at
+# import time. PyInstaller doesn't bundle *.dist-info by default, so the
+# frozen binary raises PackageNotFoundError on the first import — for
+# `readchar` (transitive: interpreter → inquirer → readchar) this only
+# fires when a chat WS opens, which manifested as endless WS-reconnect
+# and a "backend offline" badge on macOS bundle builds.
+METADATA_PACKAGES = ["readchar"]
+metadata_datas = []
+for pkg in METADATA_PACKAGES:
+    try:
+        metadata_datas += copy_metadata(pkg)
+    except Exception:
+        # Best-effort: if a future refactor drops the dep, don't block
+        # the build. The runtime import will still raise the same
+        # PackageNotFoundError, surfacing the regression in tests.
+        pass
 
 # sqlite_vec is skipped on windows-arm64 (no wheel + sdist requires py<3.12).
 # Probe whether it's actually installed before listing it as a hidden import,
@@ -36,6 +55,7 @@ a = Analysis(
         # without reading external files at runtime.
         # (dialekt_manifest_validator ships its schema inside the wheel, so
         #  PyInstaller collects it automatically via collect_data_files.)
+        *metadata_datas,
     ],
     hiddenimports=[
         # FastAPI + starlette + uvicorn stack
