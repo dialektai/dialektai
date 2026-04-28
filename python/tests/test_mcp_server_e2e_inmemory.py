@@ -110,7 +110,8 @@ def _build_full_server(tmp_path) -> tuple[MCPServer, _FakePluginContext, list[di
 def test_client_lists_all_registered_tools(tmp_path):
     """A real MCP client over in-memory transport sees every tool we
     registered — 5 DB + 5 file + 2 agent + 3 http + 1 rss + 1 bitrix
-    + 3 instagram + 3 visual + 1 web_crawl + 1 calendar = 25 total."""
+    + 3 instagram + 3 visual + 1 web_crawl + 1 calendar + 1 scheduling
+    = 26 total."""
     async def run():
         server, _, _ = _build_full_server(tmp_path)
 
@@ -156,8 +157,10 @@ def test_client_lists_all_registered_tools(tmp_path):
             assert "dialekt_web_crawl" in names
             # Calendar
             assert "dialekt_kz_holidays" in names
+            # Scheduling
+            assert "dialekt_distribute_schedule" in names
 
-            assert len(names) == 25
+            assert len(names) == 26
 
     asyncio.run(run())
 

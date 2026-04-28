@@ -53,6 +53,7 @@ def test_enabled_categories_default_is_full_set():
         "visual",
         "web_crawl",
         "calendar",
+        "scheduling",
     }
 
 

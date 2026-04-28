@@ -40,6 +40,7 @@ TOOL_CATEGORIES = (
     "visual",
     "web_crawl",
     "calendar",
+    "scheduling",
 )
 
 

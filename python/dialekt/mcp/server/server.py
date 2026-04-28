@@ -109,6 +109,8 @@ class MCPServer:
             self._register_web_crawl_tools()
         if "calendar" in enabled:
             self._register_calendar_tools()
+        if "scheduling" in enabled:
+            self._register_scheduling_tools()
 
         log.info(
             "dialekt MCP server registered %d tool(s): %s",
@@ -200,6 +202,13 @@ class MCPServer:
         from dialekt.mcp.server.tools.calendar import register_calendar_tools
 
         names = register_calendar_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_scheduling_tools(self) -> None:
+        """Attach the schedule constraint solver tool."""
+        from dialekt.mcp.server.tools.scheduling import register_scheduling_tools
+
+        names = register_scheduling_tools(self)
         self._registered_tools.extend(names)
 
     # ── Accessors used by tools / tests ─────────────────────────────────
@@ -342,6 +351,7 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "render_carousel": "visual",
     "web_crawl": "web_crawl",
     "kz_holidays": "calendar",
+    "distribute_schedule": "scheduling",
 }
 
 
