@@ -104,6 +104,7 @@ def _sql_manifest(*, uid: str, name: str, dialect: str, conn_type: str,
         connections:
           required:
             - type: {conn_type}
+              purpose: "primary_data"
               role: "readonly"
               required_permissions: [SELECT]
         autonomy:

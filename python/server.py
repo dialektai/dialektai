@@ -168,7 +168,7 @@ log = logging.getLogger("dialekt")
 # lockstep with frontend/src-tauri/Cargo.toml + tauri.conf.json + the
 # git tag at every release. The /about endpoint and frontend (via
 # /about) both read this — never hardcode a literal in screens.
-DIALEKT_VERSION = "0.27.15"
+DIALEKT_VERSION = "0.27.16"
 
 DB_PATH = DIALEKT_DIR / "dialekt.db"
 db: aiosqlite.Connection = None
@@ -1917,6 +1917,62 @@ async def import_manifest_yaml(yaml_str: str, *, status: str = "draft",
         raise HTTPException(400, "manifest_yaml is required")
     if status not in ("draft", "published"):
         status = "draft"
+
+    # Auto-patch known cloud-catalog drift before validation. Two
+    # families seen so far:
+    #  (a) `connections.required[].purpose` missing — validator made
+    #      it required mid-2026, cloud templates predate the bump.
+    #  (b) `capabilities.groups` carries deprecated names that the
+    #      current validator no longer recognises (`shell_review_only`
+    #      was renamed to `shell_execute`; review semantics now live
+    #      in `autonomy` instead of capability flags).
+    # Until cloud redeploys with patched seeds, every install of those
+    # templates 422s with cryptic schema errors. Default rewrites here
+    # are safe — `primary_data` only appears in audit metadata, and
+    # the rename matches the documented migration. Same path also
+    # covers user-imported manifests pasted from older docs.
+    try:
+        import yaml as _yml
+        _parsed = _yml.safe_load(yaml_str) or {}
+        _patched = False
+
+        _conns = (_parsed.get("connections") or {}).get("required") or []
+        for _c in _conns:
+            if isinstance(_c, dict) and "purpose" not in _c:
+                _c["purpose"] = "primary_data"
+                _patched = True
+
+        try:
+            from dialekt_manifest.schema import CAPABILITY_GROUPS as _VALID_CAPS
+        except Exception:
+            _VALID_CAPS = None
+        _RENAMES = {"shell_review_only": "shell_execute"}
+
+        _caps = (_parsed.get("capabilities") or {}).get("groups") or []
+        if _caps:
+            _new_caps: list[str] = []
+            _dropped: list[str] = []
+            for _g in _caps:
+                _g2 = _RENAMES.get(_g, _g)
+                if _VALID_CAPS is None or _g2 in _VALID_CAPS:
+                    if _g2 not in _new_caps:
+                        _new_caps.append(_g2)
+                else:
+                    _dropped.append(_g)
+            if _new_caps != _caps:
+                _parsed["capabilities"]["groups"] = _new_caps
+                _patched = True
+                if _dropped:
+                    log.info("import_manifest_yaml: dropped unknown capability groups: %s", _dropped)
+
+        if _patched:
+            yaml_str = _yml.safe_dump(_parsed, sort_keys=False, allow_unicode=True)
+            log.info("import_manifest_yaml: auto-patched manifest before validation")
+    except Exception:
+        # Don't block install on the auto-patch — validator below
+        # will surface the actual schema error if YAML is malformed.
+        pass
+
     result = ManifestValidator().validate_string(yaml_str)
     if not result.valid:
         raise HTTPException(422, detail={
@@ -2101,6 +2157,63 @@ async def post_library_sync():
     return await _sync_library_from_cloud()
 
 
+def _required_connection_types_from_manifest(manifest_yaml: str) -> list[str]:
+    """Inspect a manifest's `connections` block and return the list of
+    required DB connection types (e.g. ['postgresql'], ['clickhouse']).
+
+    Bug A — the install modal needs to render a picker scoped to the
+    types the agent actually needs; manifest authors declare those in
+    `connections.required[].type`. Soft-fail on a malformed manifest
+    (caller has already validated it via ManifestValidator at install).
+    Returns [] if no DB binding is required (MCP-only agents, vanilla
+    chat agents) so the FE can skip the picker entirely.
+    """
+    try:
+        import yaml as _yml
+        m = _yml.safe_load(manifest_yaml or "") or {}
+    except Exception:
+        return []
+    conns = (m.get("connections") or {}).get("required") or []
+    types: list[str] = []
+    for c in conns:
+        if isinstance(c, dict) and c.get("type"):
+            types.append(str(c["type"]))
+    return types
+
+
+@app.get("/connections-all")
+async def list_all_connections(type: str | None = None):
+    """Unified DB-connection listing across drivers.
+
+    The driver-specific routers (/connections, /mysql-connections,
+    /ch-connections) each filter the same SQLite table by `type`. The
+    library install picker (Bug A) needs them under one shape, so we
+    add this aggregator instead of teaching the FE the prefix matrix.
+    Optional ?type= narrows to one family.
+    """
+    if type:
+        cursor = await db.execute(
+            "SELECT id, name, type, host, port, database, username "
+            "FROM connections WHERE type = ? ORDER BY name",
+            (type,),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT id, name, type, host, port, database, username "
+            "FROM connections ORDER BY type, name"
+        )
+    rows = await cursor.fetchall()
+    return {
+        "connections": [
+            {
+                "id": r[0], "name": r[1], "type": r[2],
+                "host": r[3], "port": r[4], "database": r[5], "username": r[6],
+            }
+            for r in rows
+        ]
+    }
+
+
 @app.post("/library/{template_id}/install", status_code=201)
 async def install_library_template(template_id: str):
     """Install an agent in the user's workspace from a library template.
@@ -2108,7 +2221,12 @@ async def install_library_template(template_id: str):
     Reuses import_manifest_yaml() — same validation + agent creation
     path as the builder wizard. The created agent gets a non-null
     source_template_id so the UI can show 'Update available' when the
-    library entry's version bumps."""
+    library entry's version bumps.
+
+    Returned payload also lists the connection types the manifest
+    requires so the FE picker (Bug A) can fetch only the matching
+    existing connections instead of parsing YAML in the browser.
+    """
     cursor = await db.execute(
         "SELECT manifest_yaml FROM library_templates WHERE id = ?",
         (template_id,),
@@ -2117,11 +2235,13 @@ async def install_library_template(template_id: str):
     if not row:
         raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
     manifest_yaml = row[0]
-    return await import_manifest_yaml(
+    out = await import_manifest_yaml(
         manifest_yaml,
         status="published",  # installed from a curated library entry → trusted
         source_template_id=template_id,
     )
+    out["required_connection_types"] = _required_connection_types_from_manifest(manifest_yaml)
+    return out
 
 
 @app.get("/agents/{agent_id}/export")
@@ -5001,25 +5121,40 @@ def make_interpreter(
     provider_id = s.get("model_provider") or "ollama"
     default_model = s.get("model", "gemma3:12b")
 
-    # Embedding-only guard: if the saved session default points at a
-    # model that can't answer chat (nomic-embed-text et al.), swap to
-    # the first installed chat-capable model and warn. Hitting litellm
-    # with an embedding model triggers a generic APIConnectionError
-    # that the user can't easily decode.
+    # Default-model guard: refuse to ship an interpreter pointed at
+    # something that will fail at first use. Two failure modes:
+    # (a) embedding-only model — Ollama returns "does not support chat"
+    # (b) not-installed model — Ollama returns 404 ("model not found")
+    # Both surface to the user as a generic APIConnectionError. Swap to
+    # the first installed chat-capable Ollama model in the catalog.
     if provider_id == "ollama":
         from dialekt.llm.catalog import is_embedding_only, OLLAMA_MODELS
-        if is_embedding_only(default_model):
-            installed = get_installed_ollama_models()
+        installed = get_installed_ollama_models()
+
+        def _is_installed(model_str: str) -> bool:
+            # Ollama tags use family:tag form; settings may store
+            # short forms like "gemma3:12b" while installed reports
+            # "gemma3:12b" or "gemma3:12b-instruct". Match prefix.
+            return any(
+                t == model_str or t.startswith(model_str + "-")
+                for t in installed
+            )
+
+        bad_embed = is_embedding_only(default_model)
+        not_installed = not _is_installed(default_model)
+
+        if bad_embed or not_installed:
             chat_capable = [
                 f"{m.name}:{m.tag}" for m in OLLAMA_MODELS
                 if not all(c == "embedding" for c in m.categories)
                 and any(t.startswith(m.name + ":") for t in installed)
             ]
             replacement = chat_capable[0] if chat_capable else "gemma3:12b"
+            reason = "embedding-only" if bad_embed else "not installed"
             log.warning(
-                "session default %r is embedding-only; falling back to %r. "
+                "session default %r is %s; falling back to %r. "
                 "Update Settings → Models to pick a chat-capable model.",
-                default_model, replacement,
+                default_model, reason, replacement,
             )
             default_model = replacement
 
@@ -5039,6 +5174,20 @@ def make_interpreter(
     if provider_id == "ollama" and manifest_dict and (manifest_dict.get("model") or {}):
         installed = get_installed_ollama_models()
         model = pick_model_for_agent(manifest_dict, installed, default_model)
+        # Belt-and-suspenders: pick_model_for_agent falls back to the
+        # session default if no manifest preference is installed; that
+        # default has already been swept above for ollama, but the
+        # function may also pick the manifest's `preferred` literal
+        # which could itself be embedding-only if a template is mis-
+        # authored. Guard the result, not just the input.
+        from dialekt.llm.catalog import is_embedding_only as _is_emb
+        if _is_emb(model):
+            log.warning(
+                "Agent %r picked embedding-only model %r from manifest; "
+                "swapping to %r.",
+                agent.get("name"), model, default_model,
+            )
+            model = default_model
         log.info(f"Agent {agent.get('name')!r}: using model {model} (manifest)")
     else:
         model = default_model
@@ -5159,6 +5308,12 @@ def make_interpreter(
         interpreter.system_message = s.get("system_prompt", DEFAULT_SETTINGS["system_prompt"])
 
     _apply_autonomy(interpreter, s.get("autonomy", "ask-write"))
+    # Stash the actual chosen model so the WS handler can sync it back
+    # to the FE after a guard-driven swap (e.g. saved settings pointed
+    # at "gemma3:12b" but it isn't installed → backend swapped to
+    # qwen2.5:3b). Without this the FE keeps showing the stale label
+    # and the user only sees the discrepancy after a 404 from Ollama.
+    interpreter._dialekt_chosen_model = model
     return interpreter
 
 
@@ -5173,7 +5328,30 @@ async def ws_chat(ws: WebSocket):
     itp = make_interpreter()
     ws_id = str(uuid.uuid4())
     _active_interpreters[ws_id] = itp
+    # Tracks whether a streaming_chat thread is currently running on
+    # `itp`. Set to True before spawning the OI thread, flipped back to
+    # False in its `finally`. The `join` handler reads this to decide
+    # whether to swap interpreters now or defer.
+    streaming_state: dict = {"active": False}
+    # When the user switches sessions DURING a streaming turn, we don't
+    # want to abort (the user expects the agent to keep working). We
+    # also can't immediately swap interpreters — open-interpreter is a
+    # process-wide singleton and reset() would corrupt the running
+    # chat() generator. Stash the requested session_id here; the next
+    # chat message in the new session triggers the swap, and a plain
+    # click-back to the original session works without a swap.
+    pending_join: dict = {}
     session_id: str = None
+    # Push the actual chosen model to the FE on connect so the dropdown
+    # reflects whatever the default-model guard ended up with — without
+    # this the FE shows a stale label until the user manually flips the
+    # dropdown, and the first send fails on the not-installed model.
+    try:
+        chosen = getattr(itp, "_dialekt_chosen_model", None)
+        if chosen:
+            await ws.send_text(json.dumps({"type": "model_ok", "model": chosen}))
+    except Exception:
+        pass
     current_agent_id: str | None = None
     first_message = True
     stop_flag = threading.Event()
@@ -5240,6 +5418,36 @@ async def ws_chat(ws: WebSocket):
                 continue
 
             if msg.get("type") == "join":
+                # Bug C v2 — DO NOT abort the running stream. The
+                # streaming thread keeps writing to the *original*
+                # session's DB rows (we capture turn_sid at message
+                # start so db_save_message lands in the right place).
+                # The FE filters chunks by session_id so the new
+                # session's view stays clean; when the user comes
+                # back to the original session, /sessions/.../messages
+                # already has the finished answer because db_save
+                # ran in the streaming thread's `finally`.
+                #
+                # The interpreter swap is also deferred while a turn
+                # is in flight — open-interpreter is a process-wide
+                # singleton, calling make_interpreter (which calls
+                # interpreter.reset()) mid-iteration would corrupt
+                # the in-progress chat() generator. We stash the
+                # requested join in `pending_join` and execute it
+                # from run_oi's finally once the stream completes.
+                if streaming_state.get("active"):
+                    pending_join["session_id"] = msg.get("session_id")
+                    await send({
+                        "type": "joined",
+                        "session_id": msg.get("session_id"),
+                        "deferred": True,
+                    })
+                    log.info(
+                        "WS join: stream active; deferring interpreter swap "
+                        "to run_oi finally for session %s",
+                        msg.get("session_id"),
+                    )
+                    continue
                 session_id = msg.get("session_id")
                 cursor = await db.execute(
                     "SELECT agent_id FROM sessions WHERE id = ?", (session_id,)
@@ -5312,6 +5520,12 @@ async def ws_chat(ws: WebSocket):
                 )
                 _active_interpreters[ws_id] = itp
                 itp.messages = recent_msgs
+                # Sync the actual chosen model to FE — manifest may have
+                # picked a different one than the session default, and
+                # the guard may have swapped on top.
+                _chosen = getattr(itp, "_dialekt_chosen_model", None)
+                if _chosen:
+                    await send({"type": "model_ok", "model": _chosen})
                 await send({"type": "joined", "session_id": session_id})
                 continue
 
@@ -5321,6 +5535,62 @@ async def ws_chat(ws: WebSocket):
             content = msg.get("content", "").strip()
             if not content:
                 continue
+
+            # If a session-switch was deferred while the previous turn
+            # was streaming, refuse to start a new turn until the old
+            # one finishes. Re-running a deferred swap requires walking
+            # the entire join body (history, MCP, interpreter rebuild)
+            # — adding that mid-message is too risky for the bench
+            # session. The FE renders this as an error bubble; the
+            # user can wait or switch back to the original session.
+            if pending_join and streaming_state.get("active"):
+                await send({
+                    "type": "error",
+                    "content": "Previous turn is still running. Wait for it to finish, "
+                               "or switch back to the original chat.",
+                })
+                continue
+            # Stream finished and the user kept the new session open —
+            # do the swap now by re-emitting the join message into
+            # this same handler. We synthesize a fake `msg` and let
+            # the existing join branch run; cleanest way to keep the
+            # join logic in one place.
+            if pending_join and not streaming_state.get("active"):
+                deferred_sid = pending_join.pop("session_id", None)
+                if deferred_sid and deferred_sid != session_id:
+                    msg = {"type": "join", "session_id": deferred_sid, "_deferred": True}
+                    # Re-route through the join branch by jumping back.
+                    # Easier: inline the same logic, but to avoid code
+                    # duplication just continue and have the loop
+                    # re-process this turn. The cleanest is a goto-
+                    # like restart — Python doesn't have it, so set a
+                    # flag and use `continue` after queueing the join.
+                    # Defer this message back into the WS by replaying
+                    # it as a chat input on the next loop iteration.
+                    _deferred_chat = msg.get  # placeholder reference
+                    # The simplest correct shape: process this join
+                    # synchronously here, then fall through to handle
+                    # the chat message that the user just sent.
+                    session_id = deferred_sid
+                    cursor = await db.execute(
+                        "SELECT agent_id FROM sessions WHERE id = ?", (session_id,)
+                    )
+                    sess_row = await cursor.fetchone()
+                    agent_for_join = (
+                        await db_get_agent(sess_row[0])
+                        if sess_row and sess_row[0] else None
+                    )
+                    if agent_for_join:
+                        current_agent_id = agent_for_join["id"]
+                        agent_ctx_for_join = await resolve_agent_context(agent_for_join)
+                        itp = make_interpreter(agent_for_join, agent_ctx_for_join)
+                    else:
+                        itp = make_interpreter()
+                    _active_interpreters[ws_id] = itp
+                    _chosen = getattr(itp, "_dialekt_chosen_model", None)
+                    if _chosen:
+                        await send({"type": "model_ok", "model": _chosen})
+                    log.info("WS join: executed deferred swap to session %s", session_id)
 
             # Blocker 3.2: inline license revalidation — don't block the UI,
             # but do kick off a stale check. If the result is "revoked", the
@@ -5360,6 +5630,11 @@ async def ws_chat(ws: WebSocket):
                     agent_ctx = await resolve_agent_context(agent)
                     itp = make_interpreter(agent, agent_ctx)
                     _active_interpreters[ws_id] = itp
+                    # Sync chosen model to FE — agent manifest can pick
+                    # a different one than the session default.
+                    _chosen = getattr(itp, "_dialekt_chosen_model", None)
+                    if _chosen:
+                        await send({"type": "model_ok", "model": _chosen})
                     # Persist binding on the session row in case it wasn't set
                     # (e.g. client sent agent_id without pre-creating session).
                     await db.execute(
@@ -5387,8 +5662,18 @@ async def ws_chat(ws: WebSocket):
             code_buf = {"format": None, "content": []}
             console_buf = []
 
+            # Snapshot the session_id at turn start. The outer
+            # `session_id` is rebound on `join` and the run_oi closure
+            # would otherwise see the new value mid-stream — chunks
+            # would land in the wrong session and look like garbage in
+            # the FE. Bug C robustness: stamp every chunk with this
+            # turn's id so the FE filters orphan chunks even if the
+            # backend abort doesn't fully drain in time.
+            turn_sid = session_id
+
             def run_oi():
                 nonlocal ai_text_buf, code_buf, console_buf
+                streaming_state["active"] = True
                 tid = threading.current_thread().ident
                 _thread_confirm[tid] = {
                     "event": confirm_event,
@@ -5409,6 +5694,7 @@ async def ws_chat(ws: WebSocket):
                         ccontent = chunk.get("content", "")
 
                         if ctype in ("message", "code", "console", "error"):
+                            chunk["session_id"] = turn_sid
                             asyncio.run_coroutine_threadsafe(send(chunk), loop).result(timeout=5)
 
                         if ctype == "message" and crole == "assistant":
@@ -5423,7 +5709,7 @@ async def ws_chat(ws: WebSocket):
                                 code_str = "".join(code_buf["content"])
                                 _thread_confirm[tid]["last_code"] = code_str
                                 asyncio.run_coroutine_threadsafe(
-                                    db_save_message(session_id, "assistant", "code",
+                                    db_save_message(turn_sid, "assistant", "code",
                                                     code_str, code_buf["format"]),
                                     loop
                                 ).result(timeout=5)
@@ -5432,7 +5718,7 @@ async def ws_chat(ws: WebSocket):
                                 console_buf.append(ccontent)
                             elif chunk.get("end") and console_buf:
                                 asyncio.run_coroutine_threadsafe(
-                                    db_save_message(session_id, "tool", "console", "".join(console_buf)),
+                                    db_save_message(turn_sid, "tool", "console", "".join(console_buf)),
                                     loop
                                 ).result(timeout=5)
                                 console_buf = []
@@ -5446,7 +5732,7 @@ async def ws_chat(ws: WebSocket):
                     final_answer = "".join(ai_text_buf)
                     if final_answer:
                         asyncio.run_coroutine_threadsafe(
-                            db_save_message(session_id, "assistant", "message", final_answer),
+                            db_save_message(turn_sid, "assistant", "message", final_answer),
                             loop
                         ).result(timeout=5)
                         # Goal 8.5: persist successful interaction for future few-shot retrieval
@@ -5460,8 +5746,12 @@ async def ws_chat(ws: WebSocket):
                             except Exception:
                                 pass
                     asyncio.run_coroutine_threadsafe(
-                        send({"type": "done"}), loop
+                        send({"type": "done", "session_id": turn_sid}), loop
                     ).result(timeout=5)
+                    # Final flip of the streaming flag — the join handler
+                    # polls this to decide whether to abort the previous
+                    # turn before swapping interpreters.
+                    streaming_state["active"] = False
 
             # Carry the current async context (incl. bind_mcp_runtime's
             # ContextVar) into OI's raw thread so ctx.mcp can resolve

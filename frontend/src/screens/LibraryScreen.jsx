@@ -118,7 +118,60 @@ function TemplateCard({ entry, installed, installing, onInstall }) {
   );
 }
 
-function ConnectionRequiredModal({ entry, onConfigure, onSkip, onClose }) {
+function ConnectionPickerModal({ entry, agentId, requiredTypes, onConfigureNew, onBound, onSkip, onClose }) {
+  // requiredTypes is the list returned by the install endpoint — e.g.
+  // ['postgresql'] for the SQL Analyst (Postgres) template, ['clickhouse']
+  // for ClickHouse. We fetch only the matching rows so the picker is
+  // scoped instead of dumping every saved connection at the user.
+  const [conns, setConns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [binding, setBinding] = useState(false);
+  const [err, setErr] = useState(null);
+
+  // Use the first required type as the filter. Multi-type agents are
+  // rare and not yet expressed in any shipping template; surface that
+  // case as a TODO if it ever shows up.
+  const primaryType = requiredTypes && requiredTypes[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = primaryType
+          ? `${API}/connections-all?type=${encodeURIComponent(primaryType)}`
+          : `${API}/connections-all`;
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!cancelled) setConns(d.connections || []);
+      } catch (e) {
+        if (!cancelled) setErr(String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [primaryType]);
+
+  const handleBind = async () => {
+    if (!selected) return;
+    setBinding(true);
+    setErr(null);
+    try {
+      const r = await fetch(`${API}/agents/${encodeURIComponent(agentId)}/binding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: selected.id, connection_type: selected.type }),
+      });
+      if (!r.ok) throw new Error(await r.text() || `HTTP ${r.status}`);
+      onBound(selected);
+    } catch (e) {
+      setErr(`Bind failed: ${e.message}`);
+    } finally {
+      setBinding(false);
+    }
+  };
+
   return (
     <div
       onClick={onClose}
@@ -129,23 +182,76 @@ function ConnectionRequiredModal({ entry, onConfigure, onSkip, onClose }) {
       }}
     >
       <div onClick={e => e.stopPropagation()} style={{
-        width: 480, background: T.bg1, border: `1px solid ${T.border}`, padding: 28,
+        width: 540, maxHeight: '80vh', overflowY: 'auto',
+        background: T.bg1, border: `1px solid ${T.border}`, padding: 28,
       }}>
         <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em', marginBottom: 10 }}>
-          INSTALLED — NEXT STEP
+          INSTALLED — PICK A CONNECTION
         </div>
         <div style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-          {entry.name} needs a database connection
+          {entry.name} needs a {primaryType || 'database'} connection
         </div>
         <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6, marginBottom: 22 }}>
-          The agent is installed in your workspace, but it can't run queries until you
-          point it at a database connection. Configure one now, or come back later.
+          Pick an existing connection to bind, or add a new one. You can change
+          the binding later in Settings → Connections.
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onConfigure} style={{
-            padding: '10px 20px', background: T.cyan, color: T.bg0, border: 'none',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em',
-          }}>CONFIGURE NOW →</button>
+
+        {loading ? (
+          <div style={{ fontSize: 12, color: T.dim, marginBottom: 22 }}>Loading connections…</div>
+        ) : conns.length === 0 ? (
+          <div style={{
+            border: `1px dashed ${T.border}`, padding: 16,
+            fontSize: 12, color: T.muted, marginBottom: 22,
+          }}>
+            No {primaryType || 'database'} connections saved yet. Add one to get started.
+          </div>
+        ) : (
+          <div style={{ marginBottom: 22, border: `1px solid ${T.border}` }}>
+            {conns.map(c => (
+              <label key={c.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px',
+                borderBottom: `1px solid ${T.border}`,
+                background: selected?.id === c.id ? T.bg2 : 'transparent',
+                cursor: 'pointer',
+              }}>
+                <input
+                  type="radio"
+                  name="conn"
+                  checked={selected?.id === c.id}
+                  onChange={() => setSelected(c)}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{c.name}</div>
+                  <div className="mono" style={{ fontSize: 10, color: T.dim, marginTop: 2 }}>
+                    {c.type} · {c.username}@{c.host}:{c.port}/{c.database}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {err && (
+          <div style={{ fontSize: 12, color: T.red, marginBottom: 14 }}>{err}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={handleBind}
+            disabled={!selected || binding}
+            style={{
+              padding: '10px 20px',
+              background: !selected || binding ? T.bg2 : T.cyan,
+              color: !selected || binding ? T.dim : T.bg0,
+              border: 'none', fontSize: 13, fontWeight: 700,
+              cursor: !selected || binding ? 'not-allowed' : 'pointer',
+              letterSpacing: '.04em',
+            }}>{binding ? 'Binding…' : 'BIND & CONTINUE →'}</button>
+          <button onClick={onConfigureNew} style={{
+            padding: '10px 20px', background: 'transparent', color: T.cyan,
+            border: `1px solid ${T.cyan}`, fontSize: 12, cursor: 'pointer',
+          }}>+ ADD NEW</button>
           <button onClick={onSkip} style={{
             padding: '10px 20px', background: 'transparent', color: T.muted,
             border: `1px solid ${T.border}`, fontSize: 12, cursor: 'pointer',
@@ -234,7 +340,15 @@ export default function LibraryScreen({ onNav }) {
       const data = await r.json();
       setInstalledIds(prev => new Set([...prev, entry.id]));
       if (entry.requires_connection) {
-        setPendingModal({ entry, agentId: data.id });
+        // Backend now returns required_connection_types parsed from
+        // the manifest so the picker can scope its query. Falls back
+        // to undefined for older sidecars; the picker treats that as
+        // "show all" rather than failing.
+        setPendingModal({
+          entry,
+          agentId: data.id,
+          requiredTypes: data.required_connection_types || [],
+        });
       } else {
         setToast(`Installed: ${entry.name}`);
         setTimeout(() => setToast(null), 3000);
@@ -333,11 +447,18 @@ export default function LibraryScreen({ onNav }) {
         </div>
 
         {pendingModal && (
-          <ConnectionRequiredModal
+          <ConnectionPickerModal
             entry={pendingModal.entry}
-            onConfigure={() => {
+            agentId={pendingModal.agentId}
+            requiredTypes={pendingModal.requiredTypes}
+            onConfigureNew={() => {
               setPendingModal(null);
               onNav?.('settings', { initialSection: 'Connections' });
+            }}
+            onBound={(conn) => {
+              setPendingModal(null);
+              setToast(`${pendingModal.entry.name} bound to ${conn.name}.`);
+              setTimeout(() => setToast(null), 3000);
             }}
             onSkip={() => {
               setPendingModal(null);
