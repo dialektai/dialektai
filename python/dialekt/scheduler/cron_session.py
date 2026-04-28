@@ -73,6 +73,7 @@ class CronSession:
         interpreter_factory: Callable[..., Any] | None = None,
         chat_runner: Callable[[Any, str], Awaitable[str]] | None = None,
         override_message: str | None = None,
+        prepend_context: str | None = None,
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self.agent_id = agent_id
@@ -81,13 +82,13 @@ class CronSession:
         self.run_id = str(uuid.uuid4())
         self.session_id = f"cron_{agent_id}_{int(time.time())}"
         self.override_message = override_message
+        self.prepend_context = prepend_context
         self.timeout_seconds = timeout_seconds
         # Indirection so tests can swap real OI with a deterministic stub.
         self._interpreter_factory = interpreter_factory
         self._chat_runner = chat_runner or _default_chat_runner
 
-    @property
-    def trigger_message(self) -> str:
+    def _base_message(self) -> str:
         if self.override_message:
             return self.override_message
         manifest_yaml = self.agent.get("manifest_yaml") or ""
@@ -101,6 +102,13 @@ class CronSession:
         trigger = data.get("trigger") or {}
         msg = trigger.get("message")
         return msg.strip() if isinstance(msg, str) and msg.strip() else DEFAULT_TRIGGER_MESSAGE
+
+    @property
+    def trigger_message(self) -> str:
+        base = self._base_message()
+        if self.prepend_context:
+            return f"{self.prepend_context.rstrip()}\n\n{base}"
+        return base
 
     async def run(self) -> CronResult:
         triggered_at = datetime.now(timezone.utc)

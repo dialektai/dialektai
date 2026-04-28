@@ -221,7 +221,7 @@ function AppRoutes() {
         }} />}
       {screen === 'onboarding-step5'   && <OnboardingFirstChatScreen onNav={nav} />}
       {screen === 'mode-setup'         && <ModeSetupScreen onNav={nav} />}
-      {screen === 'wizard'             && <AgentWizardScreen onNav={nav} />}
+      {screen === 'wizard'             && <AgentWizardScreen onNav={nav} {...screenProps} />}
       {screen === 'license'            && <LicenseScreen onNav={nav} />}
       {screen === 'invite'             && <InviteRedemptionScreen onNav={nav} />}
       {screen === 'admin'              && <AdminDashboardScreen onNav={nav} />}

@@ -37,6 +37,7 @@ import yaml as _yaml
 from .cron_session import CronSession, CronResult
 from .delivery import deliver, NOTIFICATIONS_SCHEMA
 from .missed_run_policy import MissedAgent, MissedRunPolicy, decide_missed_runs
+from .rss_poll import fetch_new_items, format_for_prompt
 
 log = logging.getLogger("dialekt.scheduler.runner")
 
@@ -45,6 +46,17 @@ log = logging.getLogger("dialekt.scheduler.runner")
 # agent's manifest omits it (which the schema rejects, so this is
 # really just a defensive default).
 DEFAULT_TIMEZONE = "Asia/Almaty"
+
+AGENT_RSS_STATE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS agent_rss_state (
+    agent_id        TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    seen_guids      TEXT NOT NULL,
+    last_polled_at  TEXT NOT NULL,
+    PRIMARY KEY (agent_id, url)
+);
+"""
+
 
 SCHEDULED_RUNS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS scheduled_runs (
@@ -66,7 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_runs_agent
     ON scheduled_runs(agent_id, triggered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_scheduled_runs_status
     ON scheduled_runs(status, triggered_at DESC);
-""" + NOTIFICATIONS_SCHEMA
+""" + NOTIFICATIONS_SCHEMA + AGENT_RSS_STATE_SCHEMA
 
 
 @dataclass
@@ -213,9 +225,11 @@ class DialektScheduler:
     # ── internals ────────────────────────────────────────────────────
 
     async def _fire_one(self, agent: dict, *, override_message: str | None = None) -> CronResult:
+        prepend = await self._rss_prepend(agent)
         session = self._cron_session_factory(
             agent_id=agent["id"], agent=agent, db=self.db,
             override_message=override_message,
+            prepend_context=prepend,
         )
         result = await session.run()
 
@@ -232,6 +246,29 @@ class DialektScheduler:
 
         await self._audit(result, delivery_status=delivery.status)
         return result
+
+    async def _rss_prepend(self, agent: dict) -> str | None:
+        """Pull ``trigger.rss_feeds`` from the agent manifest, fetch+diff
+        each URL via :mod:`dialekt.scheduler.rss_poll`, and return a
+        Markdown block to prepend to the cron session's prompt.
+
+        Returns ``None`` when the agent has no rss_feeds configured or
+        nothing new arrived on this tick — the session then runs on
+        the manifest's ``trigger.message`` alone.
+
+        Errors per URL are reported in the prompt block (operator
+        wants to know the feed is down) but never abort the tick —
+        the agent still fires on schedule.
+        """
+        urls = _extract_rss_feeds(agent.get("manifest_yaml") or "")
+        if not urls:
+            return None
+        try:
+            results = await fetch_new_items(self.db, agent["id"], urls)
+        except Exception:
+            log.exception("rss_poll failed for agent %s — proceeding without context", agent["id"])
+            return None
+        return format_for_prompt(results)
 
     async def _fire_missed_runs(self) -> None:
         agents = await self._load_scheduled_agents()
@@ -317,6 +354,33 @@ class DialektScheduler:
 
 def _default_session_factory(**kwargs) -> CronSession:
     return CronSession(**kwargs)
+
+
+def _extract_rss_feeds(manifest_yaml: str) -> list[str]:
+    """Return the de-duplicated ``trigger.rss_feeds`` list from a
+    manifest YAML, or ``[]`` when absent / malformed.
+
+    The wizard emits this as a list of strings; we tolerate a single
+    string for forgiveness on hand-edited manifests."""
+    if not manifest_yaml:
+        return []
+    try:
+        data = _yaml.safe_load(manifest_yaml) or {}
+    except Exception:
+        return []
+    trigger = data.get("trigger") if isinstance(data, dict) else None
+    if not isinstance(trigger, dict):
+        return []
+    feeds = trigger.get("rss_feeds")
+    if isinstance(feeds, str):
+        feeds = [feeds]
+    if not isinstance(feeds, list):
+        return []
+    out: list[str] = []
+    for entry in feeds:
+        if isinstance(entry, str) and entry.strip() and entry not in out:
+            out.append(entry.strip())
+    return out
 
 
 def _peek_trigger_type(manifest_yaml: str) -> str | None:

@@ -37,6 +37,12 @@ log = logging.getLogger("dialekt.manifest_capabilities")
 # the codebase, not just a parser flag.
 EXTRA_CAPABILITY_GROUPS: frozenset[str] = frozenset({
     "web_search",
+    "web_crawl",
+    "rss_read",
+    "instagram_publish",
+    "bitrix_write",
+    "working_directory_read",
+    "working_directory_write",
 })
 
 

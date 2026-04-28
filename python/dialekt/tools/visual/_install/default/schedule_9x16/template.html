@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>schedule_9x16</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    font-family: 'Syne', system-ui, sans-serif;
+    background: #07080c;
+    color: #f3eee4;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    padding: 110px 90px 100px;
+    display: flex;
+    flex-direction: column;
+    background:
+      radial-gradient(circle at 80% 8%, rgba(0, 240, 200, 0.18), transparent 45%),
+      radial-gradient(circle at 10% 95%, rgba(255, 70, 140, 0.16), transparent 50%),
+      linear-gradient(180deg, #07080c 0%, #0e1118 60%, #07080c 100%);
+  }
+
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.025) 0px,
+        rgba(255, 255, 255, 0.025) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+    mix-blend-mode: overlay;
+  }
+
+  .head {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 80px;
+  }
+
+  .eyebrow {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: #00f0c8;
+    padding: 10px 18px;
+    border: 1px solid rgba(0, 240, 200, 0.45);
+    border-radius: 2px;
+    margin-bottom: 50px;
+  }
+
+  .title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 116px;
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    color: #f3eee4;
+    max-width: 880px;
+  }
+
+  .title::after {
+    content: "";
+    display: block;
+    width: 140px;
+    height: 6px;
+    background: linear-gradient(90deg, #00f0c8, #ff468c);
+    margin-top: 38px;
+  }
+
+  .agenda {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 42px;
+  }
+
+  .slot {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    align-items: baseline;
+    column-gap: 40px;
+    padding-bottom: 36px;
+    border-bottom: 1px solid rgba(243, 238, 228, 0.12);
+  }
+
+  .slot:last-child {
+    border-bottom: none;
+  }
+
+  .slot .time {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 56px;
+    letter-spacing: -0.02em;
+    color: #00f0c8;
+  }
+
+  .slot .meta {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .slot .label {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    color: #f3eee4;
+  }
+
+  .slot .note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(243, 238, 228, 0.5);
+  }
+
+  .slot.empty {
+    display: none;
+  }
+
+  .footer {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 36px;
+    border-top: 1px solid rgba(243, 238, 228, 0.15);
+  }
+
+  .footer .mark {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(243, 238, 228, 0.45);
+  }
+
+  .footer .swipe {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #ff468c;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .footer .swipe::after {
+    content: "↑";
+    font-size: 28px;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="scanlines"></div>
+
+    <div class="head">
+      <span class="eyebrow">{{EYEBROW}}</span>
+      <h1 class="title">{{TITLE}}</h1>
+    </div>
+
+    <div class="agenda">
+      <div class="slot">
+        <span class="time">{{SLOT_1_TIME}}</span>
+        <div class="meta">
+          <span class="label">{{SLOT_1_LABEL}}</span>
+          <span class="note">{{SLOT_1_NOTE}}</span>
+        </div>
+      </div>
+      <div class="slot">
+        <span class="time">{{SLOT_2_TIME}}</span>
+        <div class="meta">
+          <span class="label">{{SLOT_2_LABEL}}</span>
+          <span class="note">{{SLOT_2_NOTE}}</span>
+        </div>
+      </div>
+      <div class="slot">
+        <span class="time">{{SLOT_3_TIME}}</span>
+        <div class="meta">
+          <span class="label">{{SLOT_3_LABEL}}</span>
+          <span class="note">{{SLOT_3_NOTE}}</span>
+        </div>
+      </div>
+      <div class="slot">
+        <span class="time">{{SLOT_4_TIME}}</span>
+        <div class="meta">
+          <span class="label">{{SLOT_4_LABEL}}</span>
+          <span class="note">{{SLOT_4_NOTE}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="mark">{{FOOTER}}</span>
+      <span class="swipe">SWIPE UP</span>
+    </div>
+  </div>
+</body>
+</html>

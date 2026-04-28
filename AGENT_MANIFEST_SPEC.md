@@ -296,6 +296,29 @@ capabilities:
 - `browser` — автоматизация браузера (v1.1)
 - `screen_capture` — скриншоты (v1.1)
 
+**Дополнительные группы (v1.1, активны через ``EXTRA_CAPABILITY_GROUPS``):**
+- `web_search` — Tavily / Brave / DuckDuckGo поиск через `dialekt.tools.search`
+- `web_crawl` — глубокий сбор страниц (HTML → текст) для аудита сайта
+- `rss_read` — чтение RSS / Atom фидов через `dialekt_rss_fetch`
+- `instagram_publish` — публикация feed / story / reel через Graph API
+- `bitrix_write` — REST-вызовы к Bitrix24 через инкоминг-вебхук
+- `working_directory_read` — чтение из рабочей папки агента (см. §Working directory)
+- `working_directory_write` — запись в рабочую папку агента (резюме, программы,
+  отчёты по законодательству, рендеры, карусели в `media/`)
+
+**Working directory convention.** Агент-runtime автоматически добавляет
+`{{working_directory}}` (из `variables.working_directory.default`) в
+`MCPServer.config.allowed_file_roots`, поэтому `dialekt_read_file` /
+`dialekt_write_file` / `dialekt_make_dir` / `dialekt_render_carousel` вызовы
+с путём внутри этой папки разрешены автоматически. Шаблоны путей в
+`output.destination.path` могут использовать `{workspace}` —
+runtime раскроет в значение `variables.working_directory.default` или
+`{user_home}/dialekt-workspace/<agent_name>` если переменная не задана.
+Каталог `media/` создаётся автоматически при первом
+`dialekt_render_template` / `dialekt_render_carousel` с output_path
+внутри workspace; для каруселей принято имя
+`media/carousel/{date}-{name}/slide_NN.png`.
+
 **Exceptions:** точечные правила в формате `{action}:{pattern}`, всегда
 рассматриваются как более приоритетные, чем groups.
 
@@ -525,7 +548,7 @@ output:
 **Path variables:** используют **одинарные** фигурные скобки, чтобы отличать
 системные path-переменные от пользовательских переменных в system_prompt.
 - `{user_home}` — домашняя директория пользователя
-- `{workspace}` — рабочая директория агента
+- `{workspace}` — рабочая директория агента (см. ниже)
 - `{date}` — текущая дата (YYYY-MM-DD)
 - `{datetime}` — текущее datetime (YYYY-MM-DD-HHMM)
 - `{agent_id}` — UUID агента
@@ -533,6 +556,39 @@ output:
 **Важно:** path variables — это **закрытый список системных плейсхолдеров**,
 которые dialekt подставляет автоматически. Они не пересекаются с переменными
 из секции `variables` (которые используют `{{double}}` в system_prompt).
+
+**Working directory (`{workspace}`).** Per-agent рабочая папка на стороне
+пользователя. В wizard'е выбирается через `@tauri-apps/api/dialog.open`
+(directory picker), сохраняется в манифест как
+`variables.working_directory.default: "/home/user/iba-content"`. Runtime
+выставляет её в `MCPServer.config.allowed_file_roots`, поэтому файловые
+тулзы (`dialekt_read_file`, `dialekt_write_file`, `dialekt_make_dir`,
+`dialekt_render_carousel`) автоматически разрешают пути внутри. Если
+`variables.working_directory.default` не задан, `{workspace}` развёртывается
+в `{user_home}/dialekt-workspace/<agent_name>`.
+
+Соглашение по структуре файлов внутри workspace для контент-агентов:
+
+```
+{workspace}/
+├── reports/
+│   └── 2026-04-28_law-monitor.md
+├── resumes/
+│   └── 2026-04-28_ivanov-trainer.md
+├── programs/
+│   └── 2026-04-28_executive-mba.md
+└── media/
+    ├── 2026-04-28_announce.png
+    └── carousel/
+        └── 2026-04-28-iba-launch/
+            ├── slide_01.png
+            ├── slide_02.png
+            └── slide_03.png
+```
+
+Каталоги создаются автоматически при первом write — wizard'у достаточно
+показать их пользователю как ожидаемую структуру. Карусели всегда
+именуются `media/carousel/{date}-{name}/slide_NN.png` (zero-padded).
 
 ---
 
@@ -555,11 +611,23 @@ trigger:
   schedule: "0 9 * * *"          # cron expression
   timezone: "Asia/Almaty"         # IANA timezone
   missed_run_policy: "run_on_startup"
+  message: |                      # optional — what to say to the agent
+    Build today's digest.
+  rss_feeds:                      # optional — see below
+    - "https://adilet.zan.kz/rus/docs/rss"
 ```
 
 **Cron syntax:** стандартный POSIX cron. В builder mode dialekt показывает
 визуальный редактор расписания ("каждый день", "каждый будний день",
 "каждое 1 число месяца"), который генерирует cron за пользователя.
+
+**`trigger.rss_feeds[]` (v1.1).** Список URL RSS / Atom фидов, привязанных
+к `scheduled` триггеру. На каждом cron-тике scheduler выполняет fetch + diff
+каждого фида относительно `agent_rss_state`, и **новые** айтемы (по `guid`)
+добавляются как Markdown-блок к началу `trigger.message` перед запуском
+LLM. Фид без новых айтемов или с ошибкой не блокирует тик — агент всё
+равно запустится. Полинг привязан к cron schedule (отдельного интервала
+нет).
 
 **Missed-run recovery:** если в запланированное время ПК был выключен, при
 следующем запуске dialekt агент запускается **немедленно** (не ждёт следующего

@@ -39,9 +39,11 @@ SERVER_NAME = "dialekt"
 SERVER_INSTRUCTIONS = (
     "dialekt — local AI agent platform exposed as an MCP server. "
     "Tools are grouped by category: database (list/query/describe), "
-    "file (read/list under allowed_file_roots), and agent "
-    "(list/get the pilot's configured agents). See docs/MCP_CLIENT_USAGE.md "
-    "for the full surface."
+    "file (read/list/write/append/mkdir under allowed_file_roots), "
+    "agent (list/get), http (get/post/put), rss (fetch), bitrix "
+    "(call), instagram (publish_feed/story/reel) and visual "
+    "(list_templates/render_template/render_carousel). See "
+    "docs/MCP_CLIENT_USAGE.md for the full surface."
 )
 
 
@@ -93,6 +95,24 @@ class MCPServer:
             self._register_file_tools()
         if "agent" in enabled:
             self._register_agent_tools()
+        if "http" in enabled:
+            self._register_http_tools()
+        if "rss" in enabled:
+            self._register_rss_tools()
+        if "bitrix" in enabled:
+            self._register_bitrix_tools()
+        if "instagram" in enabled:
+            self._register_instagram_tools()
+        if "visual" in enabled:
+            self._register_visual_tools()
+        if "web_crawl" in enabled:
+            self._register_web_crawl_tools()
+        if "calendar" in enabled:
+            self._register_calendar_tools()
+        if "scheduling" in enabled:
+            self._register_scheduling_tools()
+        if "cdn" in enabled:
+            self._register_cdn_tools()
 
         log.info(
             "dialekt MCP server registered %d tool(s): %s",
@@ -135,6 +155,69 @@ class MCPServer:
         from dialekt.mcp.server.tools.agent import register_agent_tools
 
         names = register_agent_tools(self, self._plugin_context)
+        self._registered_tools.extend(names)
+
+    def _register_http_tools(self) -> None:
+        """Attach the 3 generic HTTP tools."""
+        from dialekt.mcp.server.tools.http import register_http_tools
+
+        names = register_http_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_rss_tools(self) -> None:
+        """Attach the RSS / Atom fetch tool."""
+        from dialekt.mcp.server.tools.rss import register_rss_tools
+
+        names = register_rss_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_bitrix_tools(self) -> None:
+        """Attach the generic Bitrix24 webhook tool."""
+        from dialekt.mcp.server.tools.bitrix import register_bitrix_tools
+
+        names = register_bitrix_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_instagram_tools(self) -> None:
+        """Attach the Instagram publish tools (feed/story/reel)."""
+        from dialekt.mcp.server.tools.instagram import register_instagram_tools
+
+        names = register_instagram_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_visual_tools(self) -> None:
+        """Attach the visual template / carousel tools."""
+        from dialekt.mcp.server.tools.visual import register_visual_tools
+
+        names = register_visual_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_web_crawl_tools(self) -> None:
+        """Attach the Playwright-driven page crawler."""
+        from dialekt.mcp.server.tools.web_crawl import register_web_crawl_tools
+
+        names = register_web_crawl_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_calendar_tools(self) -> None:
+        """Attach the KZ holiday calendar tool."""
+        from dialekt.mcp.server.tools.calendar import register_calendar_tools
+
+        names = register_calendar_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_scheduling_tools(self) -> None:
+        """Attach the schedule constraint solver tool."""
+        from dialekt.mcp.server.tools.scheduling import register_scheduling_tools
+
+        names = register_scheduling_tools(self)
+        self._registered_tools.extend(names)
+
+    def _register_cdn_tools(self) -> None:
+        """Attach the S3-compatible CDN upload tool."""
+        from dialekt.mcp.server.tools.cdn import register_cdn_tools
+
+        names = register_cdn_tools(self)
         self._registered_tools.extend(names)
 
     # ── Accessors used by tools / tests ─────────────────────────────────
@@ -259,8 +342,26 @@ _CATEGORY_MARKERS: dict[str, str] = {
     "search_schema": "database",
     "read_file": "file",
     "list_directory": "file",
+    "write_file": "file",
+    "append_file": "file",
+    "make_dir": "file",
     "list_agents": "agent",
     "get_agent": "agent",
+    "http_get": "http",
+    "http_post": "http",
+    "http_put": "http",
+    "rss_fetch": "rss",
+    "bitrix_call": "bitrix",
+    "instagram_publish_feed": "instagram",
+    "instagram_publish_story": "instagram",
+    "instagram_publish_reel": "instagram",
+    "list_templates": "visual",
+    "render_template": "visual",
+    "render_carousel": "visual",
+    "web_crawl": "web_crawl",
+    "kz_holidays": "calendar",
+    "distribute_schedule": "scheduling",
+    "cdn_upload": "cdn",
 }
 
 

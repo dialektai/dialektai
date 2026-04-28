@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>news_4x5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,800;1,9..144,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1080px;
+    height: 1350px;
+    overflow: hidden;
+    background: #faf6ee;
+    color: #14110d;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1350px;
+    padding: 80px 80px 70px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background:
+      radial-gradient(ellipse at 100% 0%, rgba(166, 60, 30, 0.06), transparent 60%),
+      radial-gradient(ellipse at 0% 100%, rgba(20, 17, 13, 0.05), transparent 50%),
+      #faf6ee;
+    font-family: 'Fraunces', Georgia, serif;
+  }
+
+  .paper {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: 0.06;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .masthead {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 28px;
+    border-bottom: 2px solid #14110d;
+  }
+
+  .masthead .category {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #a63c1e;
+  }
+
+  .masthead .date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: rgba(20, 17, 13, 0.6);
+  }
+
+  .editorial {
+    position: relative;
+    z-index: 2;
+    padding-top: 72px;
+  }
+
+  .headline {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-variation-settings: "opsz" 144, "SOFT" 50;
+    font-size: 96px;
+    line-height: 0.96;
+    letter-spacing: -0.025em;
+    color: #14110d;
+    max-width: 920px;
+  }
+
+  .headline-divider {
+    width: 84px;
+    height: 4px;
+    background: #a63c1e;
+    margin: 56px 0 36px;
+  }
+
+  .lead {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 30px;
+    line-height: 1.42;
+    letter-spacing: -0.005em;
+    color: rgba(20, 17, 13, 0.78);
+    max-width: 840px;
+  }
+
+  .footer {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-top: 28px;
+    border-top: 1px solid rgba(20, 17, 13, 0.2);
+  }
+
+  .source {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(20, 17, 13, 0.55);
+  }
+
+  .source span {
+    color: #14110d;
+  }
+
+  .byline {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 20px;
+    color: #14110d;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="paper"></div>
+
+    <header class="masthead">
+      <span class="category">{{CATEGORY}}</span>
+      <span class="date">{{DATE}}</span>
+    </header>
+
+    <section class="editorial">
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <div class="headline-divider"></div>
+      <p class="lead">{{LEAD}}</p>
+    </section>
+
+    <footer class="footer">
+      <span class="source">SOURCE — <span>{{SOURCE}}</span></span>
+      <span class="byline">{{BYLINE}}</span>
+    </footer>
+  </div>
+</body>
+</html>

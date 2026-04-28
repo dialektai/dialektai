@@ -11,11 +11,13 @@ const API = 'http://localhost:8765';
 
 const STEPS = [
   { label: 'Identity',      icon: 'diamond'  },
+  { label: 'Workspace',     icon: 'folder'   },
   { label: 'Model',         icon: 'sparkle'  },
   { label: 'System Prompt', icon: 'chat'     },
   { label: 'Capabilities',  icon: 'shield'   },
   { label: 'MCP Tools',     icon: 'plug'     },
   { label: 'Connections',   icon: 'folder'   },
+  { label: 'Secrets',       icon: 'shield'   },
   { label: 'Variables',     icon: 'terminal' },
   { label: 'Autonomy',      icon: 'cog'      },
   { label: 'Trigger',       icon: 'screen'   },
@@ -130,7 +132,8 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
   // We filter out rows with an empty key so an abandoned "Add variable"
   // click doesn't write `: {...}` into the manifest.
   const namedVars = (data.variables || []).filter(v => v.key && v.key.trim());
-  if (namedVars.length > 0) {
+  const hasWorkspace = !!(data.working_directory && data.working_directory.trim());
+  if (namedVars.length > 0 || hasWorkspace) {
     yaml += `\nvariables:\n`;
     namedVars.forEach(v => {
       const key = v.key.trim();
@@ -140,6 +143,13 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
       yaml += `    required: ${v.required ? 'true' : 'false'}\n`;
       yaml += `    description: "${(v.description || '').replace(/"/g, '\\"')}"\n`;
     });
+    if (hasWorkspace) {
+      yaml += `  working_directory:\n`;
+      yaml += `    type: "string"\n`;
+      yaml += `    required: false\n`;
+      yaml += `    default: "${escapeYaml(data.working_directory.trim())}"\n`;
+      yaml += `    description: "Per-agent workspace; runtime adds to allowed_file_roots"\n`;
+    }
   }
 
   // Emit mcp_servers block when the user selected any on step 4 AND
@@ -230,13 +240,79 @@ ${(data.system_prompt || '').split('\n').map(l => `  ${l}`).join('\n')}
     yaml += `\nconnections:\n  required:\n    - type: "${data.connection_type}"\n      role: "${role}"\n      purpose: "${purpose}"\n`;
   }
 
+  // Per-agent secrets — only the NAMES go into the manifest under
+  // secrets_required[]. Values get POSTed to /agents/{id}/secrets after
+  // import. Empty rows are dropped; duplicates are deduped.
+  const secretNames = Array.from(new Set(
+    (data.secrets || [])
+      .map(s => (s.name || '').trim())
+      .filter(Boolean)
+  ));
+  if (secretNames.length > 0) {
+    yaml += `\nsecrets_required:\n`;
+    secretNames.forEach(name => {
+      yaml += `  - name: "${escapeYaml(name)}"\n`;
+      yaml += `    description: "Per-agent credential — set via wizard or POST /agents/{id}/secrets"\n`;
+      yaml += `    required: true\n`;
+    });
+  }
+
   yaml += `\nautonomy:\n  recommended: "${data.autonomy_recommended}"\n  max_allowed: "${data.autonomy_max}"\n`;
 
   yaml += `\ninput:\n  type: "chat"\n  placeholder: "${(data.input_placeholder || 'Ask me anything...').replace(/"/g, '\\"')}"\n`;
 
-  yaml += `\noutput:\n  format: "${data.output_format || 'markdown'}"\n  streaming: ${data.streaming ? 'true' : 'false'}\n  destination:\n    type: "notification"\n`;
+  // Output destination. Three branches:
+  // 1. format = 'image' OR 'file' AND user picked a workspace →
+  //    filesystem destination, path templated with {workspace}/{date}/...
+  // 2. format = 'image' but no workspace → notification (visual tools
+  //    will refuse to write outside allow-list, surfacing a clean error
+  //    rather than a YAML-shape mismatch).
+  // 3. otherwise → notification (chat / markdown reply).
+  const outFormat = data.output_format || 'markdown';
+  const wantsFileDest = (outFormat === 'image' || outFormat === 'file') && hasWorkspace;
+  yaml += `\noutput:\n  format: "${outFormat}"\n  streaming: ${data.streaming ? 'true' : 'false'}\n  destination:\n`;
+  if (wantsFileDest) {
+    let path = (data.visual_output_folder || '{workspace}/media/{date}-{name}').trim();
+    // Replace {name} with the agent name slug (manifest authors expect
+    // a sane default; advanced users can override the pattern in the
+    // wizard). All other placeholders ({workspace}, {date}, {datetime},
+    // {agent_id}) are resolved by the runtime, not us.
+    const slug = (data.name || 'agent')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'agent';
+    path = path.replace(/\{name\}/g, slug);
+    yaml += `    type: "filesystem"\n`;
+    yaml += `    path: "${escapeYaml(path)}"\n`;
+    yaml += `    overwrite: false\n`;
+  } else {
+    yaml += `    type: "notification"\n`;
+  }
 
+  // Trigger block. Scheduled triggers get the v0.27 schedule fields +
+  // the v1.1 rss_feeds[] list when the user added any. Interactive /
+  // webhook / event triggers stay slim.
   yaml += `\ntrigger:\n  type: "${data.trigger_type}"\n`;
+  if (data.trigger_type === 'scheduled') {
+    yaml += `  schedule: "${escapeYaml(data.cron || '0 9 * * MON')}"\n`;
+    yaml += `  timezone: "${escapeYaml(data.cron_timezone || 'Asia/Almaty')}"\n`;
+    yaml += `  missed_run_policy: "${data.missed_run_policy || 'run_on_startup'}"\n`;
+    if (data.trigger_message && data.trigger_message.trim()) {
+      yaml += `  message: |\n`;
+      data.trigger_message.split('\n').forEach(l => {
+        yaml += `    ${l}\n`;
+      });
+    }
+    const feeds = (data.rss_feeds || [])
+      .map(u => (u || '').trim())
+      .filter(Boolean);
+    if (feeds.length > 0) {
+      yaml += `  rss_feeds:\n`;
+      feeds.forEach(u => {
+        yaml += `    - "${escapeYaml(u)}"\n`;
+      });
+    }
+  }
 
   return yaml;
 }
@@ -311,12 +387,13 @@ function Field({ label, children }) {
   );
 }
 
-function TextInput({ value, onChange, placeholder, style }) {
+function TextInput({ value, onChange, placeholder, style, type }) {
   return (
     <input
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
+      type={type || 'text'}
       style={{ ...INPUT, ...style }}
     />
   );
@@ -566,7 +643,109 @@ function StepIdentity({ data, setData, errors }) {
   );
 }
 
-// ── Step 1: Model ─────────────────────────────────────────────────────────────
+// ── Step 1: Workspace ─────────────────────────────────────────────────────────
+
+// Per-agent working directory the user picks on their own disk. Optional —
+// agents that don't need filesystem output can leave it blank. When set,
+// runtime injects it into MCPServer.config.allowed_file_roots and
+// {workspace} in output.destination.path resolves to this value.
+//
+// The Tauri dialog plugin isn't a hard dep — we dynamic-import on click
+// and fall back to the text field if it's not installed (e.g. running
+// in a plain browser dev shell). Path validation happens server-side
+// when the file/visual tools actually try to write.
+
+function StepWorkspace({ data, setData }) {
+  const [browseError, setBrowseError] = useState('');
+  const [browsing, setBrowsing] = useState(false);
+
+  const onBrowse = async () => {
+    setBrowsing(true);
+    setBrowseError('');
+    try {
+      // The @tauri-apps/plugin-dialog package is optional — it lands
+      // when the Rust side adds the dialog plugin. Until then this
+      // dynamic import fails at runtime and the user types the path
+      // manually. The /* @vite-ignore */ keeps Rolldown from trying
+      // to resolve the module at build time.
+      const moduleName = '@tauri-apps/plugin-dialog';
+      const mod = await import(/* @vite-ignore */ moduleName);
+      const picked = await mod.open({
+        directory: true,
+        multiple: false,
+        title: 'Pick the agent workspace folder',
+      });
+      if (typeof picked === 'string' && picked) {
+        setData(d => ({ ...d, working_directory: picked }));
+      }
+    } catch (e) {
+      // Plugin not installed in this build — user can still type the
+      // path manually. Surface a one-line hint, not a stack trace.
+      setBrowseError('Native picker unavailable — paste the path manually');
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        WORKING DIRECTORY — where the agent reads inputs and writes outputs
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        Optional. Pick a folder on your disk and the agent will be allowed to
+        read / write inside it (resumes, programs, .md reports, generated
+        images, carousels in <span style={{ color: T.cyan }}>media/</span>).
+        Leave empty if your agent doesn't need filesystem output.
+      </div>
+      <Field label="Workspace path">
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <TextInput
+            value={data.working_directory}
+            onChange={v => setData(d => ({ ...d, working_directory: v }))}
+            placeholder="/home/user/iba-content"
+          />
+          <button
+            onClick={onBrowse}
+            disabled={browsing}
+            style={{
+              ...INPUT,
+              cursor: browsing ? 'wait' : 'pointer',
+              padding: '6px 14px', width: 'auto',
+              fontFamily: T.mono, fontSize: 11, letterSpacing: '.04em',
+              color: T.cyan, borderColor: T.cyan,
+            }}
+          >
+            {browsing ? '…' : 'BROWSE'}
+          </button>
+        </div>
+        {browseError ? (
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+            {browseError}
+          </div>
+        ) : null}
+      </Field>
+      <div style={{
+        marginTop: 12, padding: 12,
+        background: T.bg1, border: `1px solid ${T.border}`,
+        fontFamily: T.mono, fontSize: 10, color: T.dim, lineHeight: 1.6,
+      }}>
+        <div style={{ color: T.cyan, marginBottom: 6 }}>EXPECTED LAYOUT</div>
+        <div>{'{workspace}/'}</div>
+        <div>&nbsp;&nbsp;reports/&nbsp;&nbsp;&nbsp;&nbsp;# .md reports</div>
+        <div>&nbsp;&nbsp;resumes/&nbsp;&nbsp;&nbsp;&nbsp;# trainer bios</div>
+        <div>&nbsp;&nbsp;programs/&nbsp;&nbsp;&nbsp;# course / training pages</div>
+        <div>&nbsp;&nbsp;media/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# rendered images</div>
+        <div>&nbsp;&nbsp;media/carousel/{'{date}-{name}/slide_NN.png'}</div>
+        <div style={{ marginTop: 6 }}>
+          Subfolders are created automatically on first write.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2: Model ─────────────────────────────────────────────────────────────
 
 function StepModel({ data, setData }) {
   const [installed, setInstalled] = useState([]);   // [{ id, label, kind, hint, installed }]
@@ -741,17 +920,30 @@ function StepSystemPrompt({ data, setData, errors }) {
 
 // ── Step 3: Capabilities ──────────────────────────────────────────────────────
 
-// Keys here must match the manifest schema's CAPABILITY_GROUPS set
-// (dialekt_manifest/schema.py:11). Before this fix the wizard emitted
-// `filesystem`, `terminal`, `screen` which the validator rejects with
-// 422 on publish. Labels are user-facing and can stay friendly.
+// Keys here must match the manifest schema's CAPABILITY_GROUPS set —
+// the upstream validator's CAPABILITY_GROUPS plus
+// dialekt.manifest_capabilities.EXTRA_CAPABILITY_GROUPS. The wizard
+// once emitted `filesystem` / `terminal` / `screen` which the
+// validator rejected; the renaming fixed that, and the v1.1
+// expansion adds workflow-specific capabilities (web/RSS/Bitrix/
+// Instagram/visual workspace) so the same wizard surface can author
+// content + monitoring agents without bespoke screens.
 const CAP_META = {
-  filesystem_read: { label: 'Filesystem',    desc: 'Read and write local files and directories' },
-  network:         { label: 'Network',       desc: 'Make HTTP requests and fetch remote resources' },
-  browser:         { label: 'Browser',       desc: 'Control a headless browser, scrape pages, interact with web UIs' },
-  database_read:   { label: 'Database Read', desc: 'Run read-only SELECT queries on connected databases' },
-  shell_execute:   { label: 'Terminal',      desc: 'Execute shell commands and scripts on this machine' },
-  screen_capture:  { label: 'Screen',        desc: 'Capture screenshots and observe the current display' },
+  // v1.0 baseline
+  filesystem_read:          { label: 'Filesystem',     desc: 'Read and write local files and directories' },
+  network:                  { label: 'Network',        desc: 'Make HTTP requests and fetch remote resources' },
+  browser:                  { label: 'Browser',        desc: 'Control a headless browser, scrape pages, interact with web UIs' },
+  database_read:            { label: 'Database Read',  desc: 'Run read-only SELECT queries on connected databases' },
+  shell_execute:            { label: 'Terminal',       desc: 'Execute shell commands and scripts on this machine' },
+  screen_capture:           { label: 'Screen',         desc: 'Capture screenshots and observe the current display' },
+  // v1.1 — workflow-specific
+  web_search:               { label: 'Web Search',     desc: 'Search the live web (Tavily / Brave / DuckDuckGo)' },
+  web_crawl:                { label: 'Web Crawl',      desc: 'Fetch full page HTML and extract content for analysis' },
+  rss_read:                 { label: 'RSS Read',       desc: 'Subscribe to RSS / Atom feeds and process new items each tick' },
+  instagram_publish:        { label: 'Instagram',      desc: 'Publish feed posts, stories, and reels via the Graph API' },
+  bitrix_write:             { label: 'Bitrix',         desc: 'Call any Bitrix24 REST method through an incoming webhook' },
+  working_directory_read:   { label: 'Workspace Read', desc: 'Read files inside the agent\'s working directory' },
+  working_directory_write:  { label: 'Workspace Write',desc: 'Write files (reports, posts, generated images, carousels) into the agent\'s working directory' },
 };
 
 function StepCapabilities({ data, setData }) {
@@ -1467,7 +1659,97 @@ function StepConnections({ data, setData }) {
   );
 }
 
-// ── Step 5: Variables ─────────────────────────────────────────────────────────
+// ── Step 7: Secrets ───────────────────────────────────────────────────────────
+
+// Per-agent credentials (Bitrix webhook URL, Instagram access token,
+// IG user id, etc.). On Publish they're POSTed to /agents/{id}/secrets
+// which stores them under ``agent:{id}:{name}`` in the OS keychain.
+// The manifest only carries the names, never the values.
+//
+// Names must match the keys the agent's MCP tools read by default
+// (e.g. ``bitrix_webhook_url``, ``instagram_access_token``,
+// ``instagram_ig_user_id``) or whatever the agent's system_prompt
+// references. The wizard doesn't enforce a fixed list — different
+// agents need different secrets.
+
+function StepSecrets({ data, setData }) {
+  const addSecret = () => setData(d => ({
+    ...d,
+    secrets: [...d.secrets, { name: '', value: '' }],
+  }));
+  const removeSecret = idx => setData(d => ({
+    ...d,
+    secrets: d.secrets.filter((_, i) => i !== idx),
+  }));
+  const updateSecret = (idx, field, value) => setData(d => ({
+    ...d,
+    secrets: d.secrets.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+  }));
+
+  return (
+    <div>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.dim, marginBottom: 6, letterSpacing: '.06em' }}>
+        SECRETS — per-agent credentials, stored in the OS keychain
+      </div>
+      <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginBottom: 16, lineHeight: 1.6 }}>
+        Add the credentials this agent needs (Bitrix webhook URL, Instagram
+        access token, etc.). Values never appear in the manifest, in logs,
+        or in audit rows — only the names. The MCP tools that need them
+        read by name (e.g. <span style={{ color: T.cyan }}>bitrix_webhook_url</span>,{' '}
+        <span style={{ color: T.cyan }}>instagram_access_token</span>,{' '}
+        <span style={{ color: T.cyan }}>instagram_ig_user_id</span>).
+      </div>
+      {data.secrets.length === 0 ? (
+        <div style={{
+          padding: 16, fontFamily: T.mono, fontSize: 11, color: T.dim,
+          background: T.bg1, border: `1px dashed ${T.border}`, textAlign: 'center',
+        }}>
+          No secrets declared yet — click Add Secret if this agent needs credentials.
+        </div>
+      ) : (
+        data.secrets.map((s, idx) => (
+          <div key={idx} style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8,
+            marginBottom: 8, alignItems: 'center',
+          }}>
+            <TextInput
+              value={s.name}
+              onChange={v => updateSecret(idx, 'name', v)}
+              placeholder="bitrix_webhook_url"
+            />
+            <TextInput
+              value={s.value}
+              onChange={v => updateSecret(idx, 'value', v)}
+              placeholder="https://portal.bitrix24.kz/rest/1/abcd1234"
+              type="password"
+            />
+            <button
+              onClick={() => removeSecret(idx)}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '6px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 11, color: T.dim, borderColor: T.border,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ))
+      )}
+      <button
+        onClick={addSecret}
+        style={{
+          ...INPUT, cursor: 'pointer', padding: '8px 14px', marginTop: 12,
+          width: 'auto', fontFamily: T.mono, fontSize: 11, letterSpacing: '.04em',
+          color: T.cyan, borderColor: T.cyan,
+        }}
+      >
+        + ADD SECRET
+      </button>
+    </div>
+  );
+}
+
+// ── Step 8: Variables ─────────────────────────────────────────────────────────
 
 function StepVariables({ data, setData }) {
   const addVar = () => setData(d => ({
@@ -1656,12 +1938,13 @@ function StepAutonomy({ data, setData }) {
 // ── Step 7: Trigger ───────────────────────────────────────────────────────────
 
 // `comingSoon` flags trigger types that the schema either doesn't accept
-// at all (webhook / event) or can't drive end-to-end yet (scheduled —
-// no scheduler process exists in the backend). They still render in
-// the list so the roadmap signal is visible, but Publish is gated.
+// at all (webhook / event) or can't drive end-to-end yet. ``scheduled``
+// shipped end-to-end in v0.27 (DialektScheduler + APScheduler + missed-
+// run policy + delivery + RSS poll integration), so it's no longer
+// gated. Webhook + event remain on the roadmap.
 const TRIGGER_OPTS = [
   { value: 'interactive', label: 'Interactive',  desc: 'User types a message to start the agent. Standard chat mode.' },
-  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input.', comingSoon: true },
+  { value: 'scheduled',   label: 'Scheduled',    desc: 'Agent runs on a cron schedule without user input. Optional RSS feeds get diffed each tick.' },
   { value: 'webhook',     label: 'Webhook',      desc: 'Agent is invoked via HTTP POST from an external system.', comingSoon: true },
   { value: 'event',       label: 'Event',        desc: 'Agent responds to system events (file change, DB row, etc.).', comingSoon: true },
 ];
@@ -1671,6 +1954,263 @@ const TRIGGER_OPTS = [
 function triggerSupported(triggerType) {
   const opt = TRIGGER_OPTS.find(o => o.value === triggerType);
   return !!opt && !opt.comingSoon;
+}
+
+// Common cron presets the wizard offers as one-click options. Users
+// who need finer control can edit the cron string directly.
+const CRON_PRESETS = [
+  { label: 'Every weekday 9:00',  cron: '0 9 * * MON-FRI' },
+  { label: 'Every Monday 9:00',   cron: '0 9 * * MON' },
+  { label: 'Daily 18:00',         cron: '0 18 * * *' },
+  { label: 'Every Friday 18:00',  cron: '0 18 * * FRI' },
+  { label: '1st of month 10:00',  cron: '0 10 1 * *' },
+];
+
+// IANA timezone defaults that cover the common KZ + neighbouring pilots.
+// Users can type any IANA name into the field — this list is just for
+// quick selection.
+const TZ_PRESETS = [
+  'Asia/Almaty', 'Asia/Astana', 'Asia/Tashkent', 'Asia/Bishkek',
+  'Europe/Moscow', 'Europe/London', 'America/New_York', 'UTC',
+];
+
+function VisualSubStep({ data, setData }) {
+  const [templates, setTemplates] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      fetch(`${API}/visual/templates`).then(r => r.ok ? r.json() : { templates: [] }).catch(() => ({ templates: [] })),
+      fetch(`${API}/branding`).then(r => r.ok ? r.json() : { brands: [] }).catch(() => ({ brands: [] })),
+    ]).then(([t, b]) => {
+      if (!alive) return;
+      const tList = Array.isArray(t?.templates) ? t.templates : (Array.isArray(t) ? t : []);
+      const bList = Array.isArray(b?.brands) ? b.brands : (Array.isArray(b) ? b : []);
+      setTemplates(tList);
+      setBrands(bList);
+      setLoaded(true);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <div style={{
+      marginTop: 12, marginBottom: 12,
+      padding: 14, background: T.bg1, border: `1px solid ${T.cyan}55`,
+    }}>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, marginBottom: 12, letterSpacing: '.06em' }}>
+        VISUAL OUTPUT
+      </div>
+
+      <Field label="Template">
+        <Select
+          variant="full"
+          value={data.visual_template_id}
+          onChange={v => setData(d => ({ ...d, visual_template_id: v }))}
+          options={[
+            { v: '', l: loaded ? (templates.length ? '— pick a template —' : '— no templates installed —') : '— loading… —' },
+            ...templates.map(t => ({
+              v: t.id,
+              l: `${t.id} (${t.width}×${t.height})`,
+            })),
+          ]}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Templates live in ~/.dialekt/visual/templates/. Bundled set is
+          installed on first server boot — see Settings → Branding to
+          parameterise with a brand profile.
+        </div>
+      </Field>
+
+      <Field label="Brand profile (optional)">
+        <Select
+          variant="full"
+          value={data.visual_brand_id}
+          onChange={v => setData(d => ({ ...d, visual_brand_id: v }))}
+          options={[
+            { v: '', l: '— no brand —' },
+            ...brands.map(b => ({ v: b.id || b, l: b.name || b.id || b })),
+          ]}
+        />
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <Field label="Carousel slides">
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={data.visual_carousel_count}
+            onChange={e => setData(d => ({ ...d, visual_carousel_count: Math.max(1, Math.min(10, Number(e.target.value) || 1)) }))}
+            style={INPUT}
+          />
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+            1 = single image. 2-10 = carousel rendered into the output folder
+            as slide_NN.png.
+          </div>
+        </Field>
+        <Field label="Output folder pattern">
+          <TextInput
+            value={data.visual_output_folder}
+            onChange={v => setData(d => ({ ...d, visual_output_folder: v }))}
+            placeholder="{workspace}/media/{date}-{name}"
+          />
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+            Placeholders: {'{workspace}'}, {'{date}'}, {'{datetime}'}, {'{name}'}.
+          </div>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function ScheduleSubStep({ data, setData }) {
+  const updateRss = (idx, value) => setData(d => ({
+    ...d,
+    rss_feeds: d.rss_feeds.map((u, i) => (i === idx ? value : u)),
+  }));
+  const removeRss = idx => setData(d => ({
+    ...d,
+    rss_feeds: d.rss_feeds.filter((_, i) => i !== idx),
+  }));
+  const addRss = () => setData(d => ({
+    ...d,
+    rss_feeds: [...d.rss_feeds, ''],
+  }));
+
+  return (
+    <div style={{
+      marginTop: 4, marginBottom: 12,
+      padding: 14, background: T.bg1, border: `1px solid ${T.cyan}55`,
+    }}>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.cyan, marginBottom: 12, letterSpacing: '.06em' }}>
+        SCHEDULE
+      </div>
+
+      <Field label="Cron expression">
+        <TextInput
+          value={data.cron}
+          onChange={v => setData(d => ({ ...d, cron: v }))}
+          placeholder="0 9 * * MON"
+        />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {CRON_PRESETS.map(p => (
+            <button
+              key={p.cron}
+              onClick={() => setData(d => ({ ...d, cron: p.cron }))}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '4px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 10, color: T.dim, borderColor: T.border,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 6 }}>
+          POSIX cron — minute hour day month weekday. The scheduler reads
+          this verbatim; presets above are just shortcuts.
+        </div>
+      </Field>
+
+      <Field label="Timezone (IANA)">
+        <TextInput
+          value={data.cron_timezone}
+          onChange={v => setData(d => ({ ...d, cron_timezone: v }))}
+          placeholder="Asia/Almaty"
+        />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {TZ_PRESETS.map(tz => (
+            <button
+              key={tz}
+              onClick={() => setData(d => ({ ...d, cron_timezone: tz }))}
+              style={{
+                ...INPUT, cursor: 'pointer', padding: '4px 10px', width: 'auto',
+                fontFamily: T.mono, fontSize: 10, color: T.dim, borderColor: T.border,
+              }}
+            >
+              {tz}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="If a tick was missed (computer off)">
+        <Select
+          variant="full"
+          value={data.missed_run_policy}
+          onChange={v => setData(d => ({ ...d, missed_run_policy: v }))}
+          options={[
+            { v: 'run_on_startup', l: 'Run on startup (recommended)' },
+            { v: 'skip',           l: 'Skip — wait for next scheduled tick' },
+          ]}
+        />
+      </Field>
+
+      <Field label="Default trigger message (optional)">
+        <textarea
+          value={data.trigger_message}
+          onChange={e => setData(d => ({ ...d, trigger_message: e.target.value }))}
+          placeholder="What should the agent do on each tick? (e.g. 'Build today's law-update digest.')"
+          rows={3}
+          style={{ ...INPUT, resize: 'vertical', fontFamily: 'inherit' }}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Sent to the agent on each cron tick. RSS items (if any) are
+          prepended automatically before this message reaches the LLM.
+        </div>
+      </Field>
+
+      <Field label="RSS / Atom feeds (optional)">
+        {data.rss_feeds.length === 0 ? (
+          <div style={{
+            padding: 12, fontFamily: T.mono, fontSize: 11, color: T.dim,
+            background: T.bg0, border: `1px dashed ${T.border}`, textAlign: 'center',
+          }}>
+            No feeds — the agent runs on the cron schedule alone.
+          </div>
+        ) : (
+          data.rss_feeds.map((url, idx) => (
+            <div key={idx} style={{
+              display: 'grid', gridTemplateColumns: '1fr auto', gap: 8,
+              marginBottom: 8, alignItems: 'center',
+            }}>
+              <TextInput
+                value={url}
+                onChange={v => updateRss(idx, v)}
+                placeholder="https://adilet.zan.kz/rus/docs/rss"
+              />
+              <button
+                onClick={() => removeRss(idx)}
+                style={{
+                  ...INPUT, cursor: 'pointer', padding: '6px 10px', width: 'auto',
+                  fontFamily: T.mono, fontSize: 11, color: T.dim, borderColor: T.border,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+        <button
+          onClick={addRss}
+          style={{
+            ...INPUT, cursor: 'pointer', padding: '6px 12px', marginTop: 8,
+            width: 'auto', fontFamily: T.mono, fontSize: 11,
+            color: T.cyan, borderColor: T.cyan,
+          }}
+        >
+          + ADD RSS FEED
+        </button>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 8, lineHeight: 1.6 }}>
+          On each tick, new items (by guid) are diffed against the last poll
+          and added as a Markdown block before the trigger message.
+        </div>
+      </Field>
+    </div>
+  );
 }
 
 function StepTrigger({ data, setData }) {
@@ -1741,6 +2281,10 @@ function StepTrigger({ data, setData }) {
         </div>
       )}
 
+      {data.trigger_type === 'scheduled' && (
+        <ScheduleSubStep data={data} setData={setData} />
+      )}
+
       <Field label="Input Placeholder">
         <TextInput
           value={data.input_placeholder}
@@ -1751,6 +2295,29 @@ function StepTrigger({ data, setData }) {
           Shown in the chat input box when the agent is selected
         </div>
       </Field>
+
+      <Field label="Output Format">
+        <Select
+          variant="full"
+          value={data.output_format}
+          onChange={v => setData(d => ({ ...d, output_format: v }))}
+          options={[
+            { v: 'markdown', l: 'Markdown — text replies (default)' },
+            { v: 'json',     l: 'JSON — structured output' },
+            { v: 'table',    l: 'Table — tabular result' },
+            { v: 'file',     l: 'File — saved into the workspace' },
+            { v: 'image',    l: 'Image — rendered via visual templates' },
+          ]}
+        />
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.dim, marginTop: 4 }}>
+          Drives the OUTPUT FORMAT block in the system prompt and the
+          destination of generated artifacts.
+        </div>
+      </Field>
+
+      {data.output_format === 'image' && (
+        <VisualSubStep data={data} setData={setData} />
+      )}
 
       <Field label="Response Streaming">
         <div
@@ -1962,7 +2529,7 @@ function StepList({ current, completed }) {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-export default function AgentWizardScreen({ onNav }) {
+export default function AgentWizardScreen({ onNav, fromTemplate }) {
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(new Set());
   const [errors, setErrors] = useState({});
@@ -1977,6 +2544,16 @@ export default function AgentWizardScreen({ onNav }) {
     tags: '',
     author_name: '',
     author_email: '',
+    // v1.1: per-agent working directory. User picks a path on their disk;
+    // runtime injects it into MCP allowed_file_roots so file/visual tools
+    // can write reports / posts / generated images into it. Empty means
+    // "no workspace" — the agent runs without filesystem-bound output.
+    working_directory: '',
+    // v1.1: per-agent secrets. Names + values entered by the user; on
+    // Publish they get POSTed to /agents/{id}/secrets which stores them
+    // under ``agent:{id}:{name}`` in the OS keychain. The manifest only
+    // carries the names (in secrets_required[]) — never the values.
+    secrets: [],
     model_preferred: 'llama3.2:3b',
     model_acceptable: '',
     context_window: '32768',
@@ -2007,9 +2584,112 @@ export default function AgentWizardScreen({ onNav }) {
     autonomy_recommended: 'ask-before-write',
     autonomy_max: 'ask-before-write',
     trigger_type: 'interactive',
+    // v1.1: scheduled-trigger fields, rendered inline in StepTrigger
+    // when trigger_type === 'scheduled'. The wizard YAML only emits
+    // these when the type matches, so existing interactive-only agents
+    // keep their slim manifests.
+    cron: '0 9 * * MON',
+    cron_timezone: 'Asia/Almaty',
+    missed_run_policy: 'run_on_startup',
+    trigger_message: '',
+    rss_feeds: [],
+    // v1.1: output format. 'image' unlocks the visual sub-step
+    // (template + brand + carousel slide count + output folder).
+    output_format: 'markdown',
+    visual_template_id: '',
+    visual_brand_id: '',
+    visual_carousel_count: 1,
+    visual_output_folder: '{workspace}/media/{date}-{name}',
     input_placeholder: 'Ask me anything...',
     streaming: true,
   });
+
+  // Pre-fill the wizard from a Library template when the user clicks
+  // "Customize…". The backend GET /library/{id} now returns a parsed
+  // ``manifest`` object alongside the raw YAML, so we map the fields
+  // we know how to render without shipping a YAML parser to the client.
+  // Fields the wizard doesn't surface (extensions, custom blocks) stay
+  // intact in the YAML — buildManifestYaml regenerates a fresh copy
+  // from the wizard state on save, so a perfect round-trip isn't a
+  // goal: customisation is the goal.
+  useEffect(() => {
+    if (!fromTemplate) return;
+    let alive = true;
+    fetch(`${API}/library/${encodeURIComponent(fromTemplate)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(payload => {
+        if (!alive || !payload) return;
+        const m = payload.manifest;
+        if (!m || typeof m !== 'object') {
+          // Bare-minimum fallback — at least give the user the name.
+          setData(d => ({
+            ...d,
+            name: payload.name || d.name,
+            description: payload.description || d.description,
+          }));
+          return;
+        }
+        const meta = m.metadata || {};
+        const author = meta.author || {};
+        const model = m.model || {};
+        const params = model.parameters || {};
+        const reqs = model.requirements || {};
+        const caps = (m.capabilities && m.capabilities.groups) || [];
+        const conn = (m.connections && Array.isArray(m.connections.required) && m.connections.required[0]) || null;
+        const trig = m.trigger || {};
+        const out = m.output || {};
+        const dest = out.destination || {};
+        const requiredSecrets = Array.isArray(m.secrets_required)
+          ? m.secrets_required.map(s => (typeof s === 'string' ? { name: s, value: '' } : { name: s?.name || '', value: '' })).filter(s => s.name)
+          : [];
+        const wd = (m.variables && m.variables.working_directory && m.variables.working_directory.default) || '';
+        setData(d => ({
+          ...d,
+          name: meta.name || payload.name || d.name,
+          description: meta.description || payload.description || d.description,
+          version: meta.version || d.version,
+          language: meta.language || d.language,
+          tags: Array.isArray(meta.tags) ? meta.tags.join(', ') : d.tags,
+          author_name: author.name || d.author_name,
+          author_email: author.email || d.author_email,
+          working_directory: wd,
+          model_preferred: model.preferred || d.model_preferred,
+          model_acceptable: Array.isArray(model.acceptable) ? model.acceptable.join('\n') : d.model_acceptable,
+          context_window: String(model.min_context_window || d.context_window),
+          temperature: String(params.temperature ?? d.temperature),
+          max_tokens: String(params.max_tokens ?? d.max_tokens),
+          min_ram_gb: String(reqs.min_ram_gb ?? d.min_ram_gb),
+          min_vram_gb: String(reqs.min_vram_gb ?? d.min_vram_gb),
+          recommended_ram_gb: String(reqs.recommended_ram_gb ?? d.recommended_ram_gb),
+          system_prompt: m.system_prompt || d.system_prompt,
+          capabilities: {
+            ...d.capabilities,
+            ...Object.fromEntries(caps.map(k => [k, true])),
+          },
+          connection_type: conn ? (conn.type || 'none') : d.connection_type,
+          connection_role: conn?.role || d.connection_role,
+          connection_purpose: conn?.purpose || d.connection_purpose,
+          secrets: requiredSecrets,
+          autonomy_recommended: m.autonomy?.recommended || d.autonomy_recommended,
+          autonomy_max: m.autonomy?.max_allowed || d.autonomy_max,
+          trigger_type: trig.type || d.trigger_type,
+          cron: trig.schedule || d.cron,
+          cron_timezone: trig.timezone || d.cron_timezone,
+          missed_run_policy: trig.missed_run_policy || d.missed_run_policy,
+          trigger_message: trig.message || d.trigger_message,
+          rss_feeds: Array.isArray(trig.rss_feeds) ? trig.rss_feeds.slice() : d.rss_feeds,
+          output_format: out.format || d.output_format,
+          streaming: typeof out.streaming === 'boolean' ? out.streaming : d.streaming,
+          visual_output_folder: dest.path || d.visual_output_folder,
+          input_placeholder: m.input?.placeholder || d.input_placeholder,
+        }));
+        addToast(`Loaded template: ${meta.name || payload.name || fromTemplate}`, 'info');
+      })
+      .catch(() => {
+        if (alive) addToast(`Failed to load template ${fromTemplate}`, 'error');
+      });
+    return () => { alive = false; };
+  }, [fromTemplate]);
 
   const validate = useCallback((stepIdx) => {
     const errs = {};
@@ -2020,7 +2700,9 @@ export default function AgentWizardScreen({ onNav }) {
       if (!email) errs.author_email = 'Author email is required';
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.author_email = 'Invalid email format';
     }
-    if (stepIdx === 2) {
+    // System Prompt step shifted to index 3 in v1.1 after the
+    // Workspace step landed at index 1.
+    if (stepIdx === 3) {
       if (data.system_prompt.trim().length < 20)
         errs.system_prompt = 'System prompt must be at least 20 characters';
     }
@@ -2093,6 +2775,33 @@ export default function AgentWizardScreen({ onNav }) {
         }
       }
 
+      // Push per-agent secrets into the OS keychain via /agents/{id}/secrets.
+      // Manifest only carries the names (in secrets_required[]); values land
+      // here so the agent's MCP tools can read them by name at runtime.
+      if (created.id && Array.isArray(data.secrets) && data.secrets.length > 0) {
+        const filled = data.secrets.filter(s => s.name && s.value);
+        if (filled.length > 0) {
+          try {
+            const map = {};
+            for (const s of filled) map[s.name] = s.value;
+            const sr = await fetch(`${API}/agents/${created.id}/secrets`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ secrets: map }),
+            });
+            if (!sr.ok) {
+              const sb = await sr.json().catch(() => ({}));
+              addToast(
+                `Agent saved but secrets failed: ${sb.detail || sb.error || sr.status}`,
+                'warning',
+              );
+            }
+          } catch (secretErr) {
+            addToast('Agent saved but secrets push failed — fill them in Settings → Agents', 'warning');
+          }
+        }
+      }
+
       addToast(status === 'draft' ? 'Agent saved as draft' : 'Agent published successfully', 'success');
       setTimeout(() => onNav('settings'), 600);
     } catch (err) {
@@ -2109,16 +2818,18 @@ export default function AgentWizardScreen({ onNav }) {
 
   const renderStep = () => {
     switch (step) {
-      case 0: return <StepIdentity data={data} setData={setData} errors={errors} />;
-      case 1: return <StepModel data={data} setData={setData} />;
-      case 2: return <StepSystemPrompt data={data} setData={setData} errors={errors} />;
-      case 3: return <StepCapabilities data={data} setData={setData} />;
-      case 4: return <StepMcpServers data={data} setData={setData} />;
-      case 5: return <StepConnections data={data} setData={setData} />;
-      case 6: return <StepVariables data={data} setData={setData} />;
-      case 7: return <StepAutonomy data={data} setData={setData} />;
-      case 8: return <StepTrigger data={data} setData={setData} />;
-      case 9: return <StepPublish data={data} saving={saving} onSave={save} />;
+      case 0:  return <StepIdentity data={data} setData={setData} errors={errors} />;
+      case 1:  return <StepWorkspace data={data} setData={setData} />;
+      case 2:  return <StepModel data={data} setData={setData} />;
+      case 3:  return <StepSystemPrompt data={data} setData={setData} errors={errors} />;
+      case 4:  return <StepCapabilities data={data} setData={setData} />;
+      case 5:  return <StepMcpServers data={data} setData={setData} />;
+      case 6:  return <StepConnections data={data} setData={setData} />;
+      case 7:  return <StepSecrets data={data} setData={setData} />;
+      case 8:  return <StepVariables data={data} setData={setData} />;
+      case 9:  return <StepAutonomy data={data} setData={setData} />;
+      case 10: return <StepTrigger data={data} setData={setData} />;
+      case 11: return <StepPublish data={data} saving={saving} onSave={save} />;
       default: return null;
     }
   };

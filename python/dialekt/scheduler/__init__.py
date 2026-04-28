@@ -29,7 +29,7 @@ Persistence:
   what the Settings UI reads for the runs panel.
 """
 
-from .runner import DialektScheduler, SCHEDULED_RUNS_SCHEMA
+from .runner import DialektScheduler, SCHEDULED_RUNS_SCHEMA, AGENT_RSS_STATE_SCHEMA
 from .cron_session import CronSession, CronResult
 from .delivery import deliver, DeliveryResult
 from .missed_run_policy import MissedRunPolicy, decide_missed_runs
@@ -37,6 +37,7 @@ from .missed_run_policy import MissedRunPolicy, decide_missed_runs
 __all__ = [
     "DialektScheduler",
     "SCHEDULED_RUNS_SCHEMA",
+    "AGENT_RSS_STATE_SCHEMA",
     "CronSession",
     "CronResult",
     "deliver",

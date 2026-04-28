@@ -25,8 +25,75 @@ import logging
 import os
 import textwrap
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+# IBA agent manifests live in the dialekt monorepo at agents/iba/.
+# We load them at module import time so the library seeder ships
+# the same YAML the agents/ directory carries — single source of
+# truth, no risk of the library catalog drifting from the on-disk
+# templates.
+#
+# When dialekt-cloud is built standalone (not from the monorepo),
+# the loader falls back to a stub message that the operator can't
+# install — better than silently shipping a stale copy. In production
+# the deployment script copies agents/iba/ into the cloud image.
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_IBA_DIR = _REPO_ROOT / "agents" / "iba"
+
+
+def _load_iba(name: str, *, setup_note: str | None = None) -> str:
+    """Read agents/iba/{name}.yaml; optionally augment description
+    with a "🔧 Setup needed" block so operators see required data
+    in the Library card before installing."""
+    path = _IBA_DIR / f"{name}.yaml"
+    if not path.exists():
+        # dialekt-cloud built without the monorepo — emit a placeholder
+        # that fails closed (validator rejects empty system_prompt).
+        logger.warning("IBA manifest missing at %s; library entry stubbed", path)
+        return _yaml(f"""
+            spec_version: "1.1.0"
+            minimum_dialekt_version: "1.0.0"
+            metadata:
+              id: "00000000-0000-0000-0000-000000000000"
+              name: "[STUB] {name}"
+              description: "Manifest not bundled with this dialekt-cloud build."
+              version: "0.0.0"
+              language: "ru"
+              author: {{name: "dias.now", email: "hello@dias.now"}}
+              created_at: "2026-04-28T00:00:00+00:00"
+              updated_at: "2026-04-28T00:00:00+00:00"
+            model:
+              preferred: "gemma3:12b"
+              acceptable: []
+              min_context_window: 8192
+              requirements: {{min_ram_gb: 8, min_vram_gb: 4, recommended_ram_gb: 16}}
+              parameters: {{temperature: 0.5, top_p: 0.9, max_tokens: 2048}}
+            system_prompt: "Stub manifest — not installable."
+            capabilities: {{groups: [], exceptions: []}}
+            autonomy: {{recommended: "review-only", max_allowed: "review-only"}}
+            input: {{type: "chat", placeholder: ""}}
+            output: {{format: "markdown", streaming: false, destination: {{type: "notification"}}}}
+            trigger: {{type: "interactive"}}
+        """)
+
+    raw = path.read_text(encoding="utf-8")
+    if setup_note:
+        # Inject the setup note into the metadata.description field.
+        # We do a targeted replace instead of YAML parse-and-rewrite —
+        # keeps the rest of the manifest byte-identical (signatures
+        # downstream stay stable for non-IBA templates).
+        import re
+        pattern = re.compile(r'(  description:\s*")([^"]*)(")')
+        m = pattern.search(raw)
+        if m:
+            current_desc = m.group(2)
+            combined = f"{current_desc} 🔧 Setup: {setup_note}"
+            raw = raw.replace(m.group(0), f'{m.group(1)}{combined}{m.group(3)}', 1)
+    return raw
 
 
 @dataclass(frozen=True)
@@ -380,6 +447,183 @@ LIBRARY_TEMPLATES: tuple[LibraryTemplate, ...] = (
         category="documents",
         tags=("translation", "russian", "english"),
         manifest_yaml=_TRANSLATOR_RU_EN,
+    ),
+
+    # ── IBA agent set ─────────────────────────────────────────────────
+    # Education / business-school workflow stack. All Russian-first.
+    # Setup notes injected into descriptions so operators see what
+    # data they must provide BEFORE clicking Install. The wizard's
+    # "needs N secrets" badge already covers credentials; the notes
+    # below cover workspace files (programs.yaml, audit_targets.yaml,
+    # bitrix_schema.yaml) that secrets_required[] can't express.
+
+    LibraryTemplate(
+        id="iba-content-editor",
+        category="content",
+        tags=("iba", "copywriting", "russian", "editing"),
+        manifest_yaml=_load_iba(
+            "content_editor",
+            setup_note=(
+                "Никаких внешних доступов не требуется — оператор "
+                "вставляет сырое резюме / описание программы в чат, "
+                "агент возвращает оформленный под IBA текст. "
+                "Опционально: workspace для сохранения готовых "
+                "текстов в {workspace}/resumes/ и {workspace}/programs/."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-smm-manager",
+        category="marketing",
+        tags=("iba", "instagram", "smm", "russian", "publishing"),
+        manifest_yaml=_load_iba(
+            "smm_manager",
+            setup_note=(
+                "Для copy-only режима (только тексты А/Б) — без "
+                "настройки. Для AUTO-PUBLISH в Instagram нужны 7 "
+                "секретов: instagram_access_token, instagram_ig_user_id "
+                "(Facebook Developer App клиента), cdn_endpoint_url, "
+                "cdn_access_key_id, cdn_secret_key, cdn_bucket, "
+                "cdn_public_base (S3-compatible bucket — AWS S3 / R2 / "
+                "B2 / MinIO). Опционально: подключённый Replicate MCP "
+                "сервер для AI-картинок."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-program-scheduler",
+        category="operations",
+        tags=("iba", "scheduling", "russian", "calendar"),
+        manifest_yaml=_load_iba(
+            "program_scheduler",
+            setup_note=(
+                "Положите в {workspace}/programs.yaml каталог программ "
+                "(пример смотри в agents/iba/example_catalog.yaml). "
+                "Required fields на каждую программу: id, name. "
+                "Optional: block (для антикластеринга), duration_days, "
+                "format. CSV / JSON тоже принимаются. Без файла агент "
+                "ничего не запланирует."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-website-audit",
+        category="operations",
+        tags=("iba", "audit", "seo", "content", "scheduled", "russian"),
+        manifest_yaml=_load_iba(
+            "website_audit",
+            setup_note=(
+                "Положите в {workspace}/audit_targets.yaml список URL "
+                "под ключом ``urls:``. Агент обходит каждый через "
+                "Playwright и сохраняет еженедельный отчёт в "
+                "{workspace}/reports/audit-{date}.md. "
+                "Запускается scheduled MON 8:00 Almaty. Без файла "
+                "URLов агент скажет «положите файл» и не запустит crawl."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-cms-sync",
+        category="operations",
+        tags=("iba", "bitrix", "cms", "russian"),
+        manifest_yaml=_load_iba(
+            "cms_sync",
+            setup_note=(
+                "Требуется секрет bitrix_webhook_url — incoming webhook "
+                "Bitrix24 портала клиента с правами на info-блоки. "
+                "Дополнительно: положите {workspace}/bitrix_schema.yaml "
+                "с IBLOCK_IDs и маппингом полей (см. шаблон в "
+                "system_prompt). Без схемы агент работает в DRY-RUN "
+                "режиме — показывает payload, но ничего не отправляет."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-law-monitor",
+        category="research",
+        tags=("iba", "legal", "kazakhstan", "scheduled", "russian"),
+        manifest_yaml=_load_iba(
+            "law_monitor",
+            setup_note=(
+                "Запускается scheduled FRI 18:00 Almaty. RSS-источник "
+                "adilet.zan.kz привязан к манифесту — отдельной "
+                "настройки не требует. Доставка через Telegram: нужен "
+                "секрет iba_telegram_chat_id (chat_id куда уходит "
+                "отчёт) + telegram_bot_token (бот клиента). Опционально "
+                "переключите output.destination.type на 'email' и "
+                "пропишите SMTP-секреты."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-legal-analyst",
+        category="research",
+        tags=("iba", "legal", "kazakhstan", "russian"),
+        manifest_yaml=_load_iba(
+            "legal_analyst",
+            setup_note=(
+                "Никаких внешних доступов. Интерактивный — оператор "
+                "присылает текст НПА или вопрос «какие тренинги "
+                "адаптировать под этот закон», агент отвечает. "
+                "Использует web_search (Tavily) для проверки контекста "
+                "если он включён в Settings."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-reminder-3days",
+        category="marketing",
+        tags=("iba", "instagram", "scheduled", "russian", "reminder"),
+        manifest_yaml=_load_iba(
+            "reminder_3days",
+            setup_note=(
+                "Запускается scheduled DAILY 10:00 Almaty. Проверяет "
+                "расписание программ; если программа стартует через 3 "
+                "дня — пишет напоминание-стори для Instagram. По "
+                "умолчанию текст уходит оператору в Telegram (нужен "
+                "iba_telegram_chat_id + telegram_bot_token). Для "
+                "автопубликации — те же 7 IG/CDN секретов что у "
+                "smm_manager."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-weekly-announcement",
+        category="marketing",
+        tags=("iba", "instagram", "scheduled", "russian", "announcement"),
+        manifest_yaml=_load_iba(
+            "weekly_announcement",
+            setup_note=(
+                "Запускается scheduled MON 09:00 Almaty. Анонсирует "
+                "программы недели. Те же варианты доставки и автопоста "
+                "что у reminder-3days."
+            ),
+        ),
+    ),
+
+    LibraryTemplate(
+        id="iba-schedule-planner",
+        category="operations",
+        tags=("iba", "scheduling", "russian", "interactive"),
+        manifest_yaml=_load_iba(
+            "schedule_planner",
+            setup_note=(
+                "Старая версия планировщика — оперативный chat-режим "
+                "для ad-hoc диапазонов. Захардкоженные праздники РК в "
+                "system_prompt — обновляйте перед каждым новым годом. "
+                "Для bulk-yearly расчёта 300 программ используйте "
+                "iba-program-scheduler — он подключён к solver + "
+                "kz_holidays и не требует обновления списка вручную."
+            ),
+        ),
     ),
 )
 
