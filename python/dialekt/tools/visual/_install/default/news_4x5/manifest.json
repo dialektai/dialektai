@@ -1,0 +1,45 @@
+{
+  "id": "default.news_4x5",
+  "name": "News — Portrait (4:5)",
+  "description": "Editorial news card. Вертикальный пост Instagram (4:5).",
+  "width": 1080,
+  "height": 1350,
+  "html": "template.html",
+  "variables": {
+    "CATEGORY": {
+      "type": "string",
+      "required": false,
+      "default": "NEWS",
+      "example": "INDUSTRY UPDATE"
+    },
+    "DATE": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "27 APR 2026"
+    },
+    "HEADLINE": {
+      "type": "string",
+      "required": true,
+      "example": "Kazakhstan unveils new digital trade framework for Central Asia"
+    },
+    "LEAD": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "The framework reduces cross-border friction and aligns customs digitization across five member states, taking effect in Q3."
+    },
+    "SOURCE": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "Reuters"
+    },
+    "BYLINE": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "Dias Now Daily"
+    }
+  }
+}

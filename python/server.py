@@ -739,6 +739,20 @@ async def lifespan(app: FastAPI):
     mysql_init_db(db)
     ch_init_db(db)
     log.info(f"SQLite ready at {DB_PATH}")
+    # First-run: copy bundled visual templates into the user's
+    # ~/.dialekt/visual/templates/ tree. Idempotent — existing
+    # template directories are skipped, so user edits survive
+    # restarts and only newly-shipped templates get added.
+    try:
+        from dialekt.tools.visual.installer import install_bundled_templates
+        report = install_bundled_templates()
+        if report["installed"]:
+            log.info(
+                "visual templates installed: %s (skipped existing: %s)",
+                report["installed"], report["skipped"],
+            )
+    except Exception as e:
+        log.error("visual template install skipped: %s", e)
     # Non-blocking: warn if embedding model isn't pulled yet
     from mcp_servers import schema_rag as _rag
     asyncio.create_task(_rag.check_model())

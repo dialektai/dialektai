@@ -1,0 +1,39 @@
+{
+  "id": "default.announcement_1x1",
+  "name": "Announcement — Square (1:1)",
+  "description": "Анонс события или продукта. Квадратный пост для Instagram feed.",
+  "width": 1080,
+  "height": 1080,
+  "html": "template.html",
+  "variables": {
+    "EYEBROW": {
+      "type": "string",
+      "required": false,
+      "default": "ANNOUNCEMENT",
+      "example": "NEW PROGRAM"
+    },
+    "TITLE": {
+      "type": "string",
+      "required": true,
+      "example": "Strategic Marketing Intensive"
+    },
+    "SUBTITLE": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "8-week executive program led by industry experts"
+    },
+    "DATE": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "Starts April 15, 2026"
+    },
+    "FOOTER": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "example": "iba.kz · Almaty"
+    }
+  }
+}
