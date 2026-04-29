@@ -822,7 +822,7 @@ function BatchProgressCard({ jobId, snapshot, onCancel, onDownload, onDismiss })
 
 // ── Composer ──────────────────────────────────────────────────────
 
-function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, messages, disabled, disabledHint, activeAgentId }) {
+function Composer({ onSend, onStop, streaming, connected, autonomy, onAutonomyChange, messages, disabled, disabledHint, activeAgentId }) {
   const [text, setText] = useState('');
   const [uploading, setUploading] = useState(false);
   const taRef = useRef(null);
@@ -1169,15 +1169,32 @@ function Composer({ onSend, streaming, connected, autonomy, onAutonomyChange, me
             {!connected && <span className="mono" style={{ fontSize: 10, color: T.amber }}>backend offline</span>}
             {uploading && <span className="mono" style={{ fontSize: 10, color: T.cyan }}>uploading…</span>}
             <span className="mono" style={{ fontSize: 10, color: T.dim }}>⇧⏎ newline</span>
-            <button
-              className="dlk-btn primary"
-              style={{ padding: '5px 12px', opacity: (!text.trim() || streaming || !connected || disabled) ? 0.4 : 1 }}
-              onClick={submit}
-              disabled={!text.trim() || streaming || !connected || disabled}
-            >
-              {streaming ? 'Working…' : 'Send'}{' '}
-              <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
-            </button>
+            {streaming ? (
+              <button
+                className="dlk-btn"
+                style={{
+                  padding: '5px 12px',
+                  background: T.red || '#f55', color: T.bg0,
+                  border: 'none', cursor: 'pointer',
+                  fontWeight: 700, letterSpacing: '.04em',
+                }}
+                onClick={() => onStop && onStop()}
+                title="Остановить агента"
+              >
+                STOP{' '}
+                <span className="mono" style={{ fontSize: 10, opacity: .8, marginLeft: 4 }}>■</span>
+              </button>
+            ) : (
+              <button
+                className="dlk-btn primary"
+                style={{ padding: '5px 12px', opacity: (!text.trim() || !connected || disabled) ? 0.4 : 1 }}
+                onClick={submit}
+                disabled={!text.trim() || !connected || disabled}
+              >
+                Send{' '}
+                <span className="mono" style={{ fontSize: 10, opacity: .7, marginLeft: 4 }}>⏎</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1404,6 +1421,7 @@ export default function ChatColumn({
       )}
       <Composer
         onSend={onSend}
+        onStop={onStop}
         streaming={streaming}
         connected={connected}
         autonomy={autonomy}

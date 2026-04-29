@@ -299,6 +299,164 @@ function ConnectionPickerModal({ entry, agentId, requiredTypes, onConfigureNew, 
 // secrets the manifest declares (Bitrix webhook URL, Instagram
 // access token, etc.). Mirrors the ConnectionRequiredModal pattern
 // so the experience stays consistent.
+function InstallInputsModal({ entry, requiredVariables, requiredSecrets, onSubmit, onCancel }) {
+  const [secretValues, setSecretValues] = useState(() =>
+    Object.fromEntries(requiredSecrets.map(s => [s.name, '']))
+  );
+  const [variableValues, setVariableValues] = useState(() =>
+    Object.fromEntries(requiredVariables.map(v => [v.name, v.default ?? '']))
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleSubmit = async () => {
+    setErr('');
+    const missing = [];
+    for (const s of requiredSecrets) {
+      if (s.required && !(secretValues[s.name] || '').trim()) missing.push(`secret: ${s.name}`);
+    }
+    for (const v of requiredVariables) {
+      if (v.required && !(variableValues[v.name] || '').trim() && v.default == null) {
+        missing.push(`variable: ${v.name}`);
+      }
+    }
+    if (missing.length) {
+      setErr(`Fill required fields: ${missing.join(', ')}`);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const cleanedSecrets = {};
+      for (const [k, v] of Object.entries(secretValues)) {
+        if (v && v.trim()) cleanedSecrets[k] = v;
+      }
+      const cleanedVars = {};
+      for (const [k, v] of Object.entries(variableValues)) {
+        if (v && String(v).trim()) cleanedVars[k] = v;
+      }
+      await onSubmit({ secrets: cleanedSecrets, variables: cleanedVars });
+    } catch (e) {
+      setErr(e.message || 'Install failed');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{
+        width: 580, maxHeight: '85vh', overflowY: 'auto',
+        background: T.bg1, border: `1px solid ${T.border}`, padding: 28,
+      }}>
+        <div className="mono" style={{ fontSize: 10, color: T.cyan, letterSpacing: '.14em', marginBottom: 10 }}>
+          CONFIGURE BEFORE INSTALL
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+          {entry.name}
+        </div>
+        <div style={{ fontSize: 13, color: T.muted, lineHeight: 1.6, marginBottom: 22 }}>
+          This template needs your data before it can run. Secrets are stored in
+          your OS keychain (<span className="mono" style={{ color: T.cyan }}>agent:&lt;id&gt;:&lt;name&gt;</span>),
+          variables in the local SQLite — never in logs or the manifest.
+        </div>
+
+        {requiredVariables.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.12em', marginBottom: 10 }}>
+              VARIABLES
+            </div>
+            {requiredVariables.map(v => (
+              <div key={v.name} style={{ marginBottom: 12 }}>
+                <div className="mono" style={{ fontSize: 11, color: T.text, marginBottom: 4, letterSpacing: '.04em' }}>
+                  {v.name} {v.required && <span style={{ color: T.cyan }}>*</span>}
+                </div>
+                {v.description && (
+                  <div style={{ fontSize: 11, color: T.muted, marginBottom: 6, lineHeight: 1.5 }}>
+                    {v.description}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={variableValues[v.name] ?? ''}
+                  onChange={e => setVariableValues(s => ({ ...s, [v.name]: e.target.value }))}
+                  placeholder={v.default ?? v.type ?? 'value'}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                    background: T.bg0, color: T.text, border: `1px solid ${T.border}`,
+                    fontFamily: T.mono, fontSize: 12,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {requiredSecrets.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <div className="mono" style={{ fontSize: 10, color: T.dim, letterSpacing: '.12em', marginBottom: 10 }}>
+              SECRETS
+            </div>
+            {requiredSecrets.map(s => (
+              <div key={s.name} style={{ marginBottom: 12 }}>
+                <div className="mono" style={{ fontSize: 11, color: T.text, marginBottom: 4, letterSpacing: '.04em' }}>
+                  {s.name} {s.required && <span style={{ color: T.cyan }}>*</span>}
+                </div>
+                {s.description && (
+                  <div style={{ fontSize: 11, color: T.muted, marginBottom: 6, lineHeight: 1.5 }}>
+                    {s.description}
+                  </div>
+                )}
+                <input
+                  type="password"
+                  value={secretValues[s.name] || ''}
+                  onChange={e => setSecretValues(v => ({ ...v, [s.name]: e.target.value }))}
+                  placeholder={s.name}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                    background: T.bg0, color: T.text, border: `1px solid ${T.border}`,
+                    fontFamily: T.mono, fontSize: 12,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {err ? (
+          <div className="mono" style={{ fontSize: 11, color: T.red || '#f55', marginTop: 6, marginBottom: 10 }}>
+            {err}
+          </div>
+        ) : null}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            style={{
+              padding: '10px 20px', background: T.cyan, color: T.bg0, border: 'none',
+              fontSize: 13, fontWeight: 700, cursor: submitting ? 'wait' : 'pointer',
+              letterSpacing: '.04em', opacity: submitting ? 0.6 : 1,
+            }}
+          >
+            {submitting ? 'INSTALLING…' : 'INSTALL →'}
+          </button>
+          <button onClick={onCancel} disabled={submitting} style={{
+            padding: '10px 20px', background: 'transparent', color: T.muted,
+            border: `1px solid ${T.border}`, fontSize: 12, cursor: 'pointer',
+          }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function SecretsRequiredModal({ entry, agentId, names, onSubmit, onSkip, onClose }) {
   const [values, setValues] = useState(() => Object.fromEntries(names.map(n => [n, ''])));
   const [submitting, setSubmitting] = useState(false);
@@ -415,6 +573,7 @@ export default function LibraryScreen({ onNav }) {
   const [installedIds, setInstalledIds] = useState(() => new Set());
   const [pendingModal, setPendingModal] = useState(null); // { entry, agentId } when requires_connection
   const [pendingSecretsModal, setPendingSecretsModal] = useState(null); // { entry, agentId, names }
+  const [pendingInstallInputs, setPendingInstallInputs] = useState(null); // { entry, requiredVariables, requiredSecrets }
   const [toast, setToast] = useState(null);
 
   // Load both: cached library + already-installed agents (so cards can
@@ -473,33 +632,63 @@ export default function LibraryScreen({ onNav }) {
     return Array.from(s);
   }, [entries]);
 
+  // Two-phase install:
+  //   1. preview — surfaces required_variables + required_secrets
+  //      WITHOUT creating the agent. If non-empty, render
+  //      InstallInputsModal so the user fills them in.
+  //   2. install with body — creates the agent, persists user
+  //      values to keychain (secrets) + agent_variables (vars)
+  //      atomically. If anything fails, the agent is rolled back
+  //      so the user can retry instead of being stuck with a
+  //      half-configured row.
+  const installWithBody = async (entry, body) => {
+    const r = await fetch(`${API}/library/${encodeURIComponent(entry.id)}/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(text || `HTTP ${r.status}`);
+    }
+    return r.json();
+  };
+
+  const afterInstall = (entry, data) => {
+    setInstalledIds(prev => new Set([...prev, entry.id]));
+    if (entry.requires_connection) {
+      setPendingModal({
+        entry,
+        agentId: data.id,
+        requiredTypes: data.required_connection_types || [],
+        followUpSecrets: [],
+      });
+    } else {
+      setToast(`Installed: ${entry.name}`);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   const handleInstall = async (entry) => {
     setInstallingId(entry.id);
     try {
-      const r = await fetch(`${API}/library/${encodeURIComponent(entry.id)}/install`, { method: 'POST' });
-      if (!r.ok) {
-        const text = await r.text();
-        throw new Error(text || `HTTP ${r.status}`);
+      const previewR = await fetch(`${API}/library/${encodeURIComponent(entry.id)}/preview`, { method: 'POST' });
+      if (!previewR.ok) {
+        const text = await previewR.text();
+        throw new Error(text || `HTTP ${previewR.status}`);
       }
-      const data = await r.json();
-      setInstalledIds(prev => new Set([...prev, entry.id]));
-      const secretNames = Array.isArray(entry.requires_secrets) ? entry.requires_secrets : [];
-      if (entry.requires_connection) {
-        // Backend returns required_connection_types parsed from the
-        // manifest so the picker can scope its query. Combined with
-        // the secrets follow-up flow added on origin/main: connection
-        // modal first, secrets modal chains afterwards.
-        setPendingModal({
-          entry,
-          agentId: data.id,
-          requiredTypes: data.required_connection_types || [],
-          followUpSecrets: secretNames,
-        });
-      } else if (secretNames.length > 0) {
-        setPendingSecretsModal({ entry, agentId: data.id, names: secretNames });
+      const preview = await previewR.json();
+      const variables = preview.required_variables || [];
+      const secrets = preview.required_secrets || [];
+      if (variables.length === 0 && secrets.length === 0) {
+        const data = await installWithBody(entry, {});
+        afterInstall(entry, data);
       } else {
-        setToast(`Installed: ${entry.name}`);
-        setTimeout(() => setToast(null), 3000);
+        setPendingInstallInputs({
+          entry,
+          requiredVariables: variables,
+          requiredSecrets: secrets,
+        });
       }
     } catch (e) {
       setToast(`Install failed: ${e.message}`);
@@ -650,6 +839,21 @@ export default function LibraryScreen({ onNav }) {
               setTimeout(() => setToast(null), 4000);
             }}
             onClose={() => setPendingSecretsModal(null)}
+          />
+        )}
+
+        {pendingInstallInputs && (
+          <InstallInputsModal
+            entry={pendingInstallInputs.entry}
+            requiredVariables={pendingInstallInputs.requiredVariables}
+            requiredSecrets={pendingInstallInputs.requiredSecrets}
+            onSubmit={async (body) => {
+              const entry = pendingInstallInputs.entry;
+              const data = await installWithBody(entry, body);
+              setPendingInstallInputs(null);
+              afterInstall(entry, data);
+            }}
+            onCancel={() => setPendingInstallInputs(null)}
           />
         )}
 

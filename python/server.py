@@ -156,7 +156,7 @@ def save_settings(data: dict) -> None:
 
 
 import aiosqlite
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Response, Body
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -548,6 +548,20 @@ CREATE TABLE IF NOT EXISTS agent_bindings (
 CREATE TABLE IF NOT EXISTS agent_secrets_index (
     agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (agent_id, name)
+);
+
+-- Per-agent variable values for manifest `variables:` blocks. Stored
+-- in plaintext (NOT keychain) — variables are non-secret config
+-- (RSS URLs, message templates, working directory paths, schedule
+-- overrides). Resolved at run time via {{var}} substitution.
+-- Secrets MUST go through agent_secrets_index + keychain instead.
+CREATE TABLE IF NOT EXISTS agent_variables (
+    agent_id    TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    value       TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (agent_id, name)
@@ -2252,6 +2266,82 @@ async def post_library_sync():
     return await _sync_library_from_cloud()
 
 
+_SECRET_REF_PATTERN = re.compile(r"\$\{secrets\.([a-zA-Z0-9_]+)\}")
+
+
+def _required_inputs_from_manifest(manifest_yaml: str) -> dict:
+    """Extract user-input requirements for the install-time modal.
+
+    Returns ``{"variables": [...], "secrets": [...]}``. Sources:
+
+    - Variables: top-level ``variables:`` block (name, type, required,
+      description, default).
+    - Secrets: explicit ``secrets_required:`` entries plus auto-detected
+      ``${secrets.<name>}`` refs scanned from any string value in the
+      manifest. Auto-detected names that aren't in ``secrets_required``
+      are emitted with ``required: true`` and a generic description so
+      old-style manifests (e.g. iba/law_monitor before migration) still
+      drive a working modal.
+
+    Soft-fail to ``{"variables": [], "secrets": []}`` on malformed YAML —
+    the caller has already validated the manifest via ManifestValidator
+    at the preview step, so this just guards against template regressions.
+    """
+    try:
+        import yaml as _yml
+        m = _yml.safe_load(manifest_yaml or "") or {}
+    except Exception:
+        return {"variables": [], "secrets": []}
+
+    variables_out: list[dict] = []
+    raw_vars = m.get("variables") or {}
+    if isinstance(raw_vars, dict):
+        for vname, vmeta in raw_vars.items():
+            if not isinstance(vmeta, dict):
+                continue
+            variables_out.append({
+                "name": vname,
+                "type": vmeta.get("type", "string"),
+                "required": bool(vmeta.get("required", True)),
+                "description": vmeta.get("description", ""),
+                "default": vmeta.get("default"),
+            })
+
+    secrets_by_name: dict[str, dict] = {}
+    raw_secrets = m.get("secrets_required") or []
+    if isinstance(raw_secrets, list):
+        for s in raw_secrets:
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            secrets_by_name[s["name"]] = {
+                "name": s["name"],
+                "description": s.get("description", ""),
+                "required": bool(s.get("required", True)),
+            }
+
+    def _scan(obj):
+        if isinstance(obj, str):
+            for match in _SECRET_REF_PATTERN.finditer(obj):
+                ref = match.group(1)
+                secrets_by_name.setdefault(ref, {
+                    "name": ref,
+                    "description": "",
+                    "required": True,
+                })
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                _scan(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                _scan(v)
+
+    _scan(m)
+    return {
+        "variables": variables_out,
+        "secrets": list(secrets_by_name.values()),
+    }
+
+
 def _required_connection_types_from_manifest(manifest_yaml: str) -> list[str]:
     """Inspect a manifest's `connections` block and return the list of
     required DB connection types (e.g. ['postgresql'], ['clickhouse']).
@@ -2309,14 +2399,47 @@ async def list_all_connections(type: str | None = None):
     }
 
 
+@app.post("/library/{template_id}/preview")
+async def preview_library_template(template_id: str):
+    """Inspect a library template WITHOUT creating an agent.
+
+    Returns the user-input requirements (variables + secrets) so the
+    install modal can render a form. If the template needs nothing
+    from the user, the FE skips the modal and POSTs straight to
+    /install with an empty body.
+    """
+    cursor = await db.execute(
+        "SELECT manifest_yaml FROM library_templates WHERE id = ?",
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
+    manifest_yaml = row[0]
+    inputs = _required_inputs_from_manifest(manifest_yaml)
+    return {
+        "template_id": template_id,
+        "required_variables": inputs["variables"],
+        "required_secrets": inputs["secrets"],
+        "required_connection_types": _required_connection_types_from_manifest(manifest_yaml),
+    }
+
+
 @app.post("/library/{template_id}/install", status_code=201)
-async def install_library_template(template_id: str):
+async def install_library_template(template_id: str, body: dict | None = Body(default=None)):
     """Install an agent in the user's workspace from a library template.
 
     Reuses import_manifest_yaml() — same validation + agent creation
     path as the builder wizard. The created agent gets a non-null
     source_template_id so the UI can show 'Update available' when the
     library entry's version bumps.
+
+    Optional body: ``{"secrets": {...}, "variables": {...}}``. When
+    provided, secrets are written to the per-agent keychain
+    (``agent:{id}:{name}``) and variables to the agent_variables
+    table — atomically with agent creation. If any required input is
+    missing, the agent is rolled back and the request fails 400 so the
+    user never ends up with a half-configured agent.
 
     Returned payload also lists the connection types the manifest
     requires so the FE picker (Bug A) can fetch only the matching
@@ -2330,12 +2453,74 @@ async def install_library_template(template_id: str):
     if not row:
         raise HTTPException(404, "Library template not found in local cache. Try POST /library/sync.")
     manifest_yaml = row[0]
+
+    body = body or {}
+    user_secrets = body.get("secrets") or {}
+    user_variables = body.get("variables") or {}
+    if not isinstance(user_secrets, dict) or not isinstance(user_variables, dict):
+        raise HTTPException(400, "secrets and variables must be objects")
+
+    inputs = _required_inputs_from_manifest(manifest_yaml)
+    missing: list[str] = []
+    for s in inputs["secrets"]:
+        if s["required"] and not user_secrets.get(s["name"]):
+            missing.append(f"secret:{s['name']}")
+    for v in inputs["variables"]:
+        if v["required"] and not user_variables.get(v["name"]) and v.get("default") is None:
+            missing.append(f"variable:{v['name']}")
+    if missing:
+        raise HTTPException(400, f"Missing required inputs: {', '.join(missing)}")
+
     out = await import_manifest_yaml(
         manifest_yaml,
         status="published",  # installed from a curated library entry → trusted
         source_template_id=template_id,
     )
     out["required_connection_types"] = _required_connection_types_from_manifest(manifest_yaml)
+
+    # Persist user-supplied inputs. agent_id is set by import_manifest_yaml().
+    agent_id = out.get("agent_id") or out.get("id")
+    if agent_id and (user_secrets or user_variables):
+        try:
+            for sname, sval in user_secrets.items():
+                if not _is_valid_secret_name(sname) or not isinstance(sval, str) or not sval:
+                    continue
+                set_secret(_agent_secret_keychain_name(agent_id, sname), sval)
+                await db.execute(
+                    """
+                    INSERT INTO agent_secrets_index (agent_id, name, created_at, updated_at)
+                    VALUES (?, ?, datetime('now'), datetime('now'))
+                    ON CONFLICT(agent_id, name) DO UPDATE SET
+                        updated_at = datetime('now')
+                    """,
+                    (agent_id, sname),
+                )
+            for vname, vval in user_variables.items():
+                if not _is_valid_secret_name(vname):
+                    continue
+                stored = vval if isinstance(vval, str) else json.dumps(vval)
+                if not stored:
+                    continue
+                await db.execute(
+                    """
+                    INSERT INTO agent_variables (agent_id, name, value, created_at, updated_at)
+                    VALUES (?, ?, ?, datetime('now'), datetime('now'))
+                    ON CONFLICT(agent_id, name) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = datetime('now')
+                    """,
+                    (agent_id, vname, stored),
+                )
+            await db.commit()
+        except Exception as e:
+            # Roll back the agent itself so the user can retry cleanly
+            # — half-configured agents would silently misbehave at run time.
+            try:
+                await db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+                await db.commit()
+            except Exception:
+                log.exception("install rollback: failed to delete agent %s", agent_id)
+            raise HTTPException(500, f"Failed to persist user inputs: {e}")
     return out
 
 
@@ -2504,6 +2689,84 @@ async def delete_agent_secret(agent_id: str, name: str):
         log.exception("agent secret delete: keychain remove failed for %s", keychain_name)
     await db.execute(
         "DELETE FROM agent_secrets_index WHERE agent_id = ? AND name = ?",
+        (agent_id, name),
+    )
+    await db.commit()
+    return None
+
+
+# ── Per-agent variables (non-secret, plaintext SQLite) ───────────────────────
+# Variables back manifest `variables:` blocks — RSS URLs, message text,
+# working-directory paths. Distinct from secrets: stored as plaintext
+# in agent_variables, resolved at run time via {{var}} substitution.
+
+@app.get("/agents/{agent_id}/variables")
+async def list_agent_variables(agent_id: str):
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    cursor = await db.execute(
+        "SELECT name, value, created_at, updated_at FROM agent_variables "
+        "WHERE agent_id = ? ORDER BY name",
+        (agent_id,),
+    )
+    rows = await cursor.fetchall()
+    return {
+        "agent_id": agent_id,
+        "variables": [
+            {"name": r[0], "value": r[1], "created_at": r[2], "updated_at": r[3]}
+            for r in rows
+        ],
+    }
+
+
+@app.post("/agents/{agent_id}/variables")
+async def set_agent_variables(agent_id: str, body: dict):
+    """Bulk-upsert one or more variables for an agent.
+
+    Body: ``{"variables": {"<name>": "<value>", ...}}``. Values may be
+    strings or JSON-serialisable lists/numbers (lists are stored as
+    JSON-encoded text — manifest-level `type: list` triggers parse on
+    read). Empty values are rejected — pass DELETE to remove.
+    """
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    variables = body.get("variables") if isinstance(body, dict) else None
+    if not isinstance(variables, dict) or not variables:
+        raise HTTPException(400, "Body must include non-empty 'variables' object")
+
+    written: list[str] = []
+    for name, value in variables.items():
+        if not _is_valid_secret_name(name):
+            raise HTTPException(400, f"Invalid variable name: {name!r}")
+        if value is None or (isinstance(value, str) and not value):
+            raise HTTPException(400, f"Variable {name!r} must be a non-empty value")
+        stored = value if isinstance(value, str) else json.dumps(value)
+        await db.execute(
+            """
+            INSERT INTO agent_variables (agent_id, name, value, created_at, updated_at)
+            VALUES (?, ?, ?, datetime('now'), datetime('now'))
+            ON CONFLICT(agent_id, name) DO UPDATE SET
+                value = excluded.value,
+                updated_at = datetime('now')
+            """,
+            (agent_id, name, stored),
+        )
+        written.append(name)
+    await db.commit()
+    return {"agent_id": agent_id, "written": written}
+
+
+@app.delete("/agents/{agent_id}/variables/{name}", status_code=204)
+async def delete_agent_variable(agent_id: str, name: str):
+    agent = await db_get_agent(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    if not _is_valid_secret_name(name):
+        raise HTTPException(400, f"Invalid variable name: {name!r}")
+    await db.execute(
+        "DELETE FROM agent_variables WHERE agent_id = ? AND name = ?",
         (agent_id, name),
     )
     await db.commit()
@@ -5167,6 +5430,195 @@ async def describe_image_vision(path: str) -> str:
     return f"[image at {path}]"
 
 
+def _strip_markdown_for_iba(text: str) -> str:
+    """Belt-and-suspenders for the IBA Content Editor agent: even with
+    a "no markdown" rule in system_prompt, gemma3/qwen3 still emit
+    **bold**, ### headings, --- separators, and * bullets. Strip them
+    here so the user always sees clean text. Conservative — only kills
+    the markdown-syntax tokens, doesn't touch substantive content."""
+    out = text
+    # Strip headings
+    out = re.sub(r"^#{1,6}\s*", "", out, flags=re.MULTILINE)
+    # Strip horizontal rules
+    out = re.sub(r"^\s*[-—]{3,}\s*$", "", out, flags=re.MULTILINE)
+    # Strip bold/italic markers (** ** and __ __)
+    out = re.sub(r"\*\*([^*]+?)\*\*", r"\1", out)
+    out = re.sub(r"__([^_]+?)__", r"\1", out)
+    # Single * or _ around words (italic)
+    out = re.sub(r"(?<!\*)\*(?!\*)([^*\n]+?)\*(?!\*)", r"\1", out)
+    # Convert markdown bullet markers to • bullet
+    out = re.sub(r"^(\s*)[-*]\s+", r"\1• ", out, flags=re.MULTILINE)
+    # Strip code block fences
+    out = re.sub(r"^```\w*\s*$", "", out, flags=re.MULTILINE)
+    # Collapse triple+ blank lines to double
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out.strip()
+
+
+def _detrack_line(line: str) -> str:
+    """Reverse character-tracking on a single line. Some PDFs use
+    glyph-by-glyph layout — pypdf extracts each char with a space
+    between (e.g. "K A Z Y N A  Z E I L B E K"). Heuristic: when more
+    than half the word chars on a line are followed by a single space,
+    treat the line as tracked and collapse "letter space letter" into
+    "letter letter". Real word-boundaries survive as double-spaces,
+    which we then collapse to a single space."""
+    if len(line) < 6:
+        return line
+    word_chars = re.findall(r"\w", line)
+    if len(word_chars) < 5:
+        return line
+    tracked_pairs = len(re.findall(r"\w(?= \w)", line))
+    if tracked_pairs / len(word_chars) < 0.5:
+        return line
+    line = re.sub(r"(\w) (?=\w)", r"\1", line)
+    line = re.sub(r"\s+", " ", line)
+    return line.strip()
+
+
+def _normalize_tracked_text(text: str) -> str:
+    return "\n".join(_detrack_line(ln) for ln in text.split("\n"))
+
+
+def _extract_pdf_text(path: str, max_chars: int = 60_000) -> str:
+    """Pull plain text out of a PDF via pypdf. Truncate at max_chars so a
+    big resume doesn't blow the model's context window. Soft-fail with a
+    diagnostic string the model can still reason over."""
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(path)
+        pages = []
+        for i, page in enumerate(reader.pages):
+            try:
+                pages.append(page.extract_text() or "")
+            except Exception as e:
+                pages.append(f"[page {i+1}: extract failed: {e}]")
+        text = "\n\n".join(pages).strip()
+        text = _normalize_tracked_text(text)
+        if not text:
+            return f"[pdf has {len(reader.pages)} pages but no extractable text — likely scanned image]"
+        if len(text) > max_chars:
+            text = text[:max_chars] + f"\n... [truncated — full pdf is {len(text)} chars across {len(reader.pages)} pages]"
+        return text
+    except Exception as e:
+        return f"[cannot read pdf {path}: {e}]"
+
+
+def _extract_zip_text(path: str, max_chars_per_file: int = 30_000, max_files: int = 50) -> str:
+    """Walk a ZIP archive, dispatch each entry to the appropriate
+    extractor (pdf/docx/text), and concatenate as labelled sections.
+    Each entry becomes its own ``--- <name> ---`` block so the OUTER
+    batch loop in ws_chat (which splits on ``@file:`` markers, not
+    sub-archive entries) still ships everything to the model in one
+    user message — but the model can clearly see file boundaries."""
+    try:
+        import zipfile, tempfile, os
+        out: list[str] = []
+        with zipfile.ZipFile(path) as zf:
+            entries = [i for i in zf.infolist() if not i.is_dir()][:max_files]
+            for info in entries:
+                name = info.filename
+                ext = Path(name).suffix.lower().lstrip(".")
+                try:
+                    if ext == "pdf":
+                        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                            tmp.write(zf.read(info))
+                            tmp_path = tmp.name
+                        try:
+                            text = _extract_pdf_text(tmp_path, max_chars=max_chars_per_file)
+                        finally:
+                            os.unlink(tmp_path)
+                    elif ext == "docx":
+                        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+                            tmp.write(zf.read(info))
+                            tmp_path = tmp.name
+                        try:
+                            text = _extract_docx_text(tmp_path, max_chars=max_chars_per_file)
+                        finally:
+                            os.unlink(tmp_path)
+                    else:
+                        try:
+                            text = zf.read(info).decode("utf-8")
+                            if len(text) > max_chars_per_file:
+                                text = text[:max_chars_per_file] + f"\n... [truncated]"
+                        except UnicodeDecodeError:
+                            text = f"[binary entry, {info.file_size} bytes]"
+                except Exception as e:
+                    text = f"[cannot read {name}: {e}]"
+                out.append(f"--- {Path(path).name}::{name} ---\n{text}")
+        if not out:
+            return f"[zip {Path(path).name} is empty]"
+        if len(zf.infolist()) > max_files:
+            out.append(f"[truncated — zip has {len(zf.infolist())} entries, processed first {max_files}]")
+        return "\n\n".join(out)
+    except Exception as e:
+        return f"[cannot read zip {path}: {e}]"
+
+
+def _extract_docx_text(path: str, max_chars: int = 60_000) -> str:
+    """Extract text from a .docx — paragraphs AND tables. CV docx files
+    often put work history / education in 2-column tables; ignoring
+    table cells gave us empty extractions on real Russian CVs."""
+    try:
+        from docx import Document
+        doc = Document(path)
+        chunks: list[str] = []
+        for p in doc.paragraphs:
+            if p.text and p.text.strip():
+                chunks.append(p.text.strip())
+        for tbl in doc.tables:
+            for row in tbl.rows:
+                cells = [c.text.strip() for c in row.cells if c.text and c.text.strip()]
+                if cells:
+                    chunks.append(" | ".join(cells))
+        text = "\n".join(chunks).strip()
+        if not text:
+            return "[docx has no extractable text in paragraphs or tables]"
+        if len(text) > max_chars:
+            text = text[:max_chars] + f"\n... [truncated — full docx is {len(text)} chars]"
+        return text
+    except Exception as e:
+        return f"[cannot read docx {path}: {e}]"
+
+
+def _extract_html_text(path: str, max_chars: int = 60_000) -> str:
+    """Strip HTML tags to plain text. CV pages often embed structured
+    content with semantic markup; passing raw <head><body><div> to the
+    model wastes context and confuses parsing."""
+    try:
+        import html
+        from html.parser import HTMLParser
+        class _Stripper(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.parts: list[str] = []
+                self._skip = 0
+            def handle_starttag(self, tag, attrs):
+                if tag in {"script", "style", "head"}:
+                    self._skip += 1
+                if tag in {"p", "br", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"}:
+                    self.parts.append("\n")
+            def handle_endtag(self, tag):
+                if tag in {"script", "style", "head"} and self._skip > 0:
+                    self._skip -= 1
+            def handle_data(self, data):
+                if self._skip == 0:
+                    self.parts.append(data)
+        s = _Stripper()
+        with open(path, encoding="utf-8", errors="replace") as f:
+            s.feed(f.read())
+        text = html.unescape("".join(s.parts))
+        text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
+        text = re.sub(r"[ \t]+", " ", text)
+        if not text:
+            return "[html has no extractable text]"
+        if len(text) > max_chars:
+            text = text[:max_chars] + f"\n... [truncated — full html is {len(text)} chars]"
+        return text
+    except Exception as e:
+        return f"[cannot read html {path}: {e}]"
+
+
 async def preprocess_content(content: str) -> str:
     """Expand @file: and @screenshot: markers into actual file contents for OI context."""
     text_lines, attachments = [], []
@@ -5187,16 +5639,31 @@ async def preprocess_content(content: str) -> str:
 
     for kind, path in attachments:
         if kind == "file":
+            ext = Path(path).suffix.lower().lstrip(".")
             try:
-                raw = Path(path).read_bytes()
-                try:
-                    text = raw.decode("utf-8")
-                    if len(text) > 60_000:
-                        text = text[:60_000] + f"\n... [truncated — full file is {len(text)} chars]"
-                    ext = Path(path).suffix.lstrip(".") or "text"
-                    parts.append(f"--- {Path(path).name} ---\n```{ext}\n{text}\n```")
-                except UnicodeDecodeError:
-                    parts.append(f"--- {Path(path).name} --- [binary file, {len(raw)} bytes, path: {path}]")
+                if ext == "pdf":
+                    text = _extract_pdf_text(path)
+                    parts.append(f"--- {Path(path).name} ---\n{text}")
+                elif ext == "docx":
+                    text = _extract_docx_text(path)
+                    parts.append(f"--- {Path(path).name} ---\n{text}")
+                elif ext in {"html", "htm"}:
+                    text = _extract_html_text(path)
+                    parts.append(f"--- {Path(path).name} ---\n{text}")
+                elif ext == "zip":
+                    parts.append(_extract_zip_text(path))
+                elif ext in {"png", "jpg", "jpeg", "webp", "gif"}:
+                    desc = await describe_image_vision(path)
+                    parts.append(f"--- {Path(path).name} (image) ---\n{desc}")
+                else:
+                    raw = Path(path).read_bytes()
+                    try:
+                        text = raw.decode("utf-8")
+                        if len(text) > 60_000:
+                            text = text[:60_000] + f"\n... [truncated — full file is {len(text)} chars]"
+                        parts.append(f"--- {Path(path).name} ---\n```{ext or 'text'}\n{text}\n```")
+                    except UnicodeDecodeError:
+                        parts.append(f"--- {Path(path).name} --- [binary file, {len(raw)} bytes, path: {path}]")
             except Exception as e:
                 parts.append(f"[cannot read {path}: {e}]")
         elif kind == "screenshot":
@@ -5346,11 +5813,16 @@ def make_interpreter(
         installed = get_installed_ollama_models()
 
         def _is_installed(model_str: str) -> bool:
-            # Ollama tags use family:tag form; settings may store
-            # short forms like "gemma3:12b" while installed reports
-            # "gemma3:12b" or "gemma3:12b-instruct". Match prefix.
+            # Ollama tags use family:tag form; settings may store either
+            # short forms like "gemma3:12b" or untagged forms like
+            # "gemma3-12b" while installed reports "<name>:<tag>".
+            # Match exact, hyphenated variant ("gemma3:12b-instruct"),
+            # OR the bare-name-without-tag case where installed has
+            # "<model_str>:<tag>".
             return any(
-                t == model_str or t.startswith(model_str + "-")
+                t == model_str
+                or t.startswith(model_str + "-")
+                or t.startswith(model_str + ":")
                 for t in installed
             )
 
@@ -5415,11 +5887,30 @@ def make_interpreter(
     # rather than the bare session default.
     resolved = resolve_litellm_model({**s, "model": model})
     apply_to_interpreter(interpreter, resolved)
-    interpreter.llm.context_window = int(s.get("context_window", 8192))
+
+    # Determine effective context window. Manifest's min_context_window is
+    # the agent author's contract — when it's larger than the global default,
+    # use it. Without this, Ollama silently caps requests at 2048 tokens
+    # (its built-in default) regardless of the model's actual capability,
+    # so a manifest claiming 32K runs at 2K and truncates long PDFs into
+    # hallucination territory.
+    ctx_window = int(s.get("context_window", 8192))
+    if manifest_dict:
+        manifest_ctx = (manifest_dict.get("model") or {}).get("min_context_window")
+        if isinstance(manifest_ctx, int) and manifest_ctx > ctx_window:
+            ctx_window = manifest_ctx
+    interpreter.llm.context_window = ctx_window
     interpreter.llm.max_tokens = int(s.get("max_tokens", 4096))
     interpreter.llm.temperature = float(s.get("temperature", 0.7))
     interpreter.llm.supports_functions = False
     interpreter.verbose = False
+
+    # Note: Ollama defaults num_ctx=2048 for any model. To use larger
+    # context, the agent's manifest should reference a model that has
+    # num_ctx baked in via Modelfile (e.g. `qwen3-iba` with 32K). OI
+    # doesn't expose a clean way to inject `num_ctx` into the litellm
+    # completion call without monkey-patching, so we rely on the
+    # custom Modelfile instead.
 
     if manifest_dict:
         _mp = (manifest_dict.get("model") or {}).get("parameters") or {}
@@ -5819,19 +6310,35 @@ async def ws_chat(ws: WebSocket):
             # Priority: explicit agent_id in message → existing session's agent_id
             # → current binding → no agent.
             requested_agent_id = msg.get("agent_id")
+            log.info(
+                f"[WS chat] msg.agent_id={requested_agent_id!r} "
+                f"current_agent_id={current_agent_id!r} session_id={session_id!r}"
+            )
 
             if session_id is None:
                 sid_from_client = msg.get("session_id")
                 if sid_from_client:
-                    session_id = sid_from_client
-                    # Resume — pull agent_id from DB if client didn't send one.
-                    if not requested_agent_id:
-                        row = await (await db.execute(
-                            "SELECT agent_id FROM sessions WHERE id = ?",
-                            (session_id,),
-                        )).fetchone()
-                        if row and row[0]:
+                    # Verify the session actually exists — the FE caches
+                    # session_id in memory across DB wipes / fresh
+                    # installs, and an INSERT INTO messages with a stale
+                    # FK kills the WS with "FOREIGN KEY constraint failed".
+                    row = await (await db.execute(
+                        "SELECT agent_id FROM sessions WHERE id = ?",
+                        (sid_from_client,),
+                    )).fetchone()
+                    if row:
+                        session_id = sid_from_client
+                        if not requested_agent_id and row[0]:
                             requested_agent_id = row[0]
+                    else:
+                        # Stale client-side id → spin up a fresh session
+                        # rather than 500-ing on the constraint.
+                        log.info(
+                            "WS chat: client sent unknown session_id %s — creating fresh session",
+                            sid_from_client,
+                        )
+                        session_id = await db_create_session(agent_id=requested_agent_id)
+                        first_message = True
                 else:
                     session_id = await db_create_session(agent_id=requested_agent_id)
                     first_message = True
@@ -5866,15 +6373,55 @@ async def ws_chat(ws: WebSocket):
                 await db_set_title(session_id, (plain or content)[:80])
                 first_message = False
 
-            oi_content = await preprocess_content(content)
+            # Batch-mode detection: when the user attached multiple files
+            # in one turn (multi-select OR a folder via webkitdirectory),
+            # process each file as its own OI run so the model returns a
+            # separate assistant message per file. Without this the model
+            # gets all files in one prompt, blows the context window, and
+            # often replies with a single mushy summary that mixes them.
+            file_lines = [ln for ln in content.split("\n") if ln.strip().startswith("@file:")]
+            base_text = "\n".join(
+                ln for ln in content.split("\n") if not ln.strip().startswith("@file:")
+            ).strip()
+
+            # Multi-file handling is opt-in via the agent's manifest:
+            #   input.multi_file_handling: "batch_per_file" | "merge_into_one"
+            # Default is merge_into_one so non-batch agents (SQL Analyst,
+            # General Assistant, etc.) keep their previous behaviour.
+            multi_file_mode = "merge_into_one"
+            if agent and agent.get("manifest_yaml"):
+                try:
+                    import yaml as _yml
+                    _mfh = (
+                        ((_yml.safe_load(agent["manifest_yaml"]) or {}).get("input") or {})
+                        .get("multi_file_handling")
+                    )
+                    if _mfh in ("batch_per_file", "merge_into_one"):
+                        multi_file_mode = _mfh
+                except Exception:
+                    log.exception("multi_file_handling parse failed; defaulting")
+
+            if len(file_lines) > 1 and multi_file_mode == "batch_per_file":
+                batch_contents = []
+                for idx, fl in enumerate(file_lines, start=1):
+                    # Header in Russian — English header sometimes flips
+                    # the model into English-markdown-mode for the first
+                    # few files even though system_prompt says
+                    # "Russian-only".
+                    header = "Обработай этот файл по формату из system prompt. Не задавай вопросов, не используй markdown.\n\n"
+                    sub_raw = (base_text + "\n" + fl) if base_text else fl
+                    sub_pre = await preprocess_content(sub_raw)
+                    batch_contents.append(header + sub_pre)
+            else:
+                batch_contents = [await preprocess_content(content)]
 
             stop_flag.clear()
             confirm_event.clear()
             await send({"type": "start", "session_id": session_id})
 
-            ai_text_buf = []
             code_buf = {"format": None, "content": []}
             console_buf = []
+            saved_answers: list[str] = []
 
             # Snapshot the session_id at turn start. The outer
             # `session_id` is rebound on `join` and the run_oi closure
@@ -5886,7 +6433,7 @@ async def ws_chat(ws: WebSocket):
             turn_sid = session_id
 
             def run_oi():
-                nonlocal ai_text_buf, code_buf, console_buf
+                nonlocal code_buf, console_buf
                 streaming_state["active"] = True
                 tid = threading.current_thread().ident
                 _thread_confirm[tid] = {
@@ -5896,46 +6443,116 @@ async def ws_chat(ws: WebSocket):
                     "loop": loop,
                     "last_code": "",
                 }
+                # Memory isolation is opt-in via manifest:
+                #   runtime.memory_isolation: "per_message" | "per_session"
+                # Default is per_session — chat history accumulates as
+                # normal conversational behaviour. "per_message" wipes
+                # interpreter.messages before each batch (or before each
+                # user-msg in single-batch mode), giving stateless
+                # task-style agents a fresh context every time. Useful
+                # when the agent's model has a small context window and
+                # accumulating history blows it up.
+                memory_iso = "per_session"
+                if agent and agent.get("manifest_yaml"):
+                    try:
+                        import yaml as _yml
+                        _mi = (
+                            ((_yml.safe_load(agent["manifest_yaml"]) or {}).get("runtime") or {})
+                            .get("memory_isolation")
+                        )
+                        if _mi in ("per_message", "per_session"):
+                            memory_iso = _mi
+                    except Exception:
+                        pass
+
+                # per_message also means "wipe before THIS user-turn
+                # too" — not just between batches. Otherwise the agent
+                # would still remember the previous user message's reply.
+                if memory_iso == "per_message":
+                    try:
+                        itp.messages = []
+                        if hasattr(itp, "last_messages_count"):
+                            itp.last_messages_count = 0
+                    except Exception:
+                        log.exception("pre-turn reset failed; continuing")
+
                 try:
-                    for chunk in itp.chat(oi_content, stream=True, display=False):
+                    for batch_idx, sub_content in enumerate(batch_contents):
                         if stop_flag.is_set():
                             break
 
-                        log.info(f"OI chunk: {chunk!r}")
+                        # Reset interpreter.messages between batches when
+                        # memory_isolation is per_message. We do NOT call
+                        # interpreter.reset() — that also calls
+                        # computer.terminate() which kills the python
+                        # sandbox. For per_session (default) the messages
+                        # accumulate as normal.
+                        if batch_idx > 0 and memory_iso == "per_message":
+                            try:
+                                itp.messages = []
+                                if hasattr(itp, "last_messages_count"):
+                                    itp.last_messages_count = 0
+                            except Exception:
+                                log.exception("batch reset failed; continuing")
 
-                        ctype = chunk.get("type", "")
-                        crole = chunk.get("role", "")
-                        ccontent = chunk.get("content", "")
+                        ai_text_buf: list[str] = []
+                        for chunk in itp.chat(sub_content, stream=True, display=False):
+                            if stop_flag.is_set():
+                                break
 
-                        if ctype in ("message", "code", "console", "error"):
-                            chunk["session_id"] = turn_sid
-                            asyncio.run_coroutine_threadsafe(send(chunk), loop).result(timeout=5)
+                            log.info(f"OI chunk: {chunk!r}")
 
-                        if ctype == "message" and crole == "assistant":
-                            if isinstance(ccontent, str):
-                                ai_text_buf.append(ccontent)
-                        elif ctype == "code":
-                            if chunk.get("start"):
-                                code_buf = {"format": chunk.get("format", "python"), "content": []}
-                            elif isinstance(ccontent, str):
-                                code_buf["content"].append(ccontent)
-                            elif chunk.get("end") and code_buf["content"]:
-                                code_str = "".join(code_buf["content"])
-                                _thread_confirm[tid]["last_code"] = code_str
-                                asyncio.run_coroutine_threadsafe(
-                                    db_save_message(turn_sid, "assistant", "code",
-                                                    code_str, code_buf["format"]),
-                                    loop
-                                ).result(timeout=5)
-                        elif ctype == "console":
-                            if isinstance(ccontent, str):
-                                console_buf.append(ccontent)
-                            elif chunk.get("end") and console_buf:
-                                asyncio.run_coroutine_threadsafe(
-                                    db_save_message(turn_sid, "tool", "console", "".join(console_buf)),
-                                    loop
-                                ).result(timeout=5)
-                                console_buf = []
+                            ctype = chunk.get("type", "")
+                            crole = chunk.get("role", "")
+                            ccontent = chunk.get("content", "")
+
+                            if ctype in ("message", "code", "console", "error"):
+                                chunk["session_id"] = turn_sid
+                                asyncio.run_coroutine_threadsafe(send(chunk), loop).result(timeout=5)
+
+                            if ctype == "message" and crole == "assistant":
+                                if isinstance(ccontent, str):
+                                    ai_text_buf.append(ccontent)
+                            elif ctype == "code":
+                                if chunk.get("start"):
+                                    code_buf = {"format": chunk.get("format", "python"), "content": []}
+                                elif isinstance(ccontent, str):
+                                    code_buf["content"].append(ccontent)
+                                elif chunk.get("end") and code_buf["content"]:
+                                    code_str = "".join(code_buf["content"])
+                                    _thread_confirm[tid]["last_code"] = code_str
+                                    asyncio.run_coroutine_threadsafe(
+                                        db_save_message(turn_sid, "assistant", "code",
+                                                        code_str, code_buf["format"]),
+                                        loop
+                                    ).result(timeout=5)
+                            elif ctype == "console":
+                                if isinstance(ccontent, str):
+                                    console_buf.append(ccontent)
+                                elif chunk.get("end") and console_buf:
+                                    asyncio.run_coroutine_threadsafe(
+                                        db_save_message(turn_sid, "tool", "console", "".join(console_buf)),
+                                        loop
+                                    ).result(timeout=5)
+                                    console_buf = []
+
+                        # End of this batch — persist the assistant
+                        # message for THIS file before moving on.
+                        partial_answer = "".join(ai_text_buf).strip()
+                        # IBA Content Editor: model emits **bold**, ###
+                        # headings even with "no markdown" rule in prompt.
+                        # Strip them before saving so chat history shows
+                        # clean text. Streaming chunks still go through
+                        # raw — FE-side this surfaces as live markdown
+                        # that gets normalised after `done`.
+                        if (agent or {}).get("name") == "IBA Content Editor":
+                            partial_answer = _strip_markdown_for_iba(partial_answer)
+                        if partial_answer:
+                            saved_answers.append(partial_answer)
+                            asyncio.run_coroutine_threadsafe(
+                                db_save_message(turn_sid, "assistant", "message", partial_answer),
+                                loop
+                            ).result(timeout=5)
 
                 except Exception as e:
                     asyncio.run_coroutine_threadsafe(
@@ -5943,12 +6560,8 @@ async def ws_chat(ws: WebSocket):
                     ).result(timeout=5)
                 finally:
                     _thread_confirm.pop(tid, None)
-                    final_answer = "".join(ai_text_buf)
+                    final_answer = "\n\n---\n\n".join(saved_answers) if saved_answers else ""
                     if final_answer:
-                        asyncio.run_coroutine_threadsafe(
-                            db_save_message(turn_sid, "assistant", "message", final_answer),
-                            loop
-                        ).result(timeout=5)
                         # Goal 8.5: persist successful interaction for future few-shot retrieval
                         if current_agent_id and len(final_answer) > 20:
                             try:

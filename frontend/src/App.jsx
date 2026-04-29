@@ -199,7 +199,7 @@ function AppRoutes() {
       {screen === 'settings'           && <SettingsScreen onNav={nav} {...screenProps} />}
       {screen === 'onboarding'         && <OnboardingScreen onNav={nav} />}
       {screen === 'download'           && <DownloadScreen onNav={nav} {...screenProps} />}
-      {screen === 'empty'              && <EmptyChatScreen onNav={nav} />}
+      {screen === 'empty'              && <EmptyChatScreen onNav={nav} {...screenProps} />}
       {screen === 'palette'            && <CommandPaletteScreen onNav={nav} />}
       {screen === 'offline'            && <OfflineScreen onNav={nav} />}
       {screen === 'onboarding-step3'   && <OnboardingScreen onNav={nav} />}

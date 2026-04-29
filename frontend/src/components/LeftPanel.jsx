@@ -3,6 +3,7 @@ import { T } from '../tokens.js';
 import Icon from './Icon.jsx';
 import { Logo, Meter } from './Shell.jsx';
 import { APP_VERSION } from '../version.js';
+import { useViewport } from '../hooks/useViewport.js';
 
 const API = 'http://localhost:8765';
 
@@ -32,6 +33,7 @@ export default function LeftPanel({
   selectedAgentId: selectedAgentIdProp,
   onAgentSelect,
 }) {
+  const { isVeryNarrow } = useViewport();
   const [sessions, setSessions] = useState([]);
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -211,7 +213,7 @@ export default function LeftPanel({
 
   return (
     <aside ref={asideRef} style={{
-      width: 240, background: T.bg1, borderRight: `1px solid ${T.border}`,
+      width: isVeryNarrow ? 200 : 240, background: T.bg1, borderRight: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative',
     }}>
       {/* Logo */}
