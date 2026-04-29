@@ -312,7 +312,22 @@ export function useChat() {
         // Bug C: drop chunks not for the currently visible session so
         // they don't bleed into the wrong chat. Buffer above already
         // captured them for replay on switch-back.
-        if (chunk.session_id && chunk.session_id !== sessionIdRef.current) {
+        // Exceptions:
+        //  - `start` is how a brand-new session announces its id; if
+        //    we drop it because sessionIdRef is still null, the
+        //    adoption block below never runs and ALL subsequent
+        //    chunks for this turn get filtered out (the user sees an
+        //    empty chat even though the response streamed fine).
+        //  - `done` / `error` carry global streaming state. Drop and
+        //    the spinner stays "working…" forever after a session
+        //    switch.
+        // Per-session content chunks (message/code/console) still
+        // get filtered.
+        if (chunk.session_id && sessionIdRef.current
+            && chunk.session_id !== sessionIdRef.current
+            && chunk.type !== 'start'
+            && chunk.type !== 'done'
+            && chunk.type !== 'error') {
           return;
         }
         if (chunk.type === 'start') {

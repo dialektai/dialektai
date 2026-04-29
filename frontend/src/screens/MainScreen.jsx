@@ -5,6 +5,7 @@ import ChatColumn from '../components/ChatColumn.jsx';
 import RightPanel from '../components/RightPanel.jsx';
 import ConsentModal from '../components/ConsentModal.jsx';
 import { useChat } from '../hooks/useChat.js';
+import { useViewport } from '../hooks/useViewport.js';
 import { T } from '../tokens.js';
 
 const API = 'http://localhost:8765';
@@ -37,7 +38,13 @@ export default function MainScreen({ onNav, initialMessage, initialAgentId, sess
     mcpSetupErrors, dismissMcpSetupError,
   } = useChat();
 
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const { isNarrow } = useViewport();
+  const [rightCollapsedManual, setRightCollapsedManual] = useState(false);
+  // Auto-collapse the right panel when the window is narrow — on a 870px
+  // window the right panel + left sidebar together swallow the chat
+  // column. Manual toggle still wins (user can force-expand).
+  const rightCollapsed = isNarrow || rightCollapsedManual;
+  const setRightCollapsed = setRightCollapsedManual;
   const [localTitle, setLocalTitle] = useState(null);
   // Seed from initialAgentId so a fresh chat opened from the sidebar
   // starts already scoped to the chosen agent. Subsequent in-screen

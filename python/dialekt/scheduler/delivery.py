@@ -114,8 +114,9 @@ async def _deliver_telegram(destination: dict, agent: dict, output: str) -> Deli
     Telegram has a 4096-char text limit; longer outputs are split into
     chunks at paragraph boundaries when possible.
     """
-    chat_id = _resolve_secret(destination.get("telegram_chat_id"))
-    bot_token = _resolve_secret(destination.get("telegram_bot_token") or "${secrets.telegram_bot_token}")
+    aid = agent.get("id")
+    chat_id = _resolve_secret(destination.get("telegram_chat_id"), aid)
+    bot_token = _resolve_secret(destination.get("telegram_bot_token") or "${secrets.telegram_bot_token}", aid)
     if not chat_id:
         return DeliveryResult("failed", "telegram_chat_id not configured", None)
     if not bot_token:
@@ -155,14 +156,15 @@ async def _deliver_email(
     - smtp_use_tls — "ssl" / "starttls" / "none" (default starttls)
     - subject — plain string; supports {{agent_name}} / {{date}} expansion
     """
-    host = _resolve_secret(destination.get("smtp_host"))
-    port_raw = _resolve_secret(destination.get("smtp_port") or "587")
-    user = _resolve_secret(destination.get("smtp_user"))
-    password = _resolve_secret(destination.get("smtp_password"))
-    sender = _resolve_secret(destination.get("smtp_from") or destination.get("from"))
+    aid = agent.get("id")
+    host = _resolve_secret(destination.get("smtp_host"), aid)
+    port_raw = _resolve_secret(destination.get("smtp_port") or "587", aid)
+    user = _resolve_secret(destination.get("smtp_user"), aid)
+    password = _resolve_secret(destination.get("smtp_password"), aid)
+    sender = _resolve_secret(destination.get("smtp_from") or destination.get("from"), aid)
     raw_to = destination.get("email_to") or destination.get("to")
     use_tls_mode = (
-        _resolve_secret(destination.get("smtp_use_tls") or "starttls") or "starttls"
+        _resolve_secret(destination.get("smtp_use_tls") or "starttls", aid) or "starttls"
     ).lower()
 
     if not host or not user or not password or not sender:
@@ -257,14 +259,26 @@ def _read_destination(agent: dict) -> dict | None:
     return dest if isinstance(dest, dict) else None
 
 
-def _resolve_secret(raw: Any) -> str | None:
+def _resolve_secret(raw: Any, agent_id: str | None = None) -> str | None:
+    """Resolve a ``${secrets.<name>}`` ref against the keychain.
+
+    When ``agent_id`` is given, prefer the per-agent entry stored as
+    ``agent:{agent_id}:{name}`` and only fall back to the global name
+    if the per-agent one is missing. Plain (non-ref) strings pass
+    through unchanged.
+    """
     if not raw or not isinstance(raw, str):
         return None
     m = _SECRET_REF_RE.fullmatch(raw.strip())
     if not m:
         return raw
+    name = m.group(1)
     from dialekt.secrets import get_secret
-    return get_secret(m.group(1))
+    if agent_id:
+        scoped = get_secret(f"agent:{agent_id}:{name}")
+        if scoped:
+            return scoped
+    return get_secret(name)
 
 
 def _expand_path(template: str, *, agent_id: str, run_id: str, when: datetime) -> str:

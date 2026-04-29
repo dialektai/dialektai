@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx';
 import { AppFrame } from '../components/Shell.jsx';
 import LeftPanel from '../components/LeftPanel.jsx';
 import RightPanel from '../components/RightPanel.jsx';
+import { useViewport } from '../hooks/useViewport.js';
 
 const API = 'http://localhost:8765';
 
@@ -30,6 +31,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
   const [agent, setAgent] = useState(null);
   const fileRef = useRef(null);
   const folderRef = useRef(null);
+  const { isNarrow, isVeryNarrow } = useViewport();
 
   useEffect(() => {
     fetch(`${API}/sessions`)
@@ -115,7 +117,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
           <span className="mono" style={{ fontSize: 10, color: T.dim }}>⌘N new · ⌘K palette</span>
         </header>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 40px', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isVeryNarrow ? '0 16px' : '0 40px', minHeight: 0 }}>
           <div style={{ maxWidth: 820, margin: '0 auto', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
               <div style={{ width: 48, height: 48, border: `1px solid ${T.cyan}`, background: T.bg1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -168,7 +170,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
             </div>
 
             {/* Two columns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isVeryNarrow ? '1fr' : '1fr 1fr', gap: 20 }}>
               <div>
                 <div className="upper" style={{ color: T.dim, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span>Try</span><div style={{ flex: 1, height: 1, background: T.border }} />
@@ -221,7 +223,7 @@ export default function EmptyChatScreen({ onNav, agentId }) {
           <span className="mono" style={{ fontSize: 10, color: T.dim }}>0 tokens sent to cloud · ever</span>
         </div>
       </main>
-      <RightPanel items={[]} />
+      {!isNarrow && <RightPanel items={[]} />}
     </AppFrame>
   );
 }
